@@ -1,0 +1,43 @@
+# Node modules & dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Native builds & caches
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro / Temporary Bundles
+.metro-health-check*
+
+# Environment & credentials
+.env
+.env*.local
+*.env
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs & debugging
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.system_generated/
