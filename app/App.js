@@ -1,76 +1,217 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, StyleSheet, StatusBar, Animated, Platform, ImageBackground } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS } from './styles/theme';
+import { AppProvider, useApp } from './context/AppContext';
 
+import LandingScreen from './screens/LandingScreen';
 import HomeScreen from './screens/HomeScreen';
+import ProjectsScreen from './screens/ProjectsScreen';
 import MatchesScreen from './screens/MatchesScreen';
 import ChatsScreen from './screens/ChatsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import BottomNav from './components/BottomNav';
 
-export default function App() {
-  const [activeTab, setActiveTab] = useState('discover'); // 'discover' | 'matches' | 'chats' | 'hero'
+function MainNavigator() {
+  const {
+    isAuthenticated,
+    logout,
+    invitations,
+    chats,
+    activeChatId,
+    setActiveChatId,
+    setSelectedDeveloperForProfile,
+  } = useApp();
 
-  const handleOpenChatFromMatches = (projectName) => {
+  const [activeTab, setActiveTab] = useState(isAuthenticated ? 'discover' : 'landing');
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  // Sync auth state
+  useEffect(() => {
+    if (!isAuthenticated && activeTab !== 'landing') {
+      setActiveTab('landing');
+    }
+  }, [isAuthenticated]);
+
+  // Smooth transition on tab switch
+  useEffect(() => {
+    fadeAnim.setValue(0.7);
+    slideAnim.setValue(6);
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 150,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  }, [activeTab]);
+
+  const handleOpenChat = (targetId) => {
+    if (targetId) {
+      setActiveChatId(targetId);
+    }
     setActiveTab('chats');
+  };
+
+  const handleLogout = () => {
+    logout();
+    setActiveTab('landing');
   };
 
   const renderActiveScreen = () => {
     switch (activeTab) {
+      case 'landing':
+        return (
+          <LandingScreen
+            onGetStarted={() => setActiveTab('discover')}
+          />
+        );
       case 'discover':
         return (
           <HomeScreen
+            onNavigateToProjects={() => setActiveTab('projects')}
             onNavigateToMatches={() => setActiveTab('matches')}
-            onNavigateToChat={() => setActiveTab('chats')}
+            onNavigateToProfile={(dev) => {
+              if (dev) setSelectedDeveloperForProfile(dev);
+              setActiveTab('profile');
+            }}
+            onOpenChat={handleOpenChat}
+          />
+        );
+      case 'projects':
+        return (
+          <ProjectsScreen
+            onBackToDiscover={() => setActiveTab('discover')}
+            onOpenChat={handleOpenChat}
+            onSelectForDiscovery={() => setActiveTab('discover')}
           />
         );
       case 'matches':
         return (
           <MatchesScreen
-            onOpenChat={handleOpenChatFromMatches}
+            onOpenChat={handleOpenChat}
+            onNavigateToSettings={() => {
+              setSelectedDeveloperForProfile(null);
+              setActiveTab('profile');
+            }}
+            onNavigateToProfile={(dev) => {
+              if (dev) setSelectedDeveloperForProfile(dev);
+              setActiveTab('profile');
+            }}
           />
         );
       case 'chats':
-        return <ChatsScreen />;
-      case 'hero':
-        return <ProfileScreen />;
+        return (
+          <ChatsScreen
+            onBackToMatches={() => setActiveTab('matches')}
+          />
+        );
+      case 'profile':
+        return (
+          <ProfileScreen
+            onBackToDiscover={() => {
+              setSelectedDeveloperForProfile(null);
+              setActiveTab('discover');
+            }}
+            onOpenChat={handleOpenChat}
+            onLogout={handleLogout}
+          />
+        );
       default:
-        return <HomeScreen />;
+        return (
+          <HomeScreen
+            onNavigateToProjects={() => setActiveTab('projects')}
+            onNavigateToMatches={() => setActiveTab('matches')}
+            onNavigateToProfile={(dev) => {
+              if (dev) setSelectedDeveloperForProfile(dev);
+              setActiveTab('profile');
+            }}
+            onOpenChat={handleOpenChat}
+          />
+        );
     }
   };
 
+  const isLanding = activeTab === 'landing';
+  const ContainerComponent = isLanding ? View : ImageBackground;
+  const containerProps = isLanding
+    ? { style: styles.container }
+    : {
+        source: require('./assets/comic_screen_bg.png'),
+        style: styles.container,
+        resizeMode: 'cover',
+      };
+
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.yellow} />
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-        <View style={styles.container}>
-          {/* Active Screen Body */}
-          <View style={styles.screenWrapper}>{renderActiveScreen()}</View>
+      <StatusBar
+        barStyle={isLanding ? 'light-content' : 'dark-content'}
+        backgroundColor={isLanding ? '#091830' : '#FAF6EB'}
+      />
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          { backgroundColor: isLanding ? '#091830' : '#FAF6EB' },
+        ]}
+        edges={isLanding ? [] : ['top', 'left', 'right']}
+      >
+        <ContainerComponent {...containerProps}>
+          {/* Main Screen Body */}
+          <Animated.View
+            style={[
+              styles.screenWrapper,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            {renderActiveScreen()}
+          </Animated.View>
 
-          {/* Pop Art Bottom Nav */}
-          <BottomNav
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            matchesCount={2}
-            chatsCount={2}
-          />
-        </View>
+          {/* Bottom Nav Bar (Hidden on landing screen) */}
+          {!isLanding && (
+            <BottomNav
+              activeTab={activeTab === 'chats' ? 'matches' : activeTab}
+              onTabChange={(tab) => {
+                if (tab === 'profile' || tab === 'discover') {
+                  setSelectedDeveloperForProfile(null);
+                }
+                setActiveTab(tab);
+              }}
+              matchesCount={invitations.length}
+            />
+          )}
+        </ContainerComponent>
       </SafeAreaView>
     </SafeAreaProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AppProvider>
+      <MainNavigator />
+    </AppProvider>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: COLORS.yellow,
   },
   container: {
     flex: 1,
-    backgroundColor: COLORS.creamBg,
+    backgroundColor: '#FAF6EB',
   },
   screenWrapper: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
 });

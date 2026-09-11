@@ -1,114 +1,402 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
-import { COLORS, FONTS, SPACING, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Modal,
+} from 'react-native';
+import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
-import { INITIAL_MATCHES } from '../data/projectsData';
+import { useApp } from '../context/AppContext';
+import { INITIAL_DEVELOPERS } from '../data/projectsData';
 
-export default function MatchesScreen({ onOpenChat }) {
-  const [matches, setMatches] = useState(INITIAL_MATCHES);
-  const [filterTab, setFilterTab] = useState('ALL'); // ALL, ACCEPTED, PENDING
+export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavigateToProfile }) {
+  const {
+    invitations,
+    matches,
+    acceptInvitation,
+    rejectInvitation,
+    pendingMatchCelebration,
+    setPendingMatchCelebration,
+    getOrCreateChatForMatch,
+    currentUser,
+    setSelectedDeveloperForProfile,
+  } = useApp();
 
-  const filteredMatches = matches.filter((m) => {
-    if (filterTab === 'ALL') return true;
-    return m.status === filterTab;
-  });
+  const [activeSegment, setActiveSegment] = useState('invitations'); // 'invitations' | 'matches'
+  const [selectedInviteDetail, setSelectedInviteDetail] = useState(null);
+  const [feedbackToast, setFeedbackToast] = useState(null);
+
+  const showToast = (message, color = COLORS.lime) => {
+    setFeedbackToast({ message, color });
+    setTimeout(() => setFeedbackToast(null), 1600);
+  };
+
+  const handleAccept = (invite) => {
+    const newMatch = acceptInvitation(invite);
+    setSelectedInviteDetail(null);
+    showToast(`ACCEPTED INVITATION FOR ${newMatch.projectName}! 🚀`);
+  };
+
+  const handleReject = (inviteId, devName) => {
+    rejectInvitation(inviteId, devName);
+    setSelectedInviteDetail(null);
+    showToast(`DECLINED INVITATION FROM ${devName.split(' ')[0]} ✖`, COLORS.pink);
+  };
+
+  const handleOpenMatchChat = (match) => {
+    const chat = getOrCreateChatForMatch(match);
+    if (onOpenChat) {
+      onOpenChat(chat.id);
+    }
+  };
+
+  const handleOpenDevProfile = (devId, fallbackData) => {
+    const fullDev = INITIAL_DEVELOPERS.find((d) => d.id === devId) || {
+      id: devId,
+      name: fallbackData.developerName || fallbackData.name || 'Developer',
+      role: fallbackData.developerRole || fallbackData.role || 'Full Stack Developer',
+      avatar: fallbackData.developerAvatar || fallbackData.avatar,
+      matchScore: fallbackData.matchScore || 95,
+      skills: ['React', 'Node.js', 'TypeScript', 'UI/UX'],
+      bio: `Excited to collaborate on ${fallbackData.projectName || 'projects'}! Let's build together.`,
+      experience: '3+ yrs exp',
+      location: 'Remote OK',
+      lookingTo: ['Join a project', 'Find co-founders'],
+      interests: ['Web Apps', 'Indie Hacking', 'AI Tools'],
+    };
+    if (setSelectedDeveloperForProfile) {
+      setSelectedDeveloperForProfile(fullDev);
+    }
+    if (onNavigateToProfile) {
+      onNavigateToProfile(fullDev);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* 1. TOP HEADER */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>SQUAD MATCHES</Text>
-        <ComicBadge text="COLLAB HUB" color={COLORS.yellow} textColor={COLORS.black} rotate="3deg" size="sm" />
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>MATCHES & INVITES</Text>
+        </View>
+
+        <TouchableOpacity
+          activeOpacity={0.75}
+          onPress={() => {
+            if (onNavigateToSettings) onNavigateToSettings();
+          }}
+          style={styles.settingsIconBtn}
+        >
+          <Text style={styles.settingsIconText}>⚙️</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Tabs Row */}
-      <View style={styles.filterTabsRow}>
-        {['ALL', 'ACCEPTED', 'PENDING'].map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            activeOpacity={0.8}
-            onPress={() => setFilterTab(tab)}
+      {/* 2. SEGMENTED TABS (Invitations | My Matches) */}
+      <View style={styles.segmentedBar}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setActiveSegment('invitations')}
+          style={[
+            styles.segmentBtn,
+            activeSegment === 'invitations' && styles.segmentBtnActive,
+            BRUTAL_SHADOWS.xs,
+          ]}
+        >
+          <Text
             style={[
-              styles.filterTabBtn,
-              filterTab === tab && styles.filterTabBtnActive,
-              BRUTAL_SHADOWS.xs,
+              styles.segmentText,
+              activeSegment === 'invitations' && styles.segmentTextActive,
             ]}
           >
-            <Text
-              style={[
-                styles.filterTabText,
-                filterTab === tab && styles.filterTabTextActive,
-              ]}
-            >
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
+            Invitations
+          </Text>
+          {invitations.length > 0 && (
+            <View style={[styles.segmentBadge, BRUTAL_SHADOWS.xs]}>
+              <Text style={styles.segmentBadgeText}>{invitations.length}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setActiveSegment('matches')}
+          style={[
+            styles.segmentBtn,
+            activeSegment === 'matches' && styles.segmentBtnActive,
+            BRUTAL_SHADOWS.xs,
+          ]}
+        >
+          <Text
+            style={[
+              styles.segmentText,
+              activeSegment === 'matches' && styles.segmentTextActive,
+            ]}
+          >
+            My Matches
+          </Text>
+          <View style={[styles.segmentBadgeMatches, BRUTAL_SHADOWS.xs]}>
+            <Text style={styles.segmentBadgeText}>{matches.length}</Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {filteredMatches.map((match) => {
-          const isAccepted = match.status === 'ACCEPTED';
+      {/* FEEDBACK TOAST */}
+      {feedbackToast && (
+        <View style={[styles.toastContainer, { backgroundColor: feedbackToast.color }, BRUTAL_SHADOWS.sm]}>
+          <Text style={styles.toastText}>{feedbackToast.message}</Text>
+        </View>
+      )}
 
-          return (
-            <View key={match.id} style={[styles.matchCard, BRUTAL_SHADOWS.md]}>
-              {/* Card top banner */}
-              <View style={styles.cardHeaderRow}>
-                <View style={styles.authorRow}>
-                  <Image source={{ uri: match.authorAvatar }} style={styles.avatar} />
-                  <View>
-                    <Text style={styles.authorName}>{match.authorName}</Text>
-                    <Text style={styles.authorRole}>{match.authorRole}</Text>
+      {/* 3. CONTENT AREA */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {activeSegment === 'invitations' ? (
+          /* --- INVITATIONS LIST --- */
+          invitations.length > 0 ? (
+            invitations.map((inv) => (
+              <TouchableOpacity
+                key={inv.id}
+                activeOpacity={0.9}
+                onPress={() => setSelectedInviteDetail(inv)}
+                style={[styles.inviteCard, BRUTAL_SHADOWS.sm]}
+              >
+                <View style={styles.inviteTopRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleOpenDevProfile(inv.developerId, inv)}
+                  >
+                    <Image source={{ uri: inv.developerAvatar }} style={styles.devAvatar} />
+                  </TouchableOpacity>
+                  <View style={styles.devInfo}>
+                    <View style={styles.nameScoreRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => handleOpenDevProfile(inv.developerId, inv)}
+                      >
+                        <Text style={styles.devName}>{inv.developerName}</Text>
+                      </TouchableOpacity>
+                      <View style={styles.scorePill}>
+                        <Text style={styles.scorePillText}>{inv.matchScore}% MATCH</Text>
+                      </View>
+                    </View>
+                    <Text style={styles.devRole}>{inv.developerRole}</Text>
+                    <View style={styles.projectTagPill}>
+                      <Text style={styles.projectTagPillText}>🎯 FOR: {inv.projectName}</Text>
+                    </View>
                   </View>
                 </View>
 
-                <ComicBadge
-                  text={match.status}
-                  color={isAccepted ? COLORS.lime : COLORS.yellow}
-                  textColor={COLORS.black}
-                  size="sm"
-                />
-              </View>
+                {/* Actions Row */}
+                <View style={styles.inviteActionsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleReject(inv.id, inv.developerName)}
+                    style={[styles.rejectBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.rejectBtnText}>DECLINE ✖</Text>
+                  </TouchableOpacity>
 
-              {/* Project title */}
-              <Text style={styles.projectTitle}>{match.projectTitle}</Text>
-              <Text style={styles.appliedRoleText}>
-                Applied for: <Text style={{ color: COLORS.pink, fontWeight: '900' }}>{match.appliedRole}</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleAccept(inv)}
+                    style={[styles.acceptBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.acceptBtnText}>ACCEPT & MATCH ♥</Text>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={[styles.emptyBox, BRUTAL_SHADOWS.sm]}>
+              <Text style={styles.emptyTitle}>NO PENDING INVITATIONS</Text>
+              <Text style={styles.emptySubtitle}>
+                Swipe right on developers in Discover to send collaboration invites.
               </Text>
-
-              {/* Compatibility Breakdown (from PRD spec) */}
-              <View style={[styles.scoreBox, BRUTAL_SHADOWS.xs]}>
-                <View style={styles.scoreRow}>
-                  <Text style={styles.totalScore}>⭐ {match.matchScore}% TOTAL MATCH</Text>
-                </View>
-                <View style={styles.breakdownRow}>
-                  <Text style={styles.breakdownItem}>⚡ Skill: {match.breakdown.skill}%</Text>
-                  <Text style={styles.breakdownItem}>🎯 Interest: {match.breakdown.interest}%</Text>
-                  <Text style={styles.breakdownItem}>💼 Role: {match.breakdown.role}%</Text>
-                </View>
-              </View>
-
-              {/* Message preview */}
-              <Text style={styles.recentMessageText}>"{match.recentMessage}"</Text>
-
-              {/* Action Button */}
-              {isAccepted ? (
+            </View>
+          )
+        ) : (
+          /* --- MATCHES LIST --- */
+          matches.length > 0 ? (
+            matches.map((m) => (
+              <TouchableOpacity
+                key={m.id}
+                activeOpacity={0.85}
+                onPress={() => handleOpenMatchChat(m)}
+                style={[styles.matchCard, BRUTAL_SHADOWS.sm]}
+              >
                 <TouchableOpacity
                   activeOpacity={0.8}
-                  onPress={() => onOpenChat && onOpenChat(match.projectTitle)}
-                  style={[styles.chatBtn, BRUTAL_SHADOWS.sm]}
+                  onPress={() => handleOpenDevProfile(m.developerId, m)}
                 >
-                  <Text style={styles.chatBtnText}>💬 ENTER SQUAD CHAT</Text>
+                  <Image source={{ uri: m.developerAvatar }} style={styles.devAvatar} />
                 </TouchableOpacity>
-              ) : (
-                <View style={[styles.pendingPill, BRUTAL_SHADOWS.xs]}>
-                  <Text style={styles.pendingPillText}>⏳ AWAITING OWNER APPROVAL</Text>
+                <View style={styles.matchInfo}>
+                  <View style={styles.nameScoreRow}>
+                    <Text style={styles.devName}>{m.developerName}</Text>
+                    <View style={styles.matchBadgePill}>
+                      <Text style={styles.matchBadgePillText}>{m.matchScore}% MATCH</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.devRole}>{m.developerRole}</Text>
+                  <View style={styles.projectTagPill}>
+                    <Text style={styles.projectTagPillText}>⚡ {m.projectName}</Text>
+                  </View>
+                  <Text style={styles.recentMsgText} numberOfLines={1}>
+                    {m.recentMessage}
+                  </Text>
                 </View>
-              )}
+                <View style={[styles.chatActionBubble, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.chatActionBubbleText}>💬</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={[styles.emptyBox, BRUTAL_SHADOWS.sm]}>
+              <Text style={styles.emptyTitle}>NO MATCHES YET</Text>
+              <Text style={styles.emptySubtitle}>
+                Accept incoming invitations or discover developers to form project squads!
+              </Text>
             </View>
-          );
-        })}
+          )
+        )}
       </ScrollView>
+
+      {/* 4. IT'S A MATCH! CELEBRATION MODAL */}
+      <Modal
+        visible={!!pendingMatchCelebration}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPendingMatchCelebration(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.celebrationCard, BRUTAL_SHADOWS.md]}>
+            <ComicBadge
+              text="IT'S A MATCH! 🎉"
+              color="#FCD34D"
+              textColor="#000"
+              rotate="-3deg"
+              size="md"
+            />
+
+            {pendingMatchCelebration && (
+              <>
+                <View style={styles.avatarsConnectedRow}>
+                  <Image source={{ uri: currentUser.avatar }} style={styles.connectedAvatar} />
+                  <View style={styles.connectBurst}>
+                    <Text style={styles.connectBurstText}>⚡</Text>
+                  </View>
+                  <Image source={{ uri: pendingMatchCelebration.developerAvatar }} style={styles.connectedAvatar} />
+                </View>
+
+                <Text style={styles.celebrationHeading}>
+                  You & {pendingMatchCelebration.developerName}
+                </Text>
+
+                <View style={styles.projectPillLarge}>
+                  <Text style={styles.projectPillLargeText}>
+                    COLLABORATING ON: {pendingMatchCelebration.projectName}
+                  </Text>
+                </View>
+
+                <Text style={styles.celebrationSub}>
+                  You both connected to build together. Jump into the project chat to start discussing the codebase!
+                </Text>
+
+                <View style={styles.celebrationActionsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      const matchToOpen = pendingMatchCelebration;
+                      setPendingMatchCelebration(null);
+                      handleOpenMatchChat(matchToOpen);
+                    }}
+                    style={[styles.chatNowBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.chatNowBtnText}>OPEN PROJECT CHAT 💬</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setPendingMatchCelebration(null)}
+                    style={styles.keepBrowsingBtn}
+                  >
+                    <Text style={styles.keepBrowsingBtnText}>KEEP BROWSING</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* 5. INVITATION DETAIL MODAL */}
+      <Modal
+        visible={!!selectedInviteDetail}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedInviteDetail(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
+            <View style={styles.modalHeaderRow}>
+              <ComicBadge text="INVITATION DETAILS 📑" color="#38BDF8" textColor="#000" size="sm" />
+              <TouchableOpacity onPress={() => setSelectedInviteDetail(null)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {selectedInviteDetail && (
+              <>
+                <Image source={{ uri: selectedInviteDetail.developerAvatar }} style={styles.detailAvatar} />
+                <Text style={styles.detailName}>{selectedInviteDetail.developerName}</Text>
+                <Text style={styles.detailRole}>{selectedInviteDetail.developerRole}</Text>
+
+                <View style={styles.detailProjectCard}>
+                  <Text style={styles.detailProjectTitle}>PROJECT: {selectedInviteDetail.projectName}</Text>
+                  <Text style={styles.detailProjectMatch}>Match Score: {selectedInviteDetail.matchScore}%</Text>
+                </View>
+
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    const d = selectedInviteDetail;
+                    setSelectedInviteDetail(null);
+                    handleOpenDevProfile(d.developerId, d);
+                  }}
+                  style={[styles.viewProfileModalBtn, BRUTAL_SHADOWS.xs]}
+                >
+                  <Text style={styles.viewProfileModalBtnText}>👤 VIEW FULL DEVELOPER PROFILE</Text>
+                </TouchableOpacity>
+
+                <View style={styles.detailActionsRow}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => handleReject(selectedInviteDetail.id, selectedInviteDetail.developerName)}
+                    style={[styles.rejectBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.rejectBtnText}>DECLINE ✖</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => handleAccept(selectedInviteDetail)}
+                    style={[styles.acceptBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.acceptBtnText}>ACCEPT INVITATION ♥</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -116,160 +404,463 @@ export default function MatchesScreen({ onOpenChat }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.creamBg,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.yellow,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
+    backgroundColor: '#FFCC00',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 10,
     borderBottomWidth: 3.5,
-    borderBottomColor: COLORS.black,
+    borderBottomColor: '#000000',
+  },
+  headerTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: FONTS.xl,
+    fontSize: 20,
     fontWeight: '900',
-    color: COLORS.black,
+    color: '#000000',
     letterSpacing: 0.5,
   },
-  filterTabsRow: {
+  settingsIconBtn: {
+    padding: 6,
+  },
+  settingsIconText: {
+    fontSize: 20,
+  },
+  segmentedBar: {
     flexDirection: 'row',
-    paddingHorizontal: SPACING.md,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    gap: 8,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 2.5,
-    borderBottomColor: COLORS.black,
+    borderBottomColor: '#000000',
+    gap: 10,
   },
-  filterTabBtn: {
-    backgroundColor: COLORS.lightGray,
+  segmentBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3F4F6',
     borderWidth: 2,
-    borderColor: COLORS.black,
+    borderColor: '#000000',
     borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 5,
+    paddingVertical: 7,
+    gap: 6,
   },
-  filterTabBtnActive: {
-    backgroundColor: COLORS.pink,
+  segmentBtnActive: {
+    backgroundColor: '#FFCC00',
   },
-  filterTabText: {
-    fontSize: FONTS.xs,
+  segmentText: {
+    fontSize: 12,
     fontWeight: '900',
-    color: COLORS.black,
+    color: '#000000',
   },
-  filterTabTextActive: {
-    color: COLORS.white,
+  segmentTextActive: {
+    color: '#000000',
+  },
+  segmentBadge: {
+    backgroundColor: '#EC4899',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#000000',
+  },
+  segmentBadgeMatches: {
+    backgroundColor: '#06B6D4',
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderWidth: 1,
+    borderColor: '#000000',
+  },
+  segmentBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  toastContainer: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    zIndex: 999,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderWidth: 2,
+    borderColor: '#000000',
+  },
+  toastText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  scrollArea: {
+    flex: 1,
   },
   scrollContent: {
-    padding: SPACING.md,
-    gap: 16,
+    padding: 16,
+    gap: 12,
+    paddingBottom: 28,
+  },
+  inviteCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#000000',
+    borderRadius: 20,
+    padding: 14,
   },
   matchCard: {
-    backgroundColor: COLORS.white,
-    borderWidth: 3.5,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.md,
-  },
-  cardHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#000000',
+    borderRadius: 20,
+    padding: 14,
+    gap: 12,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-  },
-  authorName: {
-    fontSize: FONTS.sm + 1,
-    fontWeight: '900',
-    color: COLORS.black,
-  },
-  authorRole: {
-    fontSize: FONTS.xs,
-    color: COLORS.textSecondary,
-    fontWeight: '700',
-  },
-  projectTitle: {
-    fontSize: FONTS['2xl'],
-    fontWeight: '900',
-    color: COLORS.black,
-    marginVertical: 4,
-  },
-  appliedRoleText: {
-    fontSize: FONTS.xs + 1,
-    fontWeight: '700',
-    color: COLORS.darkGray,
-    marginBottom: 8,
-  },
-  scoreBox: {
-    backgroundColor: '#FFFBEA',
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.md,
-    padding: 8,
-    marginBottom: 10,
-  },
-  scoreRow: {
-    marginBottom: 4,
-  },
-  totalScore: {
-    fontSize: FONTS.xs + 1,
-    fontWeight: '900',
-    color: COLORS.black,
-  },
-  breakdownRow: {
+  inviteTopRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  breakdownItem: {
-    fontSize: FONTS.xs - 1,
-    fontWeight: '800',
-    color: COLORS.darkGray,
-  },
-  recentMessageText: {
-    fontSize: FONTS.xs + 1,
-    color: COLORS.textSecondary,
-    fontStyle: 'italic',
+    alignItems: 'flex-start',
+    gap: 12,
     marginBottom: 12,
   },
-  chatBtn: {
-    backgroundColor: COLORS.lime,
+  devAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     borderWidth: 2.5,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingVertical: 10,
+    borderColor: '#000000',
+  },
+  devInfo: {
+    flex: 1,
+  },
+  matchInfo: {
+    flex: 1,
+  },
+  nameScoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  chatBtnText: {
-    fontSize: FONTS.xs + 1,
+  devName: {
+    fontSize: 15,
     fontWeight: '900',
-    color: COLORS.black,
-    letterSpacing: 0.5,
+    color: '#000000',
   },
-  pendingPill: {
-    backgroundColor: COLORS.lightGray,
+  scorePill: {
+    backgroundColor: '#FEF08A',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  scorePillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  matchBadgePill: {
+    backgroundColor: '#BBF7D0',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  matchBadgePillText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#15803D',
+  },
+  devRole: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#666666',
+    marginTop: 2,
+  },
+  projectTagPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#E0F2FE',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginTop: 4,
+  },
+  projectTagPillText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#0369A1',
+  },
+  recentMsgText: {
+    fontSize: 11,
+    color: '#666666',
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  inviteActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  rejectBtn: {
+    flex: 1,
+    backgroundColor: '#FEE2E2',
     borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
+    borderColor: '#000000',
+    borderRadius: 12,
     paddingVertical: 8,
     alignItems: 'center',
   },
-  pendingPillText: {
-    fontSize: FONTS.xs,
+  rejectBtnText: {
+    fontSize: 11,
     fontWeight: '900',
-    color: COLORS.textSecondary,
+    color: '#991B1B',
+  },
+  acceptBtn: {
+    flex: 1.5,
+    backgroundColor: '#86EFAC',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 12,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  acceptBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#166534',
+  },
+  chatActionBubble: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FFCC00',
+    borderWidth: 2,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chatActionBubbleText: {
+    fontSize: 16,
+  },
+  emptyBox: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#000000',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+    marginTop: 30,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666666',
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+
+  // Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#FAF6EB',
+    borderRadius: 24,
+    borderWidth: 3.5,
+    borderColor: '#000000',
+    padding: 20,
+    alignItems: 'center',
+  },
+  celebrationCard: {
+    paddingVertical: 24,
+  },
+  avatarsConnectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+    gap: 12,
+  },
+  connectedAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: '#000000',
+  },
+  connectBurst: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#FFCC00',
+    borderWidth: 2,
+    borderColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectBurstText: {
+    fontSize: 18,
+  },
+  celebrationHeading: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  projectPillLarge: {
+    backgroundColor: '#E0F2FE',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    marginBottom: 10,
+  },
+  projectPillLargeText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#0369A1',
+  },
+  celebrationSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#444444',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
+    paddingHorizontal: 12,
+  },
+  celebrationActionsRow: {
+    width: '100%',
+    gap: 10,
+  },
+  chatNowBtn: {
+    height: 48,
+    backgroundColor: '#FFCC00',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  chatNowBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  keepBrowsingBtn: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  keepBrowsingBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#666666',
+  },
+
+  // Detail Modal
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: 14,
+  },
+  modalCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  detailAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 3,
+    borderColor: '#000000',
+    marginBottom: 8,
+  },
+  detailName: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  detailRole: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#666666',
+    marginBottom: 12,
+  },
+  detailProjectCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 14,
+    padding: 12,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  detailProjectTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  detailProjectMatch: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803D',
+    marginTop: 4,
+  },
+  detailActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  viewProfileModalBtn: {
+    width: '100%',
+    backgroundColor: '#FEF08A',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  viewProfileModalBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
   },
 });

@@ -3,259 +3,456 @@ import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   TouchableOpacity,
+  Image,
   Modal,
-  Alert,
+  FlatList,
 } from 'react-native';
-import { COLORS, FONTS, SPACING, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
-import ComicBadge from '../components/ComicBadge';
-import ProjectCard from '../components/ProjectCard';
+import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import DeveloperCard from '../components/DeveloperCard';
+import SwipeableCard from '../components/SwipeableCard';
 import SwipeControls from '../components/SwipeControls';
-import { INITIAL_PROJECTS } from '../data/projectsData';
+import ComicBadge from '../components/ComicBadge';
+import { useApp } from '../context/AppContext';
 
-export default function HomeScreen({ onNavigateToMatches, onNavigateToChat }) {
-  const [projects, setProjects] = useState(INITIAL_PROJECTS);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [bookmarks, setBookmarks] = useState({});
+export default function HomeScreen({
+  onNavigateToProjects,
+  onNavigateToMatches,
+  onNavigateToProfile,
+  onOpenChat,
+}) {
+  const {
+    activeProject,
+    projects,
+    setActiveProjectId,
+    availableDevelopersForActiveProject,
+    skipDeveloper,
+    unskipDeveloper,
+    uninviteDeveloper,
+    inviteDeveloper,
+    resetDiscoveryForProject,
+    notifications,
+    unreadNotificationsCount,
+    markAllNotificationsRead,
+    setSelectedDeveloperForProfile,
+  } = useApp();
+
   const [history, setHistory] = useState([]);
-  const [selectedRoleModal, setSelectedRoleModal] = useState(null);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [inviteModalData, setInviteModalData] = useState(null);
   const [feedbackToast, setFeedbackToast] = useState(null);
+  const [activeSegment, setActiveSegment] = useState('DISCOVER');
 
-  const currentProject = projects[currentIndex];
+  // Modals
+  const [projectPickerVisible, setProjectPickerVisible] = useState(false);
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL');
 
-  const showToast = (message, color = COLORS.lime) => {
+  // Filter developers based on selected role filter
+  const filteredDevs = availableDevelopersForActiveProject.filter((dev) => {
+    if (selectedRoleFilter === 'ALL') return true;
+    return dev.role.toLowerCase().includes(selectedRoleFilter.toLowerCase());
+  });
+
+  // Top developer of the active project deck
+  const currentDev = filteredDevs[0];
+
+  const showToast = (message, color = COLORS.btnGreen) => {
     setFeedbackToast({ message, color });
-    setTimeout(() => setFeedbackToast(null), 1800);
+    setTimeout(() => setFeedbackToast(null), 1600);
   };
 
   const handlePass = () => {
-    if (currentIndex < projects.length) {
-      setHistory((prev) => [...prev, { index: currentIndex, action: 'PASS' }]);
-      showToast('PASSED ✖', COLORS.pink);
-      setCurrentIndex((prev) => (prev + 1) % projects.length);
+    if (currentDev) {
+      skipDeveloper(currentDev.id);
+      setHistory((prev) => [...prev, { dev: currentDev, action: 'PASS' }]);
+      showToast(`SKIPPED ${currentDev.name.split(' ')[0]} ✖`, COLORS.btnRed);
     }
   };
 
   const handleLike = () => {
-    if (currentIndex < projects.length) {
-      setHistory((prev) => [...prev, { index: currentIndex, action: 'LIKE' }]);
-      showToast('INTERESTED! 🤝 SQUAD NOTIFIED', COLORS.lime);
-      setCurrentIndex((prev) => (prev + 1) % projects.length);
+    if (currentDev) {
+      inviteDeveloper(currentDev, false);
+      setHistory((prev) => [...prev, { dev: currentDev, action: 'LIKE' }]);
+      setInviteModalData(currentDev);
+    }
+  };
+
+  const handleSuperLike = () => {
+    if (currentDev) {
+      inviteDeveloper(currentDev, true);
+      setHistory((prev) => [...prev, { dev: currentDev, action: 'SUPER' }]);
+      setInviteModalData({ ...currentDev, isSuper: true });
     }
   };
 
   const handleRewind = () => {
     if (history.length > 0) {
-      const last = history[history.length - 1];
+      const lastAction = history[history.length - 1];
+      if (lastAction.action === 'PASS') {
+        unskipDeveloper(lastAction.dev.id);
+      } else {
+        uninviteDeveloper(lastAction.dev.id);
+      }
       setHistory((prev) => prev.slice(0, -1));
-      setCurrentIndex(last.index);
-      showToast('REWOUND ↺', COLORS.cyan);
+      showToast(`RESTORED ${lastAction.dev.name.split(' ')[0]} ↺`, COLORS.btnYellow);
     } else {
-      showToast('AT DECK START', COLORS.yellow);
+      showToast('AT DECK START', COLORS.white);
     }
   };
 
-  const handleBookmark = (projectId) => {
-    setBookmarks((prev) => {
-      const updated = { ...prev, [projectId]: !prev[projectId] };
-      showToast(updated[projectId] ? 'BOOKMARKED ★' : 'REMOVED ★', COLORS.yellow);
-      return updated;
-    });
+  const handleResetDeck = () => {
+    resetDiscoveryForProject(activeProject?.id);
+    setHistory([]);
+    showToast(`RESET DECK FOR ${activeProject?.title || 'PROJECT'} ↺`, COLORS.btnYellow);
   };
 
-  const handleApply = (project, role) => {
-    setSelectedRoleModal({ project, role });
-  };
-
-  const confirmApplication = () => {
-    if (selectedRoleModal) {
-      showToast(`APPLIED FOR ${selectedRoleModal.role}!`, COLORS.lime);
-      setSelectedRoleModal(null);
+  const handleOpenDevProfile = (dev) => {
+    if (setSelectedDeveloperForProfile) {
+      setSelectedDeveloperForProfile(dev);
+    }
+    if (onNavigateToProfile) {
+      onNavigateToProfile();
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* 1. TOP HEADER BANNER (EXACT TO SCREENSHOT) */}
+      {/* 1. TOP HEADER (DevDate 3D Logo + Bell + Sliders) */}
       <View style={styles.topHeader}>
-        <View style={styles.headerLeft}>
-          {/* Avatar with live green indicator */}
-          <View style={styles.userAvatarContainer}>
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80' }}
-              style={styles.headerUserAvatar}
-            />
-            <View style={styles.onlineStatusDot} />
-          </View>
+        <Image
+          source={require('../assets/devdate_logo.png')}
+          style={styles.devdateLogo}
+          resizeMode="contain"
+        />
 
-          {/* App title & hackathon sub-badge */}
-          <View style={styles.titleColumn}>
-            <Text style={styles.appTitle}>
-              CAMPUS<Text style={styles.appTitleYellow}>COLLAB</Text> ★
-            </Text>
-            <View style={styles.eventBadge}>
-              <Text style={styles.eventBadgeText}>STANFORD HACK</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Right header buttons */}
-        <View style={styles.headerRight}>
-          {/* Filter button with badge */}
+        <View style={styles.headerIconsRow}>
+          {/* Notification Bell with Red Badge */}
           <TouchableOpacity
-            activeOpacity={0.8}
+            activeOpacity={0.75}
+            onPress={() => {
+              setNotificationsVisible(true);
+              markAllNotificationsRead();
+            }}
+            style={styles.iconBtn}
+          >
+            <Text style={styles.headerIconText}>🔔</Text>
+            {unreadNotificationsCount > 0 && (
+              <View style={styles.notificationDot} />
+            )}
+          </TouchableOpacity>
+
+          {/* Filter Sliders */}
+          <TouchableOpacity
+            activeOpacity={0.75}
             onPress={() => setFilterModalVisible(true)}
-            style={[styles.headerIconButton, styles.bgWhite, BRUTAL_SHADOWS.xs]}
+            style={styles.iconBtn}
           >
-            <Text style={styles.filterIconText}>⚙️</Text>
-            <View style={[styles.notificationBadge, BRUTAL_SHADOWS.xs]}>
-              <Text style={styles.notificationBadgeText}>3!</Text>
-            </View>
-          </TouchableOpacity>
-
-          {/* Bell notification button */}
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => showToast('2 SQUAD UPDATES', COLORS.cyan)}
-            style={[styles.headerIconButton, styles.bgCyan, BRUTAL_SHADOWS.xs]}
-          >
-            <Text style={styles.bellIconText}>🔔</Text>
+            <Text style={styles.headerIconText}>🎚️</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* 2. SUB-HEADER TICKER BAR WITH COMIC BADGES */}
-      <View style={styles.tickerBar}>
-        <ComicBadge
-          text="POW! ★"
-          color={COLORS.pink}
-          textColor={COLORS.white}
-          rotate="-4deg"
-          size="sm"
-          style={styles.powBadge}
-        />
+      {/* 2. ACTIVE PROJECT SELECTOR BADGE */}
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setProjectPickerVisible(true)}
+        style={[styles.projectSelectorBadge, BRUTAL_SHADOWS.xs]}
+      >
+        <Text style={styles.projectSelectorIcon}>{activeProject?.icon || '⚡'}</Text>
+        <Text style={styles.projectSelectorPrefix}>DISCOVERING FOR:</Text>
+        <Text style={styles.projectSelectorTitle} numberOfLines={1}>
+          {activeProject?.title || 'StudySync'}
+        </Text>
+        <Text style={styles.projectSelectorArrow}>▾</Text>
+      </TouchableOpacity>
 
-        <View style={[styles.tickerPill, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.tickerPillText}>LIVE: 14 CREATIVE TEAMS</Text>
-        </View>
+      {/* 3. SEGMENTED PILL TABS (DISCOVER | PROJECTS | PEOPLE) */}
+      <View style={styles.segmentedRow}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setActiveSegment('DISCOVER')}
+          style={[
+            styles.segmentPill,
+            activeSegment === 'DISCOVER' && styles.segmentPillActive,
+          ]}
+        >
+          <Text style={styles.segmentTextActive}>DISCOVER</Text>
+        </TouchableOpacity>
 
-        <View style={[styles.matchRatePill, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.matchRateText}>⚡ 94% MATCH RATE!</Text>
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            if (onNavigateToProjects) onNavigateToProjects();
+          }}
+          style={styles.segmentPill}
+        >
+          <Text style={styles.segmentTextInactive}>PROJECTS</Text>
+        </TouchableOpacity>
 
-        <ComicBadge
-          text="BAM! ⚡"
-          color={COLORS.yellow}
-          textColor={COLORS.black}
-          rotate="5deg"
-          size="sm"
-          style={styles.bamBadge}
-        />
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            if (onNavigateToProfile) onNavigateToProfile();
+          }}
+          style={styles.segmentPill}
+        >
+          <Text style={styles.segmentTextInactive}>PEOPLE</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* FEEDBACK POPUP TOAST */}
+      {/* FEEDBACK TOAST */}
       {feedbackToast && (
-        <View style={[styles.toastContainer, { backgroundColor: feedbackToast.color }, BRUTAL_SHADOWS.sm]}>
+        <View style={[styles.toastContainer, { backgroundColor: feedbackToast.color }, BRUTAL_SHADOWS.xs]}>
           <Text style={styles.toastText}>{feedbackToast.message}</Text>
         </View>
       )}
 
-      {/* 3. MAIN CARD DISCOVERY VIEW */}
+      {/* 4. MAIN CARD & CONTROLS */}
       <ScrollView
-        style={styles.cardScrollView}
-        contentContainerStyle={styles.cardScrollContent}
+        style={styles.scrollArea}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {currentProject ? (
-          <ProjectCard
-            project={currentProject}
-            onApply={handleApply}
-            onBookmark={handleBookmark}
-            isBookmarked={!!bookmarks[currentProject.id]}
-          />
+        {currentDev ? (
+          <SwipeableCard
+            key={currentDev.id}
+            cardKey={currentDev.id}
+            onSwipeLeft={handlePass}
+            onSwipeRight={handleLike}
+          >
+            <DeveloperCard developer={currentDev} onPress={() => handleOpenDevProfile(currentDev)} />
+          </SwipeableCard>
         ) : (
           <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
-            <Text style={styles.emptyTitle}>🎉 ALL SQUADS EXPLORED!</Text>
-            <Text style={styles.emptySubtitle}>You have reviewed all available Stanford Hack teams.</Text>
+            <Text style={styles.emptyTitle}>🎉 ALL PROFILES REVIEWED!</Text>
+            <Text style={styles.emptySubtitle}>
+              You have explored all available developer matches for {activeProject?.title}.
+            </Text>
             <TouchableOpacity
-              onPress={() => setCurrentIndex(0)}
-              style={[styles.resetBtn, BRUTAL_SHADOWS.sm]}
+              activeOpacity={0.85}
+              onPress={handleResetDeck}
+              style={[styles.resetBtn, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.resetBtnText}>↺ RESTART DECK</Text>
+              <Text style={styles.resetBtnText}>↺ EXPLORE AGAIN</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* 4. TINDER/COMIC ACTION BUTTONS */}
-        <SwipeControls
-          onRewind={handleRewind}
-          onPass={handlePass}
-          onBookmark={() => currentProject && handleBookmark(currentProject.id)}
-          onLike={handleLike}
-        />
+        {/* Action Buttons Row */}
+        {currentDev && (
+          <SwipeControls
+            onRewind={handleRewind}
+            onPass={handlePass}
+            onLike={handleLike}
+            onSuperLike={handleSuperLike}
+          />
+        )}
       </ScrollView>
 
-      {/* APPLY ROLE MODAL */}
-      <Modal visible={!!selectedRoleModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, BRUTAL_SHADOWS.lg]}>
-            <ComicBadge text="SQUAD APPLICATION" color={COLORS.yellow} textColor={COLORS.black} size="md" />
-            <Text style={styles.modalTitle}>Join {selectedRoleModal?.project.title}</Text>
-            <Text style={styles.modalSub}>Role: <Text style={{ fontWeight: '900', color: COLORS.pink }}>{selectedRoleModal?.role}</Text></Text>
-            <Text style={styles.modalBody}>
-              Your developer profile, GitHub links, and technical skill compatibility (
-              {selectedRoleModal?.project.matchScore}%) will be sent directly to{' '}
-              {selectedRoleModal?.project.authorName}.
-            </Text>
-
-            <View style={styles.modalActionsRow}>
-              <TouchableOpacity
-                onPress={() => setSelectedRoleModal(null)}
-                style={[styles.modalCancelBtn, BRUTAL_SHADOWS.xs]}
-              >
-                <Text style={styles.modalCancelText}>CANCEL</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={confirmApplication}
-                style={[styles.modalConfirmBtn, BRUTAL_SHADOWS.xs]}
-              >
-                <Text style={styles.modalConfirmText}>SEND PITCH 🚀</Text>
-              </TouchableOpacity>
+      {/* 5. INVITE CONFIRMATION MODAL */}
+      <Modal
+        visible={!!inviteModalData}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setInviteModalData(null)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
+            <View style={styles.modalSticker}>
+              <ComicBadge
+                text={inviteModalData?.isSuper ? "★ SUPER INVITED! ★" : "MATCH INVITE SENT! ♥"}
+                color={inviteModalData?.isSuper ? COLORS.btnBlue : COLORS.btnGreen}
+                textColor="#000000"
+                rotate="-3deg"
+                size="md"
+              />
             </View>
+
+            {inviteModalData && (
+              <>
+                <Text style={styles.modalDevName}>{inviteModalData.name}</Text>
+                <Text style={styles.modalDevRole}>{inviteModalData.role}</Text>
+                <Text style={styles.modalNotice}>
+                  Invited to collaborate on <Text style={{ fontWeight: '900' }}>{activeProject?.title}</Text>! When they accept, you will receive a notification in Matches.
+                </Text>
+
+                <View style={styles.modalActions}>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setInviteModalData(null)}
+                    style={[styles.continueBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.continueBtnText}>KEEP SWIPING</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      setInviteModalData(null);
+                      if (onNavigateToMatches) onNavigateToMatches();
+                    }}
+                    style={[styles.viewMatchesBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.viewMatchesBtnText}>VIEW MATCHES →</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
 
-      {/* FILTER MODAL */}
-      <Modal visible={filterModalVisible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, BRUTAL_SHADOWS.lg]}>
-            <ComicBadge text="SQUAD FILTERS" color={COLORS.cyan} textColor={COLORS.black} size="md" />
-            <Text style={styles.modalTitle}>Filter by Category</Text>
+      {/* 6. PROJECT PICKER MODAL */}
+      <Modal
+        visible={projectPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setProjectPickerVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.md]}>
+            <View style={styles.pickerHeaderRow}>
+              <ComicBadge text="SELECT DISCOVERY PROJECT 🎯" color="#FFCC00" textColor="#000" size="sm" />
+              <TouchableOpacity onPress={() => setProjectPickerVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
-            <View style={styles.filterChipsRow}>
-              {['ALL', 'AI / ML', 'ROBOTICS', 'FINTECH', 'HEALTH', 'WEB3'].map((cat, i) => (
-                <View
-                  key={cat}
+            <Text style={styles.pickerSubtitle}>
+              Developer recommendations adapt to the required skills of your active project:
+            </Text>
+
+            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
+              {projects.map((proj) => {
+                const isCurrent = proj.id === activeProject?.id;
+                return (
+                  <TouchableOpacity
+                    key={proj.id}
+                    activeOpacity={0.8}
+                    onPress={() => {
+                      setActiveProjectId(proj.id);
+                      setProjectPickerVisible(false);
+                      showToast(`DISCOVERING FOR: ${proj.title} 🎯`);
+                    }}
+                    style={[
+                      styles.projectPickerItem,
+                      isCurrent && styles.projectPickerItemActive,
+                      BRUTAL_SHADOWS.xs,
+                    ]}
+                  >
+                    <Text style={styles.pickerItemIcon}>{proj.icon || '⚡'}</Text>
+                    <View style={styles.pickerItemBody}>
+                      <Text style={styles.pickerItemTitle}>{proj.title}</Text>
+                      <Text style={styles.pickerItemTech}>{proj.techStack?.join(' • ')}</Text>
+                    </View>
+                    {isCurrent && (
+                      <View style={styles.activeCheckBadge}>
+                        <Text style={styles.activeCheckText}>ACTIVE</Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                setProjectPickerVisible(false);
+                if (onNavigateToProjects) onNavigateToProjects();
+              }}
+              style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.xs]}
+            >
+              <Text style={styles.createProjectPromptText}>➕ MANAGE OR CREATE PROJECT</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 7. NOTIFICATIONS MODAL */}
+      <Modal
+        visible={notificationsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setNotificationsVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.md]}>
+            <View style={styles.pickerHeaderRow}>
+              <ComicBadge text="NOTIFICATIONS 🔔" color="#38BDF8" textColor="#000" size="sm" />
+              <TouchableOpacity onPress={() => setNotificationsVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
+              {notifications.map((n) => (
+                <View key={n.id} style={[styles.notificationCard, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.notifTitle}>{n.title}</Text>
+                  <Text style={styles.notifMsg}>{n.message}</Text>
+                  <Text style={styles.notifTime}>{n.time}</Text>
+                </View>
+              ))}
+            </ScrollView>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                markAllNotificationsRead();
+                setNotificationsVisible(false);
+              }}
+              style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.xs]}
+            >
+              <Text style={styles.createProjectPromptText}>DISMISS ALL</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 8. FILTERS MODAL */}
+      <Modal
+        visible={filterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
+            <View style={styles.pickerHeaderRow}>
+              <ComicBadge text="DISCOVERY FILTERS 🎚️" color="#4ADE80" textColor="#000" size="sm" />
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={styles.modalCloseBtn}>
+                <Text style={styles.modalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.filterSectionTitle}>FILTER BY ROLE:</Text>
+            <View style={styles.filterPillsRow}>
+              {['ALL', 'Frontend', 'Backend', 'Full Stack', 'UI/UX', 'Mobile'].map((role) => (
+                <TouchableOpacity
+                  key={role}
+                  onPress={() => {
+                    setSelectedRoleFilter(role);
+                  }}
                   style={[
-                    styles.filterChip,
-                    i === 0 && { backgroundColor: COLORS.yellow },
+                    styles.filterPill,
+                    selectedRoleFilter === role && styles.filterPillActive,
                     BRUTAL_SHADOWS.xs,
                   ]}
                 >
-                  <Text style={styles.filterChipText}>{cat}</Text>
-                </View>
+                  <Text style={[styles.filterPillText, selectedRoleFilter === role && styles.filterPillTextActive]}>
+                    {role}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
 
             <TouchableOpacity
               onPress={() => setFilterModalVisible(false)}
-              style={[styles.modalConfirmBtn, { marginTop: 16 }, BRUTAL_SHADOWS.xs]}
+              style={[styles.createProjectPromptBtn, { marginTop: 20 }, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.modalConfirmText}>APPLY FILTERS</Text>
+              <Text style={styles.createProjectPromptText}>APPLY FILTERS</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -267,302 +464,404 @@ export default function HomeScreen({ onNavigateToMatches, onNavigateToChat }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.creamBg,
+    backgroundColor: 'transparent',
   },
   topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.yellow,
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 3.5,
-    borderBottomColor: COLORS.black,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 2,
   },
-  headerLeft: {
+  devdateLogo: {
+    width: 140,
+    height: 48,
+  },
+  headerIconsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 12,
   },
-  userAvatarContainer: {
+  iconBtn: {
     position: 'relative',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2.5,
-    borderColor: COLORS.black,
-    backgroundColor: COLORS.white,
+    padding: 6,
   },
-  headerUserAvatar: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 20,
+  headerIconText: {
+    fontSize: 22,
   },
-  onlineStatusDot: {
+  notificationDot: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: COLORS.lime,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-  },
-  titleColumn: {
-    justifyContent: 'center',
-  },
-  appTitle: {
-    fontSize: FONTS.lg + 1,
-    fontWeight: '900',
-    color: COLORS.black,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  appTitleYellow: {
-    color: COLORS.black,
-  },
-  eventBadge: {
-    backgroundColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
-    marginTop: 2,
-  },
-  eventBadgeText: {
-    fontSize: FONTS.xs - 1,
-    fontWeight: '900',
-    color: COLORS.yellow,
-    letterSpacing: 0.5,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  headerIconButton: {
-    width: 42,
-    height: 42,
-    borderRadius: BORDER_RADIUS.md,
-    borderWidth: 2.5,
-    borderColor: COLORS.black,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  bgWhite: {
-    backgroundColor: COLORS.white,
-  },
-  bgCyan: {
-    backgroundColor: COLORS.cyan,
-  },
-  filterIconText: {
-    fontSize: 18,
-  },
-  bellIconText: {
-    fontSize: 18,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: COLORS.pink,
-    borderRadius: BORDER_RADIUS.pill,
+    top: 4,
+    right: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    backgroundColor: '#EF4444',
     borderWidth: 1.5,
-    borderColor: COLORS.black,
-    paddingHorizontal: 5,
-    paddingVertical: 1,
+    borderColor: '#000000',
   },
-  notificationBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: COLORS.white,
-  },
-  tickerBar: {
+
+  // Project Selector Bar
+  projectSelectorBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 8,
-    backgroundColor: COLORS.creamBg,
-    borderBottomWidth: 2.5,
-    borderBottomColor: COLORS.black,
-  },
-  powBadge: {
-    marginRight: 4,
-  },
-  tickerPill: {
-    backgroundColor: COLORS.white,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  tickerPillText: {
-    fontSize: FONTS.xs - 1,
-    fontWeight: '900',
-    color: COLORS.black,
-  },
-  matchRatePill: {
-    backgroundColor: COLORS.lime,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  matchRateText: {
-    fontSize: FONTS.xs - 1,
-    fontWeight: '900',
-    color: COLORS.black,
-  },
-  bamBadge: {
-    marginLeft: 4,
-  },
-  cardScrollView: {
-    flex: 1,
-  },
-  cardScrollContent: {
-    paddingHorizontal: SPACING.sm,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.md,
-  },
-  toastContainer: {
     alignSelf: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    marginTop: 2,
+    marginBottom: 4,
+    gap: 6,
+  },
+  projectSelectorIcon: {
+    fontSize: 13,
+  },
+  projectSelectorPrefix: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#666666',
+    letterSpacing: 0.5,
+  },
+  projectSelectorTitle: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+    maxWidth: 160,
+  },
+  projectSelectorArrow: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+
+  // Segmented row
+  segmentedRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: 'transparent',
+    gap: 10,
+  },
+  segmentPill: {
+    flex: 1,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  segmentPillActive: {
+    backgroundColor: '#FFCC00',
     borderWidth: 2.5,
-    borderColor: COLORS.black,
+    borderColor: '#000000',
+  },
+  segmentTextActive: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+  segmentTextInactive: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+
+  toastContainer: {
+    position: 'absolute',
+    top: 60,
+    alignSelf: 'center',
+    zIndex: 999,
+    borderWidth: 2.5,
+    borderColor: '#000000',
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 16,
     paddingVertical: 6,
-    marginTop: 6,
-    zIndex: 100,
   },
   toastText: {
-    fontSize: FONTS.xs + 2,
+    color: '#000000',
+    fontSize: 11,
     fontWeight: '900',
-    color: COLORS.black,
-    letterSpacing: 0.5,
+  },
+  scrollArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+    alignItems: 'center',
   },
   emptyCard: {
-    backgroundColor: COLORS.white,
+    width: '100%',
+    backgroundColor: '#FFFFFF',
     borderWidth: 3.5,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.xl,
+    borderColor: '#000000',
+    borderRadius: 24,
+    padding: 24,
     alignItems: 'center',
-    marginVertical: 40,
+    marginTop: 40,
+    marginBottom: 40,
   },
   emptyTitle: {
-    fontSize: FONTS.xl,
+    fontSize: 18,
     fontWeight: '900',
-    color: COLORS.black,
+    color: '#000000',
     marginBottom: 8,
   },
   emptySubtitle: {
-    fontSize: FONTS.sm,
-    color: COLORS.textSecondary,
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#555555',
     textAlign: 'center',
     marginBottom: 16,
   },
   resetBtn: {
-    backgroundColor: COLORS.yellow,
+    backgroundColor: '#FFCC00',
     borderWidth: 2.5,
-    borderColor: COLORS.black,
+    borderColor: '#000000',
     borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 18,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
   resetBtnText: {
-    fontSize: FONTS.sm,
+    fontSize: 13,
     fontWeight: '900',
-    color: COLORS.black,
+    color: '#000000',
   },
-  modalOverlay: {
+
+  // Modal styling
+  modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.72)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.lg,
+    padding: 20,
   },
   modalCard: {
-    backgroundColor: COLORS.white,
-    borderWidth: 3.5,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.lg,
     width: '100%',
-    maxWidth: 360,
-  },
-  modalTitle: {
-    fontSize: FONTS.xl,
-    fontWeight: '900',
-    color: COLORS.black,
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  modalSub: {
-    fontSize: FONTS.sm,
-    color: COLORS.black,
-    marginBottom: 10,
-  },
-  modalBody: {
-    fontSize: FONTS.sm,
-    color: COLORS.textSecondary,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  modalActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  modalCancelBtn: {
-    backgroundColor: COLORS.lightGray,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  modalCancelText: {
-    fontSize: FONTS.xs + 1,
-    fontWeight: '800',
-    color: COLORS.black,
-  },
-  modalConfirmBtn: {
-    backgroundColor: COLORS.lime,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    maxWidth: 380,
+    backgroundColor: '#FAF6EB',
+    borderRadius: 24,
+    borderWidth: 3.5,
+    borderColor: '#000000',
+    padding: 20,
     alignItems: 'center',
   },
-  modalConfirmText: {
-    fontSize: FONTS.xs + 1,
-    fontWeight: '900',
-    color: COLORS.black,
+  pickerModalCard: {
+    maxHeight: 520,
+    alignItems: 'stretch',
   },
-  filterChipsRow: {
+  pickerHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalCloseBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#000000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCloseText: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+    fontSize: 14,
+  },
+  pickerSubtitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#555555',
+    marginBottom: 12,
+  },
+  pickerList: {
+    maxHeight: 300,
+  },
+  projectPickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 10,
+    gap: 10,
+  },
+  projectPickerItemActive: {
+    backgroundColor: '#FEF9C3',
+    borderColor: '#000000',
+  },
+  pickerItemIcon: {
+    fontSize: 24,
+  },
+  pickerItemBody: {
+    flex: 1,
+  },
+  pickerItemTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  pickerItemTech: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#666666',
+    marginTop: 2,
+  },
+  activeCheckBadge: {
+    backgroundColor: '#FFCC00',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  activeCheckText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  createProjectPromptBtn: {
+    height: 44,
+    backgroundColor: '#FFCC00',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+  createProjectPromptText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 0.5,
+  },
+
+  // Notifications
+  notificationCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 8,
+  },
+  notifTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  notifMsg: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#444444',
+    marginBottom: 4,
+  },
+  notifTime: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#888888',
+  },
+
+  // Filters
+  filterSectionTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  filterPillsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginTop: 12,
   },
-  filterChip: {
-    backgroundColor: COLORS.lightGray,
+  filterPill: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
+    borderColor: '#000000',
+    borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  filterChipText: {
-    fontSize: FONTS.xs,
+  filterPillActive: {
+    backgroundColor: '#FFCC00',
+  },
+  filterPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  filterPillTextActive: {
     fontWeight: '900',
-    color: COLORS.black,
+  },
+
+  modalSticker: {
+    marginBottom: 10,
+  },
+  modalDevName: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  modalDevRole: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#666666',
+    marginBottom: 10,
+  },
+  modalNotice: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#333333',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  continueBtn: {
+    flex: 1,
+    height: 42,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  continueBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  viewMatchesBtn: {
+    flex: 1.2,
+    height: 42,
+    backgroundColor: '#FFCC00',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  viewMatchesBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000000',
   },
 });
