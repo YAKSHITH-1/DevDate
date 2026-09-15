@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { COLORS, BRUTAL_SHADOWS } from '../styles/theme';
 
 export default function SwipeControls({ onRewind, onPass, onLike, onSuperLike }) {
@@ -14,22 +14,30 @@ export default function SwipeControls({ onRewind, onPass, onLike, onSuperLike })
         <Text style={styles.iconRewind}>↺</Text>
       </TouchableOpacity>
 
-      {/* 2. SKIP / PASS (✕) */}
+      {/* 2. SKIP / PASS (reject.png) */}
       <TouchableOpacity
         activeOpacity={0.75}
         onPress={onPass}
         style={[styles.btnLarge, styles.bgRed, BRUTAL_SHADOWS.sm]}
       >
-        <Text style={styles.iconSkip}>✕</Text>
+        <Image
+          source={require('../assets/reject.png')}
+          style={styles.iconRejectImg}
+          resizeMode="contain"
+        />
       </TouchableOpacity>
 
-      {/* 3. LIKE / MATCH (♥) */}
+      {/* 3. LIKE / MATCH (like.png) */}
       <TouchableOpacity
         activeOpacity={0.75}
         onPress={onLike}
         style={[styles.btnLarge, styles.bgGreen, BRUTAL_SHADOWS.sm]}
       >
-        <Text style={styles.iconHeart}>♥</Text>
+        <Image
+          source={require('../assets/like.png')}
+          style={styles.iconLikeImg}
+          resizeMode="contain"
+        />
       </TouchableOpacity>
 
       {/* 4. SUPER LIKE (★) */}
@@ -100,5 +108,13 @@ const styles = StyleSheet.create({
   iconStar: {
     fontSize: 22,
     color: '#000000',
+  },
+  iconRejectImg: {
+    width: 28,
+    height: 28,
+  },
+  iconLikeImg: {
+    width: 32,
+    height: 32,
   },
 });

@@ -7,6 +7,7 @@ import {
   INITIAL_CHATS,
   CURRENT_USER_PROFILE,
 } from '../data/projectsData';
+import { getSkillLabels } from '../data/skillsDatabase';
 
 const AppContext = createContext();
 
@@ -134,7 +135,7 @@ export function AppProvider({ children }) {
       description: projectData.description || 'Exciting collaborative developer project.',
       techStack: projectData.techStack && projectData.techStack.length > 0
         ? projectData.techStack
-        : ['React', 'Node.js'],
+        : ['react', 'nodejs'],
       membersCount: 1,
       maxMembers: parseInt(projectData.maxMembers, 10) || 4,
       members: [
@@ -146,11 +147,13 @@ export function AppProvider({ children }) {
       ],
       wantedRoles: projectData.wantedRoles && projectData.wantedRoles.length > 0
         ? projectData.wantedRoles
-        : ['Frontend Dev', 'Backend Dev'],
+        : ['Frontend Developer', 'Backend Developer'],
       experienceLevel: projectData.experienceLevel || 'Intermediate',
       status: 'Recruiting',
       icon: projectData.icon || '🚀',
       banner: projectData.banner || null,
+      duration: projectData.duration || 'Ongoing',
+      interests: projectData.interests || [],
     };
 
     setProjects((prev) => [newProj, ...prev]);
@@ -186,6 +189,19 @@ export function AppProvider({ children }) {
     });
   };
 
+  const closeProject = (id) => {
+    setProjects((prev) =>
+      prev.map((p) =>
+        p.id === id ? { ...p, status: 'CLOSED' } : p
+      )
+    );
+    addNotification({
+      type: 'PROJECT',
+      title: 'Project Closed 🔒',
+      message: `Project has been closed and is no longer recruiting.`,
+    });
+  };
+
   // --- DISCOVERY & MATCHING ACTIONS ---
   // Returns developers who have NOT been skipped or invited for the active project
   const availableDevelopersForActiveProject = useMemo(() => {
@@ -196,7 +212,7 @@ export function AppProvider({ children }) {
     return INITIAL_DEVELOPERS.filter((d) => !excludedIds.has(d.id)).map((d) => {
       // Calculate dynamic match percentage based on active project's tech stack
       let matchedSkills = 0;
-      const projSkills = activeProject?.techStack || [];
+      const projSkills = getSkillLabels(activeProject?.techStack || []);
       d.skills.forEach((s) => {
         if (projSkills.some((ps) => ps.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(ps.toLowerCase()))) {
           matchedSkills++;
@@ -505,6 +521,7 @@ export function AppProvider({ children }) {
         createProject,
         updateProject,
         deleteProject,
+        closeProject,
 
         // Discovery
         availableDevelopersForActiveProject,

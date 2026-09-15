@@ -1,13 +1,25 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { COLORS, FONTS } from '../styles/theme';
 
 export default function BottomNav({ activeTab, onTabChange, matchesCount = 3 }) {
   const tabs = [
-    { id: 'discover', label: 'Discover', icon: '🔥' },
-    { id: 'matches', label: 'Matches', icon: '💬', badge: matchesCount },
-    { id: 'projects', label: 'Projects', icon: '📁' },
-    { id: 'profile', label: 'Profile', icon: '👤' },
+    {
+      id: 'discover',
+      label: 'Discover',
+      image: require('../assets/icons8-discover-100.png'),
+    },
+    {
+      id: 'matches',
+      label: 'Matches',
+      image: require('../assets/match.png'),
+      badge: matchesCount,
+    },
+    {
+      id: 'profile',
+      label: 'Profile',
+      icon: '👤',
+    },
   ];
 
   return (
@@ -23,14 +35,25 @@ export default function BottomNav({ activeTab, onTabChange, matchesCount = 3 }) 
             style={styles.tabItem}
           >
             <View style={styles.iconContainer}>
-              <Text
-                style={[
-                  styles.tabIcon,
-                  isActive && styles.tabIconActive,
-                ]}
-              >
-                {tab.icon}
-              </Text>
+              {tab.image ? (
+                <Image
+                  source={tab.image}
+                  style={[
+                    styles.tabImg,
+                    isActive ? styles.tabImgActive : styles.tabImgInactive,
+                  ]}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.tabIcon,
+                    isActive && styles.tabIconActive,
+                  ]}
+                >
+                  {tab.icon}
+                </Text>
+              )}
 
               {tab.badge !== undefined && tab.badge > 0 && (
                 <View style={styles.badgeCircle}>
@@ -82,6 +105,18 @@ const styles = StyleSheet.create({
   tabIconActive: {
     fontSize: 22,
     opacity: 1,
+  },
+  tabImg: {
+    width: 24,
+    height: 24,
+    marginBottom: 2,
+  },
+  tabImgActive: {
+    opacity: 1,
+    transform: [{ scale: 1.08 }],
+  },
+  tabImgInactive: {
+    opacity: 0.72,
   },
   tabLabel: {
     fontSize: 11,

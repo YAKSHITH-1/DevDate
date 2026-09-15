@@ -15,6 +15,7 @@ import SwipeableCard from '../components/SwipeableCard';
 import SwipeControls from '../components/SwipeControls';
 import ComicBadge from '../components/ComicBadge';
 import { useApp } from '../context/AppContext';
+import { getSkillLabels } from '../data/skillsDatabase';
 
 export default function HomeScreen({
   onNavigateToProjects,
@@ -123,7 +124,7 @@ export default function HomeScreen({
       <View style={styles.topHeader}>
         <Image
           source={require('../assets/devdate_logo.png')}
-          style={styles.devdateLogo}
+          style={[styles.devdateLogo, { backgroundColor: 'transparent' }]}
           resizeMode="contain"
         />
 
@@ -137,7 +138,11 @@ export default function HomeScreen({
             }}
             style={styles.iconBtn}
           >
-            <Text style={styles.headerIconText}>🔔</Text>
+            <Image
+              source={require('../assets/notification.png')}
+              style={styles.notificationBellImg}
+              resizeMode="contain"
+            />
             {unreadNotificationsCount > 0 && (
               <View style={styles.notificationDot} />
             )}
@@ -345,7 +350,7 @@ export default function HomeScreen({
                     <Text style={styles.pickerItemIcon}>{proj.icon || '⚡'}</Text>
                     <View style={styles.pickerItemBody}>
                       <Text style={styles.pickerItemTitle}>{proj.title}</Text>
-                      <Text style={styles.pickerItemTech}>{proj.techStack?.join(' • ')}</Text>
+                      <Text style={styles.pickerItemTech}>{getSkillLabels(proj.techStack).join(' • ')}</Text>
                     </View>
                     {isCurrent && (
                       <View style={styles.activeCheckBadge}>
@@ -490,6 +495,10 @@ const styles = StyleSheet.create({
   },
   headerIconText: {
     fontSize: 22,
+  },
+  notificationBellImg: {
+    width: 25,
+    height: 25,
   },
   notificationDot: {
     position: 'absolute',

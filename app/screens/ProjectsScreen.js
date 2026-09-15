@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   Image,
   Modal,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
+import CreateProjectForm from '../components/CreateProjectForm';
 import { useApp } from '../context/AppContext';
+import { getSkillLabels, ALL_SKILLS } from '../data/skillsDatabase';
 
 export default function ProjectsScreen({
   onBackToDiscover,
@@ -29,107 +28,135 @@ export default function ProjectsScreen({
     createProject,
     updateProject,
     deleteProject,
+    closeProject,
   } = useApp();
 
-  const [isBookmarked, setIsBookmarked] = useState(false);
-  const [interestedModalVisible, setInterestedModalVisible] = useState(false);
+  // View mode: 'list' = My Projects cards, 'detail' = single project view
+  const [viewMode, setViewMode] = useState('list');
+
   const [toastMessage, setToastMessage] = useState(null);
 
   // Modals
-  const [optionsMenuVisible, setOptionsMenuVisible] = useState(false);
   const [createModalVisible, setCreateModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [switchPickerVisible, setSwitchPickerVisible] = useState(false);
+  const [editingProject, setEditingProject] = useState(null);
+  const [closeConfirmVisible, setCloseConfirmVisible] = useState(false);
+  const [closeTargetId, setCloseTargetId] = useState(null);
 
-  // Form Fields for Create Project
-  const [formTitle, setFormTitle] = useState('');
-  const [formCategory, setFormCategory] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formSkills, setFormSkills] = useState('');
-  const [formRoles, setFormRoles] = useState('');
-  const [formExpLevel, setFormExpLevel] = useState('Intermediate');
-
-  // Form Fields for Edit Project
-  const [editTitle, setEditTitle] = useState('');
-  const [editCategory, setEditCategory] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editSkills, setEditSkills] = useState('');
-  const [editRoles, setEditRoles] = useState('');
-  const [editExpLevel, setEditExpLevel] = useState('Intermediate');
-  const [editStatus, setEditStatus] = useState('Recruiting');
+  // For the detail view
+  const [isBookmarked, setIsBookmarked] = useState(false);
+  const [interestedModalVisible, setInterestedModalVisible] = useState(false);
 
   const proj = viewedProject || projects[0];
-  const isSelectedForDiscovery = proj?.id === activeProjectId;
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 1800);
   };
 
-  const handleOpenEdit = () => {
-    setOptionsMenuVisible(false);
-    if (!proj) return;
-    setEditTitle(proj.title);
-    setEditCategory(proj.category || 'Web App');
-    setEditDescription(proj.description || '');
-    setEditSkills(proj.techStack ? proj.techStack.join(', ') : 'React, Node.js');
-    setEditRoles(proj.wantedRoles ? proj.wantedRoles.join(', ') : 'Frontend Dev');
-    setEditExpLevel(proj.experienceLevel || 'Intermediate');
-    setEditStatus(proj.status || 'Recruiting');
+  // ─── HANDLERS ─────────────────────────────────────────────
+  const handleViewProject = (project) => {
+    setViewedProjectId(project.id);
+    setViewMode('detail');
+  };
+
+  const handleEditProject = (project) => {
+    setEditingProject(project);
     setEditModalVisible(true);
   };
 
-  const handleSaveEdit = () => {
-    if (!editTitle.trim()) {
-      showToast('TITLE CANNOT BE EMPTY');
-      return;
-    }
-    updateProject(proj.id, {
-      title: editTitle.trim(),
-      category: editCategory.trim(),
-      description: editDescription.trim(),
-      techStack: editSkills.split(',').map((s) => s.trim()).filter(Boolean),
-      wantedRoles: editRoles.split(',').map((r) => r.trim()).filter(Boolean),
-      experienceLevel: editExpLevel.trim() || 'Intermediate',
-      status: editStatus.trim() || 'Recruiting',
-    });
-    setEditModalVisible(false);
-    showToast('PROJECT UPDATED! ✔');
+  const handleCloseProject = (projectId) => {
+    setCloseTargetId(projectId);
+    setCloseConfirmVisible(true);
   };
 
-  const handleCreateSubmit = () => {
-    if (!formTitle.trim()) {
-      showToast('ENTER A PROJECT TITLE');
-      return;
+  const confirmCloseProject = () => {
+    if (closeTargetId) {
+      const p = projects.find((pr) => pr.id === closeTargetId);
+      closeProject(closeTargetId);
+      showToast(`CLOSED "${p?.title}" 🔒`);
     }
-    const newProj = createProject({
-      title: formTitle.trim(),
-      category: formCategory.trim() || 'Web App',
-      description: formDescription.trim() || 'Collaborative developer venture.',
-      techStack: formSkills.split(',').map((s) => s.trim()).filter(Boolean),
-      wantedRoles: formRoles.split(',').map((r) => r.trim()).filter(Boolean),
-      experienceLevel: formExpLevel,
-    });
-    setCreateModalVisible(false);
-    setFormTitle('');
-    setFormCategory('');
-    setFormDescription('');
-    setFormSkills('');
-    setFormRoles('');
+    setCloseConfirmVisible(false);
+    setCloseTargetId(null);
+  };
+
+  const handleFindMembers = (project) => {
+    setActiveProjectId(project.id);
+    showToast(`DISCOVERING FOR: ${project.title} 🎯`);
+    if (onSelectForDiscovery) onSelectForDiscovery();
+  };
+
+  const handleCreateSubmit = (formData) => {
+    const newProj = createProject(formData);
     showToast(`CREATED "${newProj.title}" 🚀`);
   };
 
-  const handleDelete = () => {
-    setOptionsMenuVisible(false);
-    const title = proj.title;
-    deleteProject(proj.id);
-    showToast(`DELETED "${title}" 🗑️`);
+  const handleEditSubmit = (formData) => {
+    if (!editingProject) return;
+    updateProject(editingProject.id, {
+      title: formData.title,
+      category: formData.category,
+      description: formData.description,
+      techStack: formData.techStack,
+      wantedRoles: formData.wantedRoles,
+      maxMembers: formData.maxMembers,
+      icon: formData.icon,
+      duration: formData.duration,
+      interests: formData.interests,
+    });
+    showToast('PROJECT UPDATED! ✔');
+    setEditingProject(null);
   };
 
-  return (
+  // ─── Skill label helper ──────────────────────────────────
+  const getDisplaySkills = (techStack) => {
+    if (!techStack || techStack.length === 0) return [];
+    return techStack.map((s) => {
+      const skill = ALL_SKILLS.find((sk) => sk.id === s);
+      return skill ? skill.label : s;
+    });
+  };
+
+  // ─── STATUS STYLING ──────────────────────────────────────
+  const getStatusStyle = (status) => {
+    switch (status) {
+      case 'Recruiting':
+        return { bg: '#86EFAC', color: '#166534', label: 'RECRUITING' };
+      case 'Active MVP':
+        return { bg: '#93C5FD', color: '#1E40AF', label: 'ACTIVE MVP' };
+      case 'CLOSED':
+        return { bg: '#D1D5DB', color: '#374151', label: 'CLOSED' };
+      default:
+        return { bg: '#FCD34D', color: '#713F12', label: status?.toUpperCase() || 'ACTIVE' };
+    }
+  };
+
+  // Category color for skill chips
+  const getSkillColor = (skillId) => {
+    const skill = ALL_SKILLS.find((s) => s.id === skillId);
+    if (!skill) return '#E5E7EB';
+    const colors = {
+      frontend: '#BFDBFE',
+      backend: '#FDE68A',
+      fullstack: '#C4B5FD',
+      ai_ml: '#E9D5FF',
+      mobile: '#BBF7D0',
+      database: '#FED7AA',
+      devops: '#A5F3FC',
+      design: '#FBCFE8',
+      blockchain: '#FCA5A5',
+      languages: '#E5E7EB',
+    };
+    return colors[skill.categoryId] || '#E5E7EB';
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // MODE A: MY PROJECTS LIST
+  // ═══════════════════════════════════════════════════════════
+  const renderProjectsList = () => (
     <View style={styles.container}>
-      {/* 1. TOP HEADER (Back Arrow, Switcher Pill, Bookmark, Three Dots) */}
-      <View style={styles.headerBar}>
+      {/* Header */}
+      <View style={styles.listHeader}>
         <TouchableOpacity
           activeOpacity={0.75}
           onPress={onBackToDiscover}
@@ -138,177 +165,486 @@ export default function ProjectsScreen({
           <Text style={styles.headerIconText}>←</Text>
         </TouchableOpacity>
 
-        {/* Quick Project Switcher Button in Header */}
+        <Text style={styles.listTitle}>MY PROJECTS</Text>
+
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setSwitchPickerVisible(true)}
-          style={[styles.headerProjectBadge, BRUTAL_SHADOWS.xs]}
+          onPress={() => setCreateModalVisible(true)}
+          style={[styles.newProjectBtn, BRUTAL_SHADOWS.xs]}
         >
-          <Text style={styles.headerProjectBadgeText} numberOfLines={1}>
-            {proj?.icon || '⚡'} {proj?.title || 'StudySync'} ▾
-          </Text>
+          <Text style={styles.newProjectBtnText}>➕ NEW</Text>
         </TouchableOpacity>
-
-        <View style={styles.headerRightGroup}>
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => {
-              setIsBookmarked(!isBookmarked);
-              showToast(isBookmarked ? 'REMOVED BOOKMARK' : `BOOKMARKED ${proj?.title} ★`);
-            }}
-            style={styles.headerIconBtn}
-          >
-            <Text style={styles.headerIconText}>{isBookmarked ? '🔖' : '📑'}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.75}
-            onPress={() => setOptionsMenuVisible(true)}
-            style={styles.headerIconBtn}
-          >
-            <Text style={styles.headerIconText}>···</Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
-      {/* TOAST FEEDBACK */}
+      {/* Toast */}
       {toastMessage && (
         <View style={[styles.toastContainer, BRUTAL_SHADOWS.xs]}>
           <Text style={styles.toastText}>{toastMessage}</Text>
         </View>
       )}
 
-      {/* 2. SCROLLABLE PROJECT CONTENT (EXACT MATCH TO PHONE 3) */}
-      <ScrollView style={styles.scrollArea} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Banner Container: Uses StudySync clean banner for StudySync, or generated styled comic banner */}
-        <View style={styles.bannerContainer}>
-          {proj?.title === 'StudySync' ? (
-            <Image
-              source={require('../assets/studysync_banner_clean.png')}
-              style={styles.bannerImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.customBannerWrap}>
-              <Text style={styles.customBannerIcon}>{proj?.icon || '🚀'}</Text>
-              <Text style={styles.customBannerTitle}>{proj?.title}</Text>
-              <Text style={styles.customBannerCategory}>{proj?.category || 'Dev Project'}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Active Discovery Status Badge */}
-        {isSelectedForDiscovery ? (
-          <View style={styles.activeDiscoveryNotice}>
-            <Text style={styles.activeDiscoveryNoticeText}>🎯 CURRENTLY ACTIVE FOR DEVELOPER DISCOVERY</Text>
+      {/* Project Cards List */}
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.listScrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {projects.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>📁</Text>
+            <Text style={styles.emptyTitle}>NO PROJECTS YET</Text>
+            <Text style={styles.emptySubtitle}>
+              Create your first project to start finding team members!
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setCreateModalVisible(true)}
+              style={[styles.emptyCreateBtn, BRUTAL_SHADOWS.sm]}
+            >
+              <Text style={styles.emptyCreateBtnText}>CREATE PROJECT 🚀</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => {
-              setActiveProjectId(proj.id);
-              showToast(`ACTIVATED ${proj.title} FOR DISCOVERY 🎯`);
-              if (onSelectForDiscovery) onSelectForDiscovery();
-            }}
-            style={[styles.activateDiscoveryBtn, BRUTAL_SHADOWS.xs]}
-          >
-            <Text style={styles.activateDiscoveryBtnText}>🎯 SELECT FOR DISCOVERY DECK →</Text>
-          </TouchableOpacity>
-        )}
+          projects.map((project) => {
+            const statusInfo = getStatusStyle(project.status);
+            const displaySkills = getDisplaySkills(project.techStack);
+            const isActive = project.id === activeProjectId;
+            const isClosed = project.status === 'CLOSED';
+            const shownSkills = displaySkills.slice(0, 5);
+            const extraCount = displaySkills.length - 5;
 
-        {/* Project Meta Tags Row */}
-        <View style={styles.tagsRow}>
-          {proj?.techStack && proj.techStack.length > 0 ? (
-            proj.techStack.map((tech, i) => (
-              <View key={i} style={styles.blueTag}>
-                <Text style={styles.blueTagText}>{tech}</Text>
-              </View>
-            ))
-          ) : (
-            <>
-              <View style={styles.blueTag}><Text style={styles.blueTagText}>Web App</Text></View>
-              <View style={styles.blueTag}><Text style={styles.blueTagText}>Open Source</Text></View>
-              <View style={styles.blueTag}><Text style={styles.blueTagText}>MVP</Text></View>
-            </>
-          )}
-          <View style={styles.greenTag}>
-            <Text style={styles.greenTagText}>
-              {proj?.status === 'Recruiting' ? 'Looking for Collaborators' : proj?.status || 'Active'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Project Meta Info Row: Category, Experience Level, Members */}
-        <View style={styles.projectStatsRow}>
-          <View style={styles.metaStatPill}>
-            <Text style={styles.metaStatPillText}>📁 {proj?.category || 'Dev Venture'}</Text>
-          </View>
-          <View style={styles.metaStatPill}>
-            <Text style={styles.metaStatPillText}>⭐ {proj?.experienceLevel || 'Intermediate'}</Text>
-          </View>
-          <View style={styles.metaStatPill}>
-            <Text style={styles.metaStatPillText}>👥 {proj?.membersCount || (proj?.members ? proj.members.length : 2)}/{proj?.maxMembers || 4} Members</Text>
-          </View>
-        </View>
-
-        {/* Description */}
-        <Text style={styles.descriptionText}>
-          {proj?.description || 'Real-time study rooms for developers to code together, share goals, and stay accountable.'}
-        </Text>
-
-        {/* LOOKING FOR Section */}
-        <Text style={styles.sectionHeader}>LOOKING FOR</Text>
-        <View style={styles.lookingForGrid}>
-          {proj?.wantedRoles && proj.wantedRoles.length > 0 ? (
-            proj.wantedRoles.map((role, i) => (
-              <View key={i} style={styles.roleTag}>
-                <Text style={styles.roleTagText}>{role}</Text>
-              </View>
-            ))
-          ) : (
-            <>
-              <View style={styles.roleTag}><Text style={styles.roleTagText}>Frontend Dev</Text></View>
-              <View style={styles.roleTag}><Text style={styles.roleTagText}>Backend Dev</Text></View>
-              <View style={styles.roleTag}><Text style={styles.roleTagText}>UI/UX Designer</Text></View>
-              <View style={styles.roleTag}><Text style={styles.roleTagText}>Product Thinker</Text></View>
-            </>
-          )}
-        </View>
-
-        {/* CURRENT SQUAD MEMBERS */}
-        {proj?.members && proj.members.length > 0 && (
-          <View style={styles.squadSection}>
-            <Text style={styles.sectionHeader}>CURRENT SQUAD ({proj.members.length})</Text>
-            <View style={styles.squadRow}>
-              {proj.members.map((member, i) => (
-                <View key={member.id || i} style={styles.squadMemberPill}>
-                  {member.avatar ? (
-                    <Image source={{ uri: member.avatar }} style={styles.squadAvatar} />
-                  ) : null}
-                  <Text style={styles.squadMemberName}>{member.name}</Text>
+            return (
+              <View
+                key={project.id}
+                style={[styles.projectCard, BRUTAL_SHADOWS.sm]}
+              >
+                {/* Card Header: Icon + Title + Status */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardTitleRow}>
+                    <Text style={styles.cardIcon}>{project.icon || '🚀'}</Text>
+                    <View style={styles.cardTitleGroup}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {project.title}
+                      </Text>
+                      <Text style={styles.cardCategory}>{project.category}</Text>
+                    </View>
+                  </View>
+                  <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
+                    <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>
+                      {statusInfo.label}
+                    </Text>
+                  </View>
                 </View>
-              ))}
-            </View>
-          </View>
+
+                {/* Active Discovery Indicator */}
+                {isActive && !isClosed && (
+                  <View style={styles.activeIndicator}>
+                    <Text style={styles.activeIndicatorText}>🎯 ACTIVE FOR DISCOVERY</Text>
+                  </View>
+                )}
+
+                {/* Description */}
+                <Text style={styles.cardDescription} numberOfLines={2}>
+                  {project.description}
+                </Text>
+
+                {/* Skills Chips */}
+                <View style={styles.cardSkillsRow}>
+                  {shownSkills.map((skill, idx) => (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.skillChip,
+                        { backgroundColor: getSkillColor(project.techStack[idx]) },
+                      ]}
+                    >
+                      <Text style={styles.skillChipText}>{skill}</Text>
+                    </View>
+                  ))}
+                  {extraCount > 0 && (
+                    <View style={styles.skillChipMore}>
+                      <Text style={styles.skillChipMoreText}>+{extraCount}</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Team Size Bar */}
+                <View style={styles.teamSizeRow}>
+                  <Text style={styles.teamSizeText}>
+                    👥 {project.membersCount || project.members?.length || 1}/{project.maxMembers || 4} Members
+                  </Text>
+                  <View style={styles.teamSizeBarBg}>
+                    <View
+                      style={[
+                        styles.teamSizeBarFill,
+                        {
+                          width: `${Math.min(100, ((project.membersCount || project.members?.length || 1) / (project.maxMembers || 4)) * 100)}%`,
+                        },
+                      ]}
+                    />
+                  </View>
+                </View>
+
+                {/* Roles Wanted */}
+                {project.wantedRoles && project.wantedRoles.length > 0 && (
+                  <View style={styles.rolesPreview}>
+                    <Text style={styles.rolesPreviewLabel}>LOOKING FOR:</Text>
+                    <Text style={styles.rolesPreviewText} numberOfLines={1}>
+                      {project.wantedRoles.slice(0, 3).join(' • ')}
+                      {project.wantedRoles.length > 3 ? ` +${project.wantedRoles.length - 3}` : ''}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Action Buttons */}
+                <View style={styles.cardActions}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleViewProject(project)}
+                    style={[styles.actionBtn, styles.actionBtnView, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.actionBtnText}>👁️ VIEW</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleEditProject(project)}
+                    style={[styles.actionBtn, styles.actionBtnEdit, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.actionBtnText}>✏️ EDIT</Text>
+                  </TouchableOpacity>
+
+                  {!isClosed ? (
+                    <>
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => handleCloseProject(project.id)}
+                        style={[styles.actionBtn, styles.actionBtnClose, BRUTAL_SHADOWS.xs]}
+                      >
+                        <Text style={styles.actionBtnCloseText}>🔒 CLOSE</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => handleFindMembers(project)}
+                        style={[styles.actionBtn, styles.actionBtnFind, BRUTAL_SHADOWS.xs]}
+                      >
+                        <Text style={styles.actionBtnFindText}>🎯 FIND</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <View style={[styles.actionBtn, styles.actionBtnDisabled]}>
+                      <Text style={styles.actionBtnDisabledText}>CLOSED</Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            );
+          })
         )}
       </ScrollView>
+    </View>
+  );
 
-      {/* 3. EXACT FLOATING 'I'M INTERESTED' BURST BUTTON */}
-      <View style={styles.bottomCtaContainer}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => setInterestedModalVisible(true)}
-          style={styles.interestedImageBtn}
+  // ═══════════════════════════════════════════════════════════
+  // MODE B: PROJECT DETAIL VIEW
+  // ═══════════════════════════════════════════════════════════
+  const renderProjectDetail = () => {
+    const isSelectedForDiscovery = proj?.id === activeProjectId;
+    const isClosed = proj?.status === 'CLOSED';
+    const displaySkills = getDisplaySkills(proj?.techStack);
+
+    return (
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.headerBar}>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => setViewMode('list')}
+            style={styles.headerIconBtn}
+          >
+            <Text style={styles.headerIconText}>←</Text>
+          </TouchableOpacity>
+
+          <View style={[styles.headerProjectBadge, BRUTAL_SHADOWS.xs]}>
+            <Text style={styles.headerProjectBadgeText} numberOfLines={1}>
+              {proj?.icon || '⚡'} {proj?.title || 'Project'}
+            </Text>
+          </View>
+
+          <View style={styles.headerRightGroup}>
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => {
+                setIsBookmarked(!isBookmarked);
+                showToast(isBookmarked ? 'REMOVED BOOKMARK' : `BOOKMARKED ${proj?.title} ★`);
+              }}
+              style={styles.headerIconBtn}
+            >
+              <Image
+                source={require('../assets/bookmark.png')}
+                style={[
+                  styles.headerBookmarkImg,
+                  !isBookmarked && styles.headerBookmarkInactive,
+                ]}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => handleEditProject(proj)}
+              style={styles.headerIconBtn}
+            >
+              <Text style={styles.headerIconText}>✏️</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Toast */}
+        {toastMessage && (
+          <View style={[styles.toastContainer, BRUTAL_SHADOWS.xs]}>
+            <Text style={styles.toastText}>{toastMessage}</Text>
+          </View>
+        )}
+
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.detailScrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          <Image
-            source={require('../assets/im_interested_btn.png')}
-            style={styles.interestedBtnImage}
-            resizeMode="contain"
-          />
-        </TouchableOpacity>
-      </View>
+          {/* Banner */}
+          <View style={styles.bannerContainer}>
+            {proj?.title === 'StudySync' ? (
+              <Image
+                source={require('../assets/studysync_banner_clean.png')}
+                style={styles.bannerImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.customBannerWrap}>
+                <Text style={styles.customBannerIcon}>{proj?.icon || '🚀'}</Text>
+                <Text style={styles.customBannerTitle}>{proj?.title}</Text>
+                <Text style={styles.customBannerCategory}>{proj?.category || 'Dev Project'}</Text>
+              </View>
+            )}
 
-      {/* 4. APPLICATION CONFIRMATION MODAL */}
+            {/* Status overlay badge */}
+            <View style={styles.bannerStatusOverlay}>
+              {(() => {
+                const si = getStatusStyle(proj?.status);
+                return (
+                  <View style={[styles.bannerStatusBadge, { backgroundColor: si.bg }]}>
+                    <Text style={[styles.bannerStatusText, { color: si.color }]}>{si.label}</Text>
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
+
+          {/* Active Discovery Badge */}
+          {!isClosed && isSelectedForDiscovery && (
+            <View style={styles.activeDiscoveryNotice}>
+              <Text style={styles.activeDiscoveryNoticeText}>🎯 CURRENTLY ACTIVE FOR DEVELOPER DISCOVERY</Text>
+            </View>
+          )}
+          {!isClosed && !isSelectedForDiscovery && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => {
+                setActiveProjectId(proj.id);
+                showToast(`ACTIVATED ${proj.title} FOR DISCOVERY 🎯`);
+                if (onSelectForDiscovery) onSelectForDiscovery();
+              }}
+              style={[styles.activateDiscoveryBtn, BRUTAL_SHADOWS.xs]}
+            >
+              <Text style={styles.activateDiscoveryBtnText}>🎯 SELECT FOR DISCOVERY DECK →</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Skills Tags */}
+          <View style={styles.tagsRow}>
+            {displaySkills.map((skill, i) => (
+              <View key={i} style={[styles.blueTag, { backgroundColor: getSkillColor(proj?.techStack[i]) }]}>
+                <Text style={styles.blueTagText}>{skill}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Meta Info */}
+          <View style={styles.projectStatsRow}>
+            <View style={styles.metaStatPill}>
+              <Text style={styles.metaStatPillText}>📁 {proj?.category || 'Dev Venture'}</Text>
+            </View>
+            <View style={styles.metaStatPill}>
+              <Text style={styles.metaStatPillText}>⏱️ {proj?.duration || 'Ongoing'}</Text>
+            </View>
+            <View style={styles.metaStatPill}>
+              <Text style={styles.metaStatPillText}>
+                👥 {proj?.membersCount || (proj?.members ? proj.members.length : 2)}/{proj?.maxMembers || 4} Members
+              </Text>
+            </View>
+          </View>
+
+          {/* Description */}
+          <Text style={styles.descriptionText}>
+            {proj?.description || 'Real-time study rooms for developers to code together, share goals, and stay accountable.'}
+          </Text>
+
+          {/* Looking For Roles */}
+          <Text style={styles.sectionHeader}>LOOKING FOR</Text>
+          <View style={styles.lookingForGrid}>
+            {proj?.wantedRoles && proj.wantedRoles.length > 0 ? (
+              proj.wantedRoles.map((role, i) => (
+                <View key={i} style={styles.roleTag}>
+                  <Text style={styles.roleTagText}>{role}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyFieldText}>No roles specified</Text>
+            )}
+          </View>
+
+          {/* Interests */}
+          {proj?.interests && proj.interests.length > 0 && (
+            <>
+              <Text style={styles.sectionHeader}>INTERESTS</Text>
+              <View style={styles.lookingForGrid}>
+                {proj.interests.map((interest, i) => (
+                  <View key={i} style={styles.interestTag}>
+                    <Text style={styles.interestTagText}>{interest}</Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Current Squad */}
+          {proj?.members && proj.members.length > 0 && (
+            <View style={styles.squadSection}>
+              <Text style={styles.sectionHeader}>CURRENT SQUAD ({proj.members.length})</Text>
+              <View style={styles.squadRow}>
+                {proj.members.map((member, i) => (
+                  <View key={member.id || i} style={styles.squadMemberPill}>
+                    {member.avatar ? (
+                      <Image source={{ uri: member.avatar }} style={styles.squadAvatar} />
+                    ) : null}
+                    <Text style={styles.squadMemberName}>{member.name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* Detail Action Buttons */}
+          <View style={styles.detailActionRow}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => handleEditProject(proj)}
+              style={[styles.detailActionBtn, styles.detailActionEdit, BRUTAL_SHADOWS.xs]}
+            >
+              <Text style={styles.detailActionBtnText}>✏️ EDIT PROJECT</Text>
+            </TouchableOpacity>
+
+            {!isClosed ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleCloseProject(proj.id)}
+                style={[styles.detailActionBtn, styles.detailActionClose, BRUTAL_SHADOWS.xs]}
+              >
+                <Text style={styles.detailActionCloseText}>🔒 CLOSE PROJECT</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={[styles.detailActionBtn, styles.detailActionClosed]}>
+                <Text style={styles.detailActionClosedText}>🔒 PROJECT CLOSED</Text>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Floating "I'm Interested" Button (only visible if not closed) */}
+        {!isClosed && (
+          <View style={styles.bottomCtaContainer}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setInterestedModalVisible(true)}
+              style={styles.interestedImageBtn}
+            >
+              <Image
+                source={require('../assets/im_interested_btn.png')}
+                style={[styles.interestedBtnImage, { backgroundColor: 'transparent' }]}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // MAIN RENDER
+  // ═══════════════════════════════════════════════════════════
+  return (
+    <View style={styles.container}>
+      {viewMode === 'list' ? renderProjectsList() : renderProjectDetail()}
+
+      {/* CREATE PROJECT FORM (3-step) */}
+      <CreateProjectForm
+        visible={createModalVisible}
+        onClose={() => setCreateModalVisible(false)}
+        onSubmit={handleCreateSubmit}
+        mode="create"
+      />
+
+      {/* EDIT PROJECT FORM (3-step, pre-filled) */}
+      <CreateProjectForm
+        visible={editModalVisible}
+        onClose={() => {
+          setEditModalVisible(false);
+          setEditingProject(null);
+        }}
+        onSubmit={handleEditSubmit}
+        initialData={editingProject}
+        mode="edit"
+      />
+
+      {/* CLOSE PROJECT CONFIRMATION MODAL */}
+      <Modal
+        visible={closeConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setCloseConfirmVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.confirmCard, BRUTAL_SHADOWS.md]}>
+            <ComicBadge text="CLOSE PROJECT? 🔒" color="#FCA5A5" textColor="#000" size="md" />
+            <Text style={styles.confirmTitle}>Are you sure?</Text>
+            <Text style={styles.confirmSubtitle}>
+              Closing this project will change its status to CLOSED and prevent new member recruitment. You can still view and edit the project.
+            </Text>
+
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setCloseConfirmVisible(false)}
+                style={[styles.confirmCancelBtn, BRUTAL_SHADOWS.xs]}
+              >
+                <Text style={styles.confirmCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={confirmCloseProject}
+                style={[styles.confirmCloseBtn, BRUTAL_SHADOWS.xs]}
+              >
+                <Text style={styles.confirmCloseText}>CLOSE IT</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* APPLICATION CONFIRMATION MODAL (detail view) */}
       <Modal
         visible={interestedModalVisible}
         transparent
@@ -316,339 +652,59 @@ export default function ProjectsScreen({
         onRequestClose={() => setInterestedModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
-            <ComicBadge
-              text="APPLICATION FILED! 🚀"
-              color="#FCD34D"
-              textColor="#000000"
-              rotate="-3deg"
-              size="md"
-            />
-            <Text style={styles.modalTitle}>{proj?.title} Squad</Text>
-            <Text style={styles.modalSubtitle}>
+          <View style={[styles.confirmCard, BRUTAL_SHADOWS.md]}>
+            <ComicBadge text="APPLICATION FILED! 🚀" color="#FCD34D" textColor="#000" rotate="-3deg" size="md" />
+            <Text style={styles.confirmTitle}>{proj?.title} Squad</Text>
+            <Text style={styles.confirmSubtitle}>
               You signaled interest to join {proj?.title}! The squad leads have been notified and you will receive a direct invitation response in Matches.
             </Text>
-
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setInterestedModalVisible(false)}
-              style={[styles.modalDoneBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.confirmCloseBtn, { backgroundColor: '#FFCC00' }, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.modalDoneBtnText}>AWESOME!</Text>
+              <Text style={styles.confirmCloseText}>AWESOME!</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-
-      {/* 5. PROJECT OPTIONS ACTION SHEET MODAL */}
-      <Modal
-        visible={optionsMenuVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setOptionsMenuVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.optionsModalCard, BRUTAL_SHADOWS.md]}>
-            <View style={styles.pickerHeaderRow}>
-              <ComicBadge text="PROJECT OPTIONS ⚙️" color="#38BDF8" textColor="#000" size="sm" />
-              <TouchableOpacity onPress={() => setOptionsMenuVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Select for Discovery Option */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setActiveProjectId(proj.id);
-                setOptionsMenuVisible(false);
-                showToast(`DISCOVERING FOR: ${proj.title} 🎯`);
-                if (onSelectForDiscovery) onSelectForDiscovery();
-              }}
-              style={[styles.optionItemBtn, isSelectedForDiscovery && styles.optionItemBtnActive, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.optionItemText}>
-                {isSelectedForDiscovery ? '✔ ACTIVE FOR DISCOVERY' : '🎯 SELECT FOR DISCOVERY'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Switch Project */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setOptionsMenuVisible(false);
-                setSwitchPickerVisible(true);
-              }}
-              style={[styles.optionItemBtn, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.optionItemText}>🔀 SWITCH / VIEW OTHER PROJECTS</Text>
-            </TouchableOpacity>
-
-            {/* Edit Project */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={handleOpenEdit}
-              style={[styles.optionItemBtn, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.optionItemText}>✏️ EDIT PROJECT DETAILS</Text>
-            </TouchableOpacity>
-
-            {/* Create New Project */}
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => {
-                setOptionsMenuVisible(false);
-                setCreateModalVisible(true);
-              }}
-              style={[styles.optionItemBtn, { backgroundColor: '#FEF08A' }, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.optionItemText}>➕ CREATE NEW PROJECT</Text>
-            </TouchableOpacity>
-
-            {/* Delete Project */}
-            {projects.length > 1 && (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={handleDelete}
-                style={[styles.optionItemBtn, styles.deleteOptionBtn, BRUTAL_SHADOWS.xs]}
-              >
-                <Text style={styles.deleteOptionText}>🗑️ DELETE THIS PROJECT</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </Modal>
-
-      {/* 6. SWITCH PROJECT PICKER MODAL */}
-      <Modal
-        visible={switchPickerVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setSwitchPickerVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.md]}>
-            <View style={styles.pickerHeaderRow}>
-              <ComicBadge text="ALL PROJECTS 📁" color="#FFCC00" textColor="#000" size="sm" />
-              <TouchableOpacity onPress={() => setSwitchPickerVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
-              {projects.map((p) => (
-                <TouchableOpacity
-                  key={p.id}
-                  activeOpacity={0.8}
-                  onPress={() => {
-                    setViewedProjectId(p.id);
-                    setSwitchPickerVisible(false);
-                    showToast(`VIEWING ${p.title}`);
-                  }}
-                  style={[
-                    styles.projectPickerItem,
-                    p.id === proj.id && styles.projectPickerItemActive,
-                    BRUTAL_SHADOWS.xs,
-                  ]}
-                >
-                  <Text style={styles.pickerItemIcon}>{p.icon || '⚡'}</Text>
-                  <View style={styles.pickerItemBody}>
-                    <Text style={styles.pickerItemTitle}>{p.title}</Text>
-                    <Text style={styles.pickerItemTech}>{p.category} • {p.membersCount} members</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => {
-                setSwitchPickerVisible(false);
-                setCreateModalVisible(true);
-              }}
-              style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.createProjectPromptText}>➕ CREATE NEW PROJECT</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* 7. CREATE PROJECT MODAL */}
-      <Modal
-        visible={createModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCreateModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalBackdrop}
-        >
-          <ScrollView contentContainerStyle={styles.scrollModalCenter} showsVerticalScrollIndicator={false}>
-            <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
-              <View style={styles.pickerHeaderRow}>
-                <ComicBadge text="NEW PROJECT 🚀" color="#4ADE80" textColor="#000" size="sm" />
-                <TouchableOpacity onPress={() => setCreateModalVisible(false)} style={styles.modalCloseBtn}>
-                  <Text style={styles.modalCloseText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.formSectionTitle}>PROJECT TITLE</Text>
-              <TextInput
-                style={styles.comicInput}
-                placeholder="e.g. CodeForge, DevPulse"
-                placeholderTextColor="#999"
-                value={formTitle}
-                onChangeText={setFormTitle}
-              />
-
-              <Text style={styles.formSectionTitle}>CATEGORY</Text>
-              <TextInput
-                style={styles.comicInput}
-                placeholder="e.g. AI / Productivity, EdTech, Mobile"
-                placeholderTextColor="#999"
-                value={formCategory}
-                onChangeText={setFormCategory}
-              />
-
-              <Text style={styles.formSectionTitle}>DESCRIPTION</Text>
-              <TextInput
-                style={[styles.comicInput, styles.textAreaInput]}
-                placeholder="What are you building and why?"
-                placeholderTextColor="#999"
-                value={formDescription}
-                onChangeText={setFormDescription}
-                multiline
-              />
-
-              <Text style={styles.formSectionTitle}>TECH STACK (comma separated)</Text>
-              <TextInput
-                style={styles.comicInput}
-                placeholder="e.g. React, Node.js, Python, AWS"
-                placeholderTextColor="#999"
-                value={formSkills}
-                onChangeText={setFormSkills}
-              />
-
-              <Text style={styles.formSectionTitle}>LOOKING FOR ROLES (comma separated)</Text>
-              <TextInput
-                style={styles.comicInput}
-                placeholder="e.g. Frontend Dev, Backend Dev, UI/UX"
-                placeholderTextColor="#999"
-                value={formRoles}
-                onChangeText={setFormRoles}
-              />
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleCreateSubmit}
-                style={[styles.submitFormBtn, BRUTAL_SHADOWS.sm]}
-              >
-                <Text style={styles.submitFormBtnText}>CREATE & LAUNCH FOR MATCHING 🚀</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* 8. EDIT PROJECT MODAL */}
-      <Modal
-        visible={editModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEditModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalBackdrop}
-        >
-          <ScrollView contentContainerStyle={styles.scrollModalCenter} showsVerticalScrollIndicator={false}>
-            <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
-              <View style={styles.pickerHeaderRow}>
-                <ComicBadge text="EDIT PROJECT ✏️" color="#FCD34D" textColor="#000" size="sm" />
-                <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
-                  <Text style={styles.modalCloseText}>✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.formSectionTitle}>PROJECT TITLE</Text>
-              <TextInput
-                style={styles.comicInput}
-                value={editTitle}
-                onChangeText={setEditTitle}
-              />
-
-              <Text style={styles.formSectionTitle}>CATEGORY</Text>
-              <TextInput
-                style={styles.comicInput}
-                value={editCategory}
-                onChangeText={setEditCategory}
-              />
-
-              <Text style={styles.formSectionTitle}>DESCRIPTION</Text>
-              <TextInput
-                style={[styles.comicInput, styles.textAreaInput]}
-                value={editDescription}
-                onChangeText={setEditDescription}
-                multiline
-              />
-
-              <Text style={styles.formSectionTitle}>TECH STACK</Text>
-              <TextInput
-                style={styles.comicInput}
-                value={editSkills}
-                onChangeText={setEditSkills}
-              />
-
-              <Text style={styles.formSectionTitle}>LOOKING FOR ROLES</Text>
-              <TextInput
-                style={styles.comicInput}
-                value={editRoles}
-                onChangeText={setEditRoles}
-              />
-
-              <Text style={styles.formSectionTitle}>EXPERIENCE LEVEL</Text>
-              <TextInput
-                style={styles.comicInput}
-                value={editExpLevel}
-                onChangeText={setEditExpLevel}
-              />
-
-              <Text style={styles.formSectionTitle}>STATUS</Text>
-              <TextInput
-                style={styles.comicInput}
-                value={editStatus}
-                onChangeText={setEditStatus}
-              />
-
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleSaveEdit}
-                style={[styles.submitFormBtn, BRUTAL_SHADOWS.sm]}
-              >
-                <Text style={styles.submitFormBtnText}>SAVE PROJECT CHANGES ✔</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
 }
 
+// ─── STYLES ──────────────────────────────────────────────────
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
   },
-  headerBar: {
+
+  // ─── LIST VIEW HEADER ────────────────────────────────────
+  listHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'transparent',
     paddingHorizontal: 16,
     paddingVertical: 10,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000',
+    letterSpacing: 1,
+  },
+  newProjectBtn: {
+    backgroundColor: '#4ADE80',
+    borderWidth: 2.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  newProjectBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000',
   },
   headerIconBtn: {
     padding: 4,
@@ -656,12 +712,303 @@ const styles = StyleSheet.create({
   headerIconText: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#000000',
+    color: '#000',
+  },
+  headerBookmarkImg: {
+    width: 22,
+    height: 22,
+  },
+  headerBookmarkInactive: {
+    opacity: 0.45,
+  },
+
+  // ─── TOAST ───────────────────────────────────────────────
+  toastContainer: {
+    position: 'absolute',
+    top: 55,
+    alignSelf: 'center',
+    zIndex: 999,
+    backgroundColor: '#FCD34D',
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  toastText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#000',
+  },
+
+  // ─── SCROLL ──────────────────────────────────────────────
+  scrollArea: {
+    flex: 1,
+  },
+  listScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
+  },
+  detailScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 110,
+  },
+
+  // ─── EMPTY STATE ─────────────────────────────────────────
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 60,
+    paddingHorizontal: 30,
+  },
+  emptyIcon: {
+    fontSize: 56,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 24,
+  },
+  emptyCreateBtn: {
+    height: 48,
+    paddingHorizontal: 28,
+    backgroundColor: '#FFCC00',
+    borderWidth: 2.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyCreateBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000',
+  },
+
+  // ═══ PROJECT CARD (List Mode) ════════════════════════════
+  projectCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 3,
+    borderColor: '#000',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  cardIcon: {
+    fontSize: 30,
+  },
+  cardTitleGroup: {
+    flex: 1,
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#000',
+  },
+  cardCategory: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#666',
+    marginTop: 1,
+  },
+  statusBadge: {
+    borderWidth: 1.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  statusBadgeText: {
+    fontSize: 9,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  activeIndicator: {
+    backgroundColor: '#FEF9C3',
+    borderWidth: 1.5,
+    borderColor: '#000',
+    borderRadius: 8,
+    paddingVertical: 4,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  activeIndicatorText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#854D0E',
+    letterSpacing: 0.5,
+  },
+  cardDescription: {
+    fontSize: 12,
+    fontWeight: '500',
+    lineHeight: 17,
+    color: '#333',
+    marginBottom: 10,
+  },
+
+  // Skills Chips
+  cardSkillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginBottom: 10,
+  },
+  skillChip: {
+    borderWidth: 1.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  skillChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#000',
+  },
+  skillChipMore: {
+    borderWidth: 1.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: '#F3F4F6',
+  },
+  skillChipMoreText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#666',
+  },
+
+  // Team Size
+  teamSizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  teamSizeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000',
+    minWidth: 100,
+  },
+  teamSizeBarBg: {
+    flex: 1,
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#000',
+    overflow: 'hidden',
+  },
+  teamSizeBarFill: {
+    height: '100%',
+    backgroundColor: '#4ADE80',
+    borderRadius: 3,
+  },
+
+  // Roles Preview
+  rolesPreview: {
+    marginBottom: 10,
+  },
+  rolesPreviewLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#666',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  rolesPreviewText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000',
+  },
+
+  // Action Buttons
+  cardActions: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 4,
+  },
+  actionBtn: {
+    flex: 1,
+    height: 36,
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionBtnView: {
+    backgroundColor: '#E0F2FE',
+  },
+  actionBtnEdit: {
+    backgroundColor: '#FEF9C3',
+  },
+  actionBtnClose: {
+    backgroundColor: '#FEE2E2',
+  },
+  actionBtnFind: {
+    backgroundColor: '#4ADE80',
+  },
+  actionBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000',
+  },
+  actionBtnCloseText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#B91C1C',
+  },
+  actionBtnFindText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000',
+  },
+  actionBtnDisabled: {
+    backgroundColor: '#E5E7EB',
+    borderColor: '#9CA3AF',
+  },
+  actionBtnDisabledText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#6B7280',
+  },
+
+  // ═══ DETAIL VIEW ═════════════════════════════════════════
+  headerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   headerProjectBadge: {
     backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: '#000',
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -670,43 +1017,21 @@ const styles = StyleSheet.create({
   headerProjectBadgeText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: '#000',
   },
   headerRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
   },
-  toastContainer: {
-    position: 'absolute',
-    top: 55,
-    alignSelf: 'center',
-    zIndex: 999,
-    backgroundColor: '#FCD34D',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  toastText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  scrollArea: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 110,
-  },
+
+  // Banner
   bannerContainer: {
     width: '100%',
-    height: 380,
+    height: 340,
     borderRadius: 18,
     borderWidth: 2.5,
-    borderColor: '#000000',
+    borderColor: '#000',
     overflow: 'hidden',
     backgroundColor: '#FAF6EB',
     marginBottom: 14,
@@ -730,7 +1055,7 @@ const styles = StyleSheet.create({
   customBannerTitle: {
     fontSize: 28,
     fontWeight: '900',
-    color: '#000000',
+    color: '#000',
     textAlign: 'center',
   },
   customBannerCategory: {
@@ -739,10 +1064,29 @@ const styles = StyleSheet.create({
     color: '#2563EB',
     marginTop: 6,
   },
+  bannerStatusOverlay: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+  },
+  bannerStatusBadge: {
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  bannerStatusText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+
+  // Detail — Discovery
   activeDiscoveryNotice: {
     backgroundColor: '#FEF9C3',
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: '#000',
     borderRadius: 12,
     paddingVertical: 6,
     alignItems: 'center',
@@ -757,7 +1101,7 @@ const styles = StyleSheet.create({
   activateDiscoveryBtn: {
     backgroundColor: '#FFCC00',
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: '#000',
     borderRadius: 12,
     paddingVertical: 8,
     alignItems: 'center',
@@ -766,9 +1110,11 @@ const styles = StyleSheet.create({
   activateDiscoveryBtnText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: '#000',
     letterSpacing: 0.5,
   },
+
+  // Detail — Tags
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -776,9 +1122,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   blueTag: {
-    backgroundColor: '#E0F2FE',
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: '#000',
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -786,32 +1131,42 @@ const styles = StyleSheet.create({
   blueTagText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#000000',
+    color: '#000',
   },
-  greenTag: {
-    backgroundColor: '#86EFAC',
+
+  // Detail — Meta Stats
+  projectStatsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  metaStatPill: {
+    backgroundColor: '#FAF6EB',
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: '#000',
     borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
-  greenTagText: {
+  metaStatPillText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#000000',
+    fontWeight: '800',
+    color: '#000',
   },
+
+  // Detail — Description
   descriptionText: {
     fontSize: 13,
     fontWeight: '500',
     lineHeight: 18,
-    color: '#000000',
+    color: '#000',
     marginBottom: 16,
   },
   sectionHeader: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#000000',
+    color: '#000',
     letterSpacing: 0.5,
     marginBottom: 10,
   },
@@ -819,11 +1174,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 12,
   },
   roleTag: {
     backgroundColor: '#E0F2FE',
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: '#000',
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 14,
     paddingVertical: 6,
@@ -831,8 +1187,104 @@ const styles = StyleSheet.create({
   roleTagText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
+    color: '#000',
   },
+  interestTag: {
+    backgroundColor: '#E9D5FF',
+    borderWidth: 1.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  interestTagText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000',
+  },
+  emptyFieldText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999',
+  },
+
+  // Detail — Squad
+  squadSection: {
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  squadRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  squadMemberPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  squadAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#000',
+  },
+  squadMemberName: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000',
+  },
+
+  // Detail — Action Row
+  detailActionRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 8,
+    marginBottom: 20,
+  },
+  detailActionBtn: {
+    flex: 1,
+    height: 44,
+    borderWidth: 2.5,
+    borderColor: '#000',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailActionEdit: {
+    backgroundColor: '#FEF9C3',
+  },
+  detailActionClose: {
+    backgroundColor: '#FEE2E2',
+  },
+  detailActionClosed: {
+    backgroundColor: '#E5E7EB',
+    borderColor: '#9CA3AF',
+  },
+  detailActionBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000',
+  },
+  detailActionCloseText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#B91C1C',
+  },
+  detailActionClosedText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#6B7280',
+  },
+
+  // Floating CTA
   bottomCtaContainer: {
     position: 'absolute',
     bottom: 12,
@@ -849,6 +1301,8 @@ const styles = StyleSheet.create({
     width: 320,
     height: 70,
   },
+
+  // ─── MODALS ──────────────────────────────────────────────
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
@@ -856,246 +1310,63 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  scrollModalCenter: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-  },
-  modalCard: {
+  confirmCard: {
     width: '100%',
     maxWidth: 380,
     backgroundColor: '#FAF6EB',
     borderRadius: 24,
     borderWidth: 3.5,
-    borderColor: '#000000',
-    padding: 20,
+    borderColor: '#000',
+    padding: 24,
     alignItems: 'center',
   },
-  modalTitle: {
+  confirmTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#000000',
-    marginTop: 12,
+    color: '#000',
+    marginTop: 14,
     marginBottom: 8,
   },
-  modalSubtitle: {
+  confirmSubtitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#444444',
+    color: '#444',
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: 18,
-  },
-  modalDoneBtn: {
-    backgroundColor: '#FFCC00',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 28,
-    paddingVertical: 10,
-  },
-  modalDoneBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  optionsModalCard: {
-    alignItems: 'stretch',
-  },
-  pickerHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  modalCloseBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalCloseText: {
-    color: '#FFFFFF',
-    fontWeight: '900',
-    fontSize: 14,
-  },
-  optionItemBtn: {
-    height: 46,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  optionItemBtnActive: {
-    backgroundColor: '#FEF08A',
-  },
-  optionItemText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  deleteOptionBtn: {
-    backgroundColor: '#FEE2E2',
-    borderColor: '#DC2626',
-    marginTop: 4,
-  },
-  deleteOptionText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#DC2626',
-  },
-  pickerModalCard: {
-    maxHeight: 520,
-    alignItems: 'stretch',
-  },
-  pickerList: {
-    maxHeight: 320,
-  },
-  projectPickerItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-    gap: 10,
-  },
-  projectPickerItemActive: {
-    backgroundColor: '#FEF9C3',
-  },
-  pickerItemIcon: {
-    fontSize: 24,
-  },
-  pickerItemBody: {
-    flex: 1,
-  },
-  pickerItemTitle: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  pickerItemTech: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#666666',
-    marginTop: 2,
-  },
-  createProjectPromptBtn: {
-    height: 44,
-    backgroundColor: '#FFCC00',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  createProjectPromptText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  formSectionTitle: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    alignSelf: 'flex-start',
-    marginBottom: 4,
-    marginTop: 8,
-  },
-  comicInput: {
-    width: '100%',
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  textAreaInput: {
-    height: 70,
-    textAlignVertical: 'top',
-    paddingTop: 8,
-  },
-  submitFormBtn: {
-    width: '100%',
-    height: 48,
-    backgroundColor: '#FFCC00',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 18,
-    marginBottom: 8,
-  },
-  submitFormBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  projectStatsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  metaStatPill: {
-    backgroundColor: '#FAF6EB',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  metaStatPillText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  squadSection: {
-    marginTop: 16,
     marginBottom: 20,
   },
-  squadRow: {
+  confirmBtnRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    gap: 12,
   },
-  squadMemberPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  confirmCancelBtn: {
+    height: 42,
+    paddingHorizontal: 22,
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
+    borderWidth: 2.5,
+    borderColor: '#000',
     borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  squadAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#000000',
+  confirmCancelText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000',
   },
-  squadMemberName: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
+  confirmCloseBtn: {
+    height: 42,
+    paddingHorizontal: 22,
+    backgroundColor: '#FCA5A5',
+    borderWidth: 2.5,
+    borderColor: '#000',
+    borderRadius: BORDER_RADIUS.pill,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  confirmCloseText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#000',
   },
 });

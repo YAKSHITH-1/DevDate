@@ -2,12 +2,16 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, BRUTAL_SHADOWS, COMIC_TEXT_SHADOW } from '../styles/theme';
 import ComicBadge from './ComicBadge';
+import { getSkillLabels } from '../data/skillsDatabase';
 
 function ProjectCard({ project, onApply, onBookmark, isBookmarked }) {
   if (!project) return null;
 
   // Clean description to ensure human-centered, easily understandable pitch
   const cleanDescription = project.description?.replace(/agentic /gi, 'intelligent ') || '';
+
+  // Resolve canonical skill IDs to display labels
+  const displayTechStack = getSkillLabels(project.techStack);
 
   return (
     <View style={[styles.cardContainer, BRUTAL_SHADOWS.card]}>
@@ -32,13 +36,17 @@ function ProjectCard({ project, onApply, onBookmark, isBookmarked }) {
           )}
         </View>
 
-        {/* Comic Mascot / Robot Profile Button */}
+        {/* Bookmark Button */}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => onBookmark && onBookmark(project.id)}
           style={[styles.mascotBtn, BRUTAL_SHADOWS.xs]}
         >
-          <Text style={styles.mascotIcon}>🤖</Text>
+          <Image
+            source={require('../assets/bookmark.png')}
+            style={[styles.cardBookmarkImg, !isBookmarked && styles.cardBookmarkInactive]}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
       </View>
 
@@ -88,7 +96,7 @@ function ProjectCard({ project, onApply, onBookmark, isBookmarked }) {
           <View style={styles.techSection}>
             <Text style={styles.sectionHeader}>📺 TECH ARSENAL:</Text>
             <View style={styles.techTagsRow}>
-              {project.techStack?.map((tech, index) => {
+              {displayTechStack?.map((tech, index) => {
                 let tagBg = COLORS.white;
                 let tagColor = COLORS.black;
                 let prefix = '';
@@ -208,6 +216,13 @@ const styles = StyleSheet.create({
   },
   mascotIcon: {
     fontSize: 18,
+  },
+  cardBookmarkImg: {
+    width: 20,
+    height: 20,
+  },
+  cardBookmarkInactive: {
+    opacity: 0.45,
   },
   avatarSection: {
     alignItems: 'center',

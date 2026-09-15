@@ -395,7 +395,11 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
             onPress={handleThirdPartySkip}
             style={[styles.actionBtnRound, styles.bgRed, BRUTAL_SHADOWS.xs]}
           >
-            <Text style={styles.actionIconText}>✕</Text>
+            <Image
+              source={require('../assets/reject.png')}
+              style={styles.actionIconImg}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -403,7 +407,11 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
             onPress={handleThirdPartyLike}
             style={[styles.actionBtnRound, styles.bgGreen, BRUTAL_SHADOWS.xs]}
           >
-            <Text style={styles.actionIconHeart}>♥</Text>
+            <Image
+              source={require('../assets/like.png')}
+              style={styles.actionIconImg}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -413,7 +421,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
           >
             <Image
               source={require('../assets/lets_build_burst.png')}
-              style={styles.letsBuildImage}
+              style={[styles.letsBuildImage, { backgroundColor: 'transparent' }]}
               resizeMode="contain"
             />
           </TouchableOpacity>
@@ -982,6 +990,10 @@ const styles = StyleSheet.create({
   actionIconHeart: {
     fontSize: 24,
     color: '#000000',
+  },
+  actionIconImg: {
+    width: 28,
+    height: 28,
   },
   letsBuildStickerBtn: {
     flex: 1,
