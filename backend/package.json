@@ -1,0 +1,37 @@
+{
+  "name": "devdate",
+  "version": "1.0.0",
+  "description": "A platform for project collaboration.",
+  "license": "ISC",
+  "author": "Shrikar and Yakshith",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "seed:skills": "node src/scripts/seedSkills.js",
+    "seed:devs": "node src/scripts/seedDevelopers.js",
+    "migrate:skills": "node src/scripts/migrateProjectSkills.js",
+    "test:projects": "node tests/project.test.js",
+    "test:skills": "node tests/skill.test.js",
+    "test:invitations": "node tests/invitation.test.js",
+    "test:auth": "node tests/auth.test.js",
+    "test": "node tests/auth.test.js && node tests/skill.test.js && node tests/project.test.js && node tests/invitation.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "express-validator": "^7.3.2",
+    "googleapis": "^180.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.10.0",
+    "nodemailer": "^10.0.9",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
