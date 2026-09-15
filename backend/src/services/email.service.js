@@ -118,7 +118,7 @@ export const sendVerificationEmail = async (email, otp, expiryMinutes = 10) => {
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`❌ [Email Delivery Error] Failed to send verification email to ${email}: ${error.message}`);
+    console.error(`[Email Delivery Error] Failed to send verification email to ${email}: ${error.message}`);
     throw error;
   }
 };
@@ -194,7 +194,7 @@ export const sendPasswordResetEmail = async (email, resetUrl, expiryMinutes = 15
     const info = await transporter.sendMail(mailOptions);
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error(`❌ [Email Delivery Error] Failed to send password reset email to ${email}: ${error.message}`);
+    console.error(` [Email Delivery Error] Failed to send password reset email to ${email}: ${error.message}`);
     throw error;
   }
 };
