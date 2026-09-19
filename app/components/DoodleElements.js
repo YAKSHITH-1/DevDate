@@ -243,7 +243,70 @@ export function DoodleUser({ size = 22, color = COLORS.ink, fillColor = '#FFFFFF
   );
 }
 
-// 7. Drawn Doodle Check
+// 7. Drawn Doodle Folder / Project Icon (Replaces folder/projects icon)
+export function DoodleFolder({ size = 22, color = COLORS.ink, fillColor = '#FFFFFF', style }) {
+  const folderWidth = Math.round(size * 0.88);
+  const folderHeight = Math.round(size * 0.62);
+  const tabWidth = Math.round(folderWidth * 0.44);
+  const tabHeight = Math.round(size * 0.22);
+
+  return (
+    <View
+      style={[
+        {
+          width: size,
+          height: size,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        style,
+      ]}
+    >
+      <View style={{ width: folderWidth, height: folderHeight + tabHeight - 2 }}>
+        {/* Folder tab */}
+        <View
+          style={{
+            width: tabWidth,
+            height: tabHeight,
+            borderTopLeftRadius: 3,
+            borderTopRightRadius: 3,
+            borderWidth: 1.8,
+            borderBottomWidth: 0,
+            borderColor: color,
+            backgroundColor: fillColor,
+            marginLeft: 1,
+          }}
+        />
+        {/* Folder body */}
+        <View
+          style={{
+            width: folderWidth,
+            height: folderHeight,
+            marginTop: -2,
+            borderRadius: 4,
+            borderWidth: 1.8,
+            borderColor: color,
+            backgroundColor: fillColor,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {/* Subtle horizontal code/accent bar */}
+          <View
+            style={{
+              width: folderWidth * 0.46,
+              height: 2,
+              backgroundColor: color,
+              borderRadius: 1,
+            }}
+          />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// 8. Drawn Doodle Check
 export function DoodleCheck({ size = 16, color = COLORS.green, style }) {
   return (
     <View

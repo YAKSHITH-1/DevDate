@@ -356,7 +356,20 @@ export async function fetchInvitationsApi(userId, token = null) {
  * Create and send an invitation via POST /api/invitations
  * Guards against attempting recruitment using mock project IDs (e.g. 'p1')
  */
-export async function createInvitationApi({ projectId, developerId, message = '', senderId = null }, token = null) {
+export async function createInvitationApi(firstArg, ...rest) {
+  let projectId, developerId, message = '', senderId = null, token = null;
+
+  if (firstArg && typeof firstArg === 'object') {
+    ({ projectId, developerId, message = '', senderId = null } = firstArg);
+    token = rest[0] || null;
+  } else {
+    projectId = firstArg;
+    developerId = rest[0];
+    message = rest[1] || '';
+    token = rest[2] || null;
+    senderId = rest[3] || null;
+  }
+
   const headers = {};
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (senderId) headers['x-user-id'] = senderId;
@@ -399,10 +412,16 @@ export async function recordSwipeApi(projectId, developerId, action = 'PASS', to
     };
   }
 
+  // Normalize action to backend supported values: 'PASS' or 'INTERESTED'
+  const upperAction = String(action || 'PASS').toUpperCase();
+  const normalizedAction = (upperAction === 'LIKE' || upperAction === 'SUPERLIKE' || upperAction === 'INTERESTED')
+    ? 'INTERESTED'
+    : 'PASS';
+
   const result = await request('/discovery/swipe', {
     method: 'POST',
     headers,
-    body: JSON.stringify({ projectId, developerId, action }),
+    body: JSON.stringify({ projectId, developerId, action: normalizedAction }),
   });
 
   return result;
@@ -1690,6 +1709,7 @@ export function normalizeDeveloper(rawDev, activeProject = null) {
   const experience = rawDev.experience || '2+ Years';
   const availability = rawDev.availability || 'Available';
   const location = rawDev.location || 'Remote OK';
+  const age = rawDev.age || 24;
   const github = rawDev.github || '';
   const linkedin = rawDev.linkedin || '';
   const portfolio = rawDev.portfolio || '';
@@ -1728,6 +1748,7 @@ export function normalizeDeveloper(rawDev, activeProject = null) {
     experience,
     availability,
     location,
+    age,
     github,
     linkedin,
     portfolio,

@@ -15,7 +15,6 @@ import {
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
 import { DoodleStar, DoodleCode, DoodleArrow, DoodleSparkle } from '../components/DoodleElements';
-import NotificationsList from '../components/NotificationsList';
 import { useApp } from '../context/AppContext';
 import { resolveProfileAvatar } from '../utils/avatar';
 
@@ -41,12 +40,9 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
     sendTyping,
     sendStopTyping,
     typingStatusByMatch,
-    notifications,
-    unreadNotificationsCount,
   } = useApp();
 
   // Screen state
-  const [activeSegment, setActiveSegment] = useState('messages'); // 'messages' | 'notifications'
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState(null);
@@ -186,7 +182,7 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
                   ),
                 }}
                 style={styles.threadAvatar}
-                onError={() => {}}
+                onError={() => { }}
               />
               {/* Online badge */}
               <View
@@ -282,7 +278,7 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
                     onPress={() => handleQuickIcebreaker("Hey! I saw your profile and would love to collaborate.")}
                     style={[styles.icebreakerBtn, BRUTAL_SHADOWS.xs]}
                   >
-                    <Text style={styles.icebreakerBtnText}>SAY HELLO --></Text>
+                    <Text style={styles.icebreakerBtnText}>SAY HELLO --</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -420,163 +416,108 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
             />
           </View>
 
-          {/* Segmented Switcher: MESSAGES vs NOTIFICATIONS */}
-          <View style={styles.segmentContainer}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setActiveSegment('messages')}
-              style={[
-                styles.segmentTab,
-                activeSegment === 'messages' && styles.segmentTabActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.segmentTabText,
-                  activeSegment === 'messages' && styles.segmentTabTextActive,
-                ]}
-              >
-                MESSAGES ({chats.length})
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setActiveSegment('notifications')}
-              style={[
-                styles.segmentTab,
-                activeSegment === 'notifications' && styles.segmentTabActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.segmentTabText,
-                  activeSegment === 'notifications' && styles.segmentTabTextActive,
-                ]}
-              >
-                NOTIFICATIONS {unreadNotificationsCount > 0 ? `(${unreadNotificationsCount} NEW)` : `(${notifications.length})`}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* SEGMENT CONTENT A: CONVERSATION LIST */}
-          {activeSegment === 'messages' && (
-            <ScrollView
-              contentContainerStyle={styles.chatListScroll}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={Boolean(matchesLoading)}
-                  onRefresh={refreshMatchesAndInvitations}
-                  tintColor={COLORS.black}
-                  colors={[COLORS.yellow, COLORS.cyan]}
-                />
-              }
-            >
-              {chats.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <View style={styles.emptyIconWrap}>
-                    <DoodleCode symbol="//" bgColor={COLORS.yellow} color={COLORS.black} style={{ paddingHorizontal: 12, paddingVertical: 6 }} />
-                  </View>
-                  <Text style={styles.emptyTitle}>NO CONVERSATIONS YET!</Text>
-                  <Text style={styles.emptySubtitle}>
-                    Swipe right on developers in Discover to send invites, or accept incoming invites in Matches to unlock squad chats!
-                  </Text>
-                  {onBackToMatches && (
-                    <TouchableOpacity
-                      activeOpacity={0.85}
-                      onPress={onBackToMatches}
-                      style={[styles.emptyActionBtn, BRUTAL_SHADOWS.sm]}
-                    >
-                      <Text style={styles.emptyActionText}>GO TO MATCHES --></Text>
-                    </TouchableOpacity>
-                  )}
+          {/* CONVERSATION LIST */}
+          <ScrollView
+            contentContainerStyle={styles.chatListScroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={Boolean(matchesLoading)}
+                onRefresh={refreshMatchesAndInvitations}
+                tintColor={COLORS.black}
+                colors={[COLORS.yellow, COLORS.cyan]}
+              />
+            }
+          >
+            {chats.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <View style={styles.emptyIconWrap}>
+                  <DoodleCode symbol="//" bgColor={COLORS.yellow} color={COLORS.black} style={{ paddingHorizontal: 12, paddingVertical: 6 }} />
                 </View>
-              ) : (
-                chats.map((item) => (
+                <Text style={styles.emptyTitle}>NO CONVERSATIONS YET!</Text>
+                <Text style={styles.emptySubtitle}>
+                  Swipe right on developers in Discover to send invites, or accept incoming invites in Matches to unlock squad chats!
+                </Text>
+                {onBackToMatches && (
                   <TouchableOpacity
-                    key={item.id || item.matchId}
                     activeOpacity={0.85}
-                    onPress={() => {
-                      if (markChatAsRead) markChatAsRead(item.id || item.matchId);
-                      setActiveChatId(item.id || item.matchId);
-                    }}
-                    style={[
-                      styles.chatListItem,
-                      item.unreadCount > 0 ? styles.chatListItemUnread : styles.chatListItemRead,
-                      BRUTAL_SHADOWS.sm,
-                    ]}
+                    onPress={onBackToMatches}
+                    style={[styles.emptyActionBtn, BRUTAL_SHADOWS.sm]}
                   >
-                    <View style={styles.avatarContainer}>
-                      <Image
-                        source={{
-                          uri: resolveProfileAvatar(
-                            item.developerAvatar,
-                            item.developerName || 'Developer',
-                            'voxel-bot'
-                          ),
-                        }}
-                        style={styles.listAvatar}
-                        onError={() => {}}
-                      />
-                      {item.status === 'Online' && <View style={styles.onlineBadge} />}
-                    </View>
-
-                    <View style={styles.chatListDetails}>
-                      <View style={styles.chatTitleRow}>
-                        <Text style={[styles.listDevName, item.unreadCount > 0 && styles.listDevNameUnread]} numberOfLines={1}>
-                          {item.developerName}
-                        </Text>
-                        <Text style={styles.listTimeText}>{item.time || 'Active'}</Text>
-                      </View>
-
-                      <View style={styles.chatProjectBadgeRow}>
-                        <View style={styles.projectChip}>
-                          <Text style={styles.listProjectTag} numberOfLines={1}>
-                            // {item.projectName || 'DevDate Rig'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text
-                        style={[
-                          styles.listSnippetText,
-                          item.unreadCount > 0 && styles.listSnippetTextUnread,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {item.lastMessage || 'Channel created. Tap to start chatting.'}
-                      </Text>
-                    </View>
-
-                    <View style={styles.listRightCol}>
-                      {item.unreadCount > 0 ? (
-                        <View style={[styles.unreadBadgePill, BRUTAL_SHADOWS.xs]}>
-                          <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
-                        </View>
-                      ) : (
-                        <DoodleArrow direction="right" size={14} color={COLORS.textMuted} />
-                      )}
-                    </View>
+                    <Text style={styles.emptyActionText}>GO TO MATCHES --</Text>
                   </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-          )}
+                )}
+              </View>
+            ) : (
+              chats.map((item) => (
+                <TouchableOpacity
+                  key={item.id || item.matchId}
+                  activeOpacity={0.85}
+                  onPress={() => {
+                    if (markChatAsRead) markChatAsRead(item.id || item.matchId);
+                    setActiveChatId(item.id || item.matchId);
+                  }}
+                  style={[
+                    styles.chatListItem,
+                    item.unreadCount > 0 ? styles.chatListItemUnread : styles.chatListItemRead,
+                    BRUTAL_SHADOWS.sm,
+                  ]}
+                >
+                  <View style={styles.avatarContainer}>
+                    <Image
+                      source={{
+                        uri: resolveProfileAvatar(
+                          item.developerAvatar,
+                          item.developerName || 'Developer',
+                          'voxel-bot'
+                        ),
+                      }}
+                      style={styles.listAvatar}
+                      onError={() => { }}
+                    />
+                    {item.status === 'Online' && <View style={styles.onlineBadge} />}
+                  </View>
 
-          {/* SEGMENT CONTENT B: NOTIFICATIONS FEED */}
-          {activeSegment === 'notifications' && (
-            <NotificationsList
-              showHeader={true}
-              onSelectNotification={(notif) => {
-                if (notif?.matchId) {
-                  setActiveChatId(notif.matchId);
-                } else if (notif?.type === 'INVITATION_RECEIVED' && onBackToMatches) {
-                  onBackToMatches();
-                }
-              }}
-            />
-          )}
+                  <View style={styles.chatListDetails}>
+                    <View style={styles.chatTitleRow}>
+                      <Text style={[styles.listDevName, item.unreadCount > 0 && styles.listDevNameUnread]} numberOfLines={1}>
+                        {item.developerName}
+                      </Text>
+                      <Text style={styles.listTimeText}>{item.time || 'Active'}</Text>
+                    </View>
+
+                    <View style={styles.chatProjectBadgeRow}>
+                      <View style={styles.projectChip}>
+                        <Text style={styles.listProjectTag} numberOfLines={1}>
+                            // {item.projectName || 'DevDate Rig'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text
+                      style={[
+                        styles.listSnippetText,
+                        item.unreadCount > 0 && styles.listSnippetTextUnread,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item.lastMessage || 'Channel created. Tap to start chatting.'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.listRightCol}>
+                    {item.unreadCount > 0 ? (
+                      <View style={[styles.unreadBadgePill, BRUTAL_SHADOWS.xs]}>
+                        <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+                      </View>
+                    ) : (
+                      <DoodleArrow direction="right" size={14} color={COLORS.textMuted} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -619,42 +560,6 @@ const styles = StyleSheet.create({
     color: COLORS.borderBlack,
     marginTop: 2,
     fontFamily: FONTS.mono,
-  },
-
-  // Segment Switcher
-  segmentContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
-    borderRadius: BORDER_RADIUS.pill,
-    borderWidth: BORDERS.regular,
-    borderColor: COLORS.borderBlack,
-    marginHorizontal: SPACING.md,
-    marginTop: 12,
-    marginBottom: 8,
-    padding: 3,
-  },
-  segmentTab: {
-    flex: 1,
-    height: 38,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  segmentTabActive: {
-    backgroundColor: COLORS.cyan,
-    borderWidth: 2,
-    borderColor: COLORS.borderBlack,
-    ...BRUTAL_SHADOWS.xs,
-  },
-  segmentTabText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
-    letterSpacing: 0.4,
-  },
-  segmentTabTextActive: {
-    color: COLORS.borderBlack,
-    fontWeight: '900',
   },
 
   // Active Chat Thread Header

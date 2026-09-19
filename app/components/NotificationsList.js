@@ -23,6 +23,7 @@ export default function NotificationsList({
   onSelectNotification,
   showHeader = true,
   contentContainerStyle,
+  style,
 }) {
   const {
     notifications,
@@ -46,7 +47,7 @@ export default function NotificationsList({
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, style]}>
       {/* Top Action / Status Bar */}
       {showHeader && (
         <View style={styles.statusBar}>
@@ -132,6 +133,7 @@ export default function NotificationsList({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
     backgroundColor: 'transparent',
   },
   statusBar: {
@@ -143,6 +145,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: BORDERS.thin,
     borderBottomColor: 'rgba(24, 24, 27, 0.12)',
     backgroundColor: COLORS.creamLight,
+    width: '100%',
+    borderRadius: 8,
+    marginBottom: 6,
   },
   statusLeft: {
     flexDirection: 'row',

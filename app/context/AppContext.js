@@ -710,19 +710,34 @@ export function AppProvider({ children }) {
           ? effectiveProjectId.toString()
           : null;
 
-      const res = await fetchDiscoveryDevelopersApi({
-        projectId: validProjectId,
-        search: filterOptions.search || '',
-        skills: filterOptions.skills || '',
-        role: filterOptions.role && filterOptions.role !== 'ALL' ? filterOptions.role : '',
-        availability:
-          filterOptions.availability && filterOptions.availability !== 'ALL'
-            ? filterOptions.availability
-            : '',
-      });
+      const token = currentUser?.token || accessToken || null;
+      const uid = currentUser?._id || currentUser?.id || null;
 
-      if (res.success && res.data?.developers) {
-        const normalized = res.data.developers
+      const res = await fetchDiscoveryDevelopersApi(
+        {
+          projectId: validProjectId,
+          search: filterOptions.search || '',
+          skills: filterOptions.skills || '',
+          role: filterOptions.role && filterOptions.role !== 'ALL' ? filterOptions.role : '',
+          availability:
+            filterOptions.availability && filterOptions.availability !== 'ALL'
+              ? filterOptions.availability
+              : '',
+        },
+        token,
+        uid
+      );
+
+      const rawDevs = Array.isArray(res.data)
+        ? res.data
+        : Array.isArray(res.data?.developers)
+        ? res.data.developers
+        : Array.isArray(res.data?.data)
+        ? res.data.data
+        : null;
+
+      if (res.success && rawDevs) {
+        const normalized = rawDevs
           .map((d) => normalizeDeveloper(d, activeProject))
           .filter(Boolean);
         setDiscoveryDevelopers(normalized);
@@ -751,8 +766,9 @@ export function AppProvider({ children }) {
   // --- DISCOVERY & MATCHING ACTIONS ---
   // Returns developers who have NOT been skipped or invited for the active project
   const availableDevelopersForActiveProject = useMemo(() => {
-    const skipped = skippedDevsByProject[activeProjectId] || [];
-    const invited = invitedDevsByProject[activeProjectId] || [];
+    const targetId = activeProjectId || activeProject?.id || 'default';
+    const skipped = skippedDevsByProject[targetId] || [];
+    const invited = invitedDevsByProject[targetId] || [];
     const excludedIds = new Set([...skipped, ...invited]);
 
     const pool = Array.isArray(discoveryDevelopers) ? discoveryDevelopers : [];
@@ -779,60 +795,82 @@ export function AppProvider({ children }) {
           matchScore: d.matchScore || calculatedScore,
         };
       });
-  }, [activeProjectId, skippedDevsByProject, invitedDevsByProject, discoveryDevelopers, activeProject]);
+  }, [activeProjectId, activeProject, skippedDevsByProject, invitedDevsByProject, discoveryDevelopers]);
 
-  const skipDeveloper = (devId) => {
+  const skipDeveloper = (devOrId, projId = null) => {
+    const devId = typeof devOrId === 'object' && devOrId !== null ? (devOrId.id || devOrId._id) : devOrId;
+    if (!devId) return;
+    const targetId = projId || activeProjectId || activeProject?.id || 'default';
     setSkippedDevsByProject((prev) => ({
       ...prev,
-      [activeProjectId]: [...(prev[activeProjectId] || []), devId],
+      [targetId]: [...(prev[targetId] || []).filter((id) => id !== devId), devId],
     }));
   };
 
-  const unskipDeveloper = (devId) => {
+  const unskipDeveloper = (devOrId, projId = null) => {
+    const devId = typeof devOrId === 'object' && devOrId !== null ? (devOrId.id || devOrId._id) : devOrId;
+    if (!devId) return;
+    const targetId = projId || activeProjectId || activeProject?.id || 'default';
     setSkippedDevsByProject((prev) => ({
       ...prev,
-      [activeProjectId]: (prev[activeProjectId] || []).filter((id) => id !== devId),
+      [targetId]: (prev[targetId] || []).filter((id) => id !== devId),
     }));
   };
 
-  const uninviteDeveloper = (devId) => {
+  const uninviteDeveloper = (devOrId, projId = null) => {
+    const devId = typeof devOrId === 'object' && devOrId !== null ? (devOrId.id || devOrId._id) : devOrId;
+    if (!devId) return;
+    const targetId = projId || activeProjectId || activeProject?.id || 'default';
     setInvitedDevsByProject((prev) => ({
       ...prev,
-      [activeProjectId]: (prev[activeProjectId] || []).filter((id) => id !== devId),
+      [targetId]: (prev[targetId] || []).filter((id) => id !== devId),
     }));
     setInvitations((prev) =>
       prev.filter(
-        (inv) => !(inv.developerId === devId && inv.projectId === activeProjectId)
+        (inv) => !(inv.developerId === devId && (inv.projectId === targetId || inv.projectId === activeProjectId))
       )
     );
   };
 
-  const resetDiscoveryForProject = (projectId) => {
-    const targetId = projectId || activeProjectId;
+  const resetDiscoveryForProject = (projectId = null) => {
+    const targetId = projectId || activeProjectId || activeProject?.id || 'default';
     setSkippedDevsByProject((prev) => ({
+      ...prev,
+      [targetId]: [],
+    }));
+    setInvitedDevsByProject((prev) => ({
       ...prev,
       [targetId]: [],
     }));
   };
 
-  const inviteDeveloper = (dev, isSuper = false) => {
+  const inviteDeveloper = (devOrId, isSuper = false, projId = null) => {
+    const devObj =
+      typeof devOrId === 'object' && devOrId !== null
+        ? devOrId
+        : (discoveryDevelopers.find((d) => d.id === devOrId) || { id: devOrId, name: 'Developer', role: 'Full Stack' });
+    const devId = devObj.id || devOrId;
+    if (!devId) return;
+
+    const targetId = projId || activeProjectId || activeProject?.id || 'default';
+
     // Record invited ID for active project so dev won't re-appear
     setInvitedDevsByProject((prev) => ({
       ...prev,
-      [activeProjectId]: [...(prev[activeProjectId] || []), dev.id],
+      [targetId]: [...(prev[targetId] || []).filter((id) => id !== devId), devId],
     }));
 
     // Create an invitation record tied to the active project
     const newInvitation = {
       id: `inv-${Date.now()}`,
-      developerId: dev.id,
-      developerName: dev.name,
-      developerRole: dev.role,
-      developerAvatar: dev.avatar,
-      projectId: activeProjectId,
+      developerId: devId,
+      developerName: devObj.name || 'Developer',
+      developerRole: devObj.role || 'Full Stack Developer',
+      developerAvatar: devObj.avatar || '',
+      projectId: targetId,
       projectName: activeProject ? activeProject.title : 'StudySync',
       timeAgo: 'Just now',
-      matchScore: dev.matchScore || 95,
+      matchScore: devObj.matchScore || 95,
       isSuper,
       status: 'PENDING',
     };
@@ -843,7 +881,7 @@ export function AppProvider({ children }) {
     addNotification({
       type: 'INVITATION',
       title: isSuper ? 'Super Invite Sent!' : 'Invite Sent!',
-      message: `Invited ${dev.name} to join ${newInvitation.projectName}.`,
+      message: `Invited ${devObj.name || 'Developer'} to join ${newInvitation.projectName}.`,
     });
   };
 

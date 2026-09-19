@@ -95,7 +95,9 @@ export default function DeveloperCard({ developer, onPress }) {
       <View style={styles.cardBody}>
         {/* Name with Green Online Indicator Dot */}
         <View style={styles.nameRow}>
-          <Text style={styles.devName}>{developer.name}, {developer.age}</Text>
+          <Text style={styles.devName}>
+            {developer.age ? `${developer.name}, ${developer.age}` : developer.name}
+          </Text>
           <View style={styles.onlineDot} />
         </View>
 

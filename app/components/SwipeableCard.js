@@ -53,7 +53,6 @@ export default function SwipeableCard({ children, onSwipeLeft, onSwipeRight, car
             duration: 200,
             useNativeDriver: false,
           }).start(() => {
-            pan.setValue({ x: 0, y: 0 });
             onSwipeRight && onSwipeRight();
           });
         } else if (gesture.dx < 0 && (isFar || isFlick)) {
@@ -63,7 +62,6 @@ export default function SwipeableCard({ children, onSwipeLeft, onSwipeRight, car
             duration: 200,
             useNativeDriver: false,
           }).start(() => {
-            pan.setValue({ x: 0, y: 0 });
             onSwipeLeft && onSwipeLeft();
           });
         } else {

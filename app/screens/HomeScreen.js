@@ -34,6 +34,7 @@ export default function HomeScreen({
     setActiveProjectId,
     availableDevelopersForActiveProject,
     discoveryLoading,
+    discoveryError,
     loadDiscoveryDevelopers,
     skipDeveloper,
     unskipDeveloper,
@@ -91,7 +92,6 @@ export default function HomeScreen({
   const [history, setHistory] = useState([]);
   const [inviteModalData, setInviteModalData] = useState(null);
   const [feedbackToast, setFeedbackToast] = useState(null);
-  const [activeSegment, setActiveSegment] = useState('DISCOVER');
   const [isProcessingSwipe, setIsProcessingSwipe] = useState(false);
 
   // Modals
@@ -110,7 +110,7 @@ export default function HomeScreen({
   // Filter developers based on selected role filter
   const filteredDevs = availableDevelopersForActiveProject.filter((dev) => {
     if (selectedRoleFilter === 'ALL') return true;
-    return dev.role.toLowerCase().includes(selectedRoleFilter.toLowerCase());
+    return (dev.role || '').toLowerCase().includes(selectedRoleFilter.toLowerCase());
   });
 
   // Top developer of the active project deck
@@ -129,41 +129,39 @@ export default function HomeScreen({
     }
     if (!currentDev) return;
 
+    const devToPass = currentDev;
     setIsProcessingSwipe(true);
+
+    // 1. Advance deck locally immediately
+    skipDeveloper(devToPass.id);
+    showToast('PASSED', '#94A3B8');
+
+    setHistory((prev) => [
+      ...prev,
+      {
+        dev: devToPass,
+        action: 'PASS',
+        projectId: activeProject?.id,
+        invitationId: null,
+      },
+    ]);
+
+    // 2. Persist to backend asynchronously
     try {
-      // If active project is a real MongoDB ObjectId, persist PASS to backend
       const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
       if (isRealProject) {
         const token = currentUser?.token || null;
         const uid = currentUser?._id || currentUser?.id;
-        const res = await recordSwipeApi(
+        recordSwipeApi(
           activeProject.id,
-          currentDev._id || currentDev.id,
+          devToPass._id || devToPass.id,
           'PASS',
           token,
           uid
-        );
-        if (!res.success) {
-          showToast(res.error || 'Failed to record pass', COLORS.btnRed);
-          setIsProcessingSwipe(false);
-          return;
-        }
+        ).catch((err) => console.error('recordSwipeApi PASS error:', err));
       }
-
-      setHistory((prev) => [
-        ...prev,
-        {
-          dev: currentDev,
-          action: 'PASS',
-          projectId: activeProject?.id,
-          invitationId: null,
-        },
-      ]);
-      skipDeveloper(currentDev.id);
-      showToast('PASSED', '#94A3B8');
     } catch (err) {
       console.error('handlePass error:', err);
-      showToast('Error recording pass', COLORS.btnRed);
     } finally {
       setIsProcessingSwipe(false);
     }
@@ -177,61 +175,52 @@ export default function HomeScreen({
     }
     if (!currentDev) return;
 
+    const devToLike = currentDev;
     setIsProcessingSwipe(true);
+
+    // 1. Advance deck locally immediately & show modal
+    inviteDeveloper(devToLike);
+    setInviteModalData({
+      name: devToLike.name,
+      role: devToLike.role,
+      isSuper: false,
+    });
+
+    setHistory((prev) => [
+      ...prev,
+      {
+        dev: devToLike,
+        action: 'INVITE',
+        projectId: activeProject?.id,
+        invitationId: null,
+      },
+    ]);
+
+    // 2. Persist to backend asynchronously
     try {
       const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
-      let createdInvitationId = null;
-
       if (isRealProject) {
         const token = currentUser?.token || null;
         const uid = currentUser?._id || currentUser?.id;
 
-        // 1. Record LIKE swipe
-        const swipeRes = await recordSwipeApi(
+        recordSwipeApi(
           activeProject.id,
-          currentDev._id || currentDev.id,
-          'LIKE',
+          devToLike._id || devToLike.id,
+          'INTERESTED',
           token,
           uid
-        );
-        if (!swipeRes.success) {
-          showToast(swipeRes.error || 'Failed to record invite', COLORS.btnRed);
-          setIsProcessingSwipe(false);
-          return;
-        }
+        ).catch((err) => console.error('recordSwipeApi LIKE error:', err));
 
-        // 2. Create pending Invitation record
-        const invRes = await createInvitationApi(
+        createInvitationApi(
           activeProject.id,
-          currentDev._id || currentDev.id,
+          devToLike._id || devToLike.id,
           'Hey! Would love to collaborate on this project.',
           token,
           uid
-        );
-        if (invRes.success && invRes.invitation?._id) {
-          createdInvitationId = invRes.invitation._id;
-        }
+        ).catch((err) => console.error('createInvitationApi error:', err));
       }
-
-      setHistory((prev) => [
-        ...prev,
-        {
-          dev: currentDev,
-          action: 'INVITE',
-          projectId: activeProject?.id,
-          invitationId: createdInvitationId,
-        },
-      ]);
-
-      inviteDeveloper(currentDev.id);
-      setInviteModalData({
-        name: currentDev.name,
-        role: currentDev.role,
-        isSuper: false,
-      });
     } catch (err) {
       console.error('handleLike error:', err);
-      showToast('Error sending invite', COLORS.btnRed);
     } finally {
       setIsProcessingSwipe(false);
     }
@@ -245,59 +234,50 @@ export default function HomeScreen({
     }
     if (!currentDev) return;
 
+    const devToLike = currentDev;
     setIsProcessingSwipe(true);
+
+    inviteDeveloper(devToLike, true);
+    setInviteModalData({
+      name: devToLike.name,
+      role: devToLike.role,
+      isSuper: true,
+    });
+
+    setHistory((prev) => [
+      ...prev,
+      {
+        dev: devToLike,
+        action: 'SUPER',
+        projectId: activeProject?.id,
+        invitationId: null,
+      },
+    ]);
+
     try {
       const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
-      let createdInvitationId = null;
-
       if (isRealProject) {
         const token = currentUser?.token || null;
         const uid = currentUser?._id || currentUser?.id;
 
-        const swipeRes = await recordSwipeApi(
+        recordSwipeApi(
           activeProject.id,
-          currentDev._id || currentDev.id,
-          'SUPERLIKE',
+          devToLike._id || devToLike.id,
+          'INTERESTED',
           token,
           uid
-        );
-        if (!swipeRes.success) {
-          showToast(swipeRes.error || 'Failed to record super invite', COLORS.btnRed);
-          setIsProcessingSwipe(false);
-          return;
-        }
+        ).catch((err) => console.error('recordSwipeApi SUPERLIKE error:', err));
 
-        const invRes = await createInvitationApi(
+        createInvitationApi(
           activeProject.id,
-          currentDev._id || currentDev.id,
-          '⭐ Super-invited you to collaborate!',
+          devToLike._id || devToLike.id,
+          'Super-invited you to collaborate!',
           token,
           uid
-        );
-        if (invRes.success && invRes.invitation?._id) {
-          createdInvitationId = invRes.invitation._id;
-        }
+        ).catch((err) => console.error('createInvitationApi super error:', err));
       }
-
-      setHistory((prev) => [
-        ...prev,
-        {
-          dev: currentDev,
-          action: 'SUPER',
-          projectId: activeProject?.id,
-          invitationId: createdInvitationId,
-        },
-      ]);
-
-      inviteDeveloper(currentDev.id);
-      setInviteModalData({
-        name: currentDev.name,
-        role: currentDev.role,
-        isSuper: true,
-      });
     } catch (err) {
       console.error('handleSuperLike error:', err);
-      showToast('Error sending super invite', COLORS.btnRed);
     } finally {
       setIsProcessingSwipe(false);
     }
@@ -354,6 +334,7 @@ export default function HomeScreen({
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => {
+              if (loadNotifications) loadNotifications();
               setNotificationsVisible(true);
             }}
             style={styles.iconBtn}
@@ -393,42 +374,6 @@ export default function HomeScreen({
         <Text style={styles.projectSelectorArrow}>▾</Text>
       </TouchableOpacity>
 
-      {/* 3. SEGMENTED PILL TABS (DISCOVER | PROJECTS | PEOPLE) */}
-      <View style={styles.segmentedRow}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setActiveSegment('DISCOVER')}
-          style={[
-            styles.segmentPill,
-            activeSegment === 'DISCOVER' && styles.segmentPillActive,
-          ]}
-        >
-          <Text style={activeSegment === 'DISCOVER' ? styles.segmentTextActive : styles.segmentTextInactive}>
-            DISCOVER
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            if (onNavigateToProjects) onNavigateToProjects();
-          }}
-          style={styles.segmentPill}
-        >
-          <Text style={styles.segmentTextInactive}>PROJECTS</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => {
-            if (onNavigateToProfile) onNavigateToProfile();
-          }}
-          style={styles.segmentPill}
-        >
-          <Text style={styles.segmentTextInactive}>PEOPLE</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* FEEDBACK TOAST */}
       {feedbackToast && (
         <View style={[styles.toastContainer, { backgroundColor: feedbackToast.color }, BRUTAL_SHADOWS.xs]}>
@@ -459,6 +404,23 @@ export default function HomeScreen({
             <Text style={styles.emptySubtitle}>
               Connecting to real developer database...
             </Text>
+          </View>
+        ) : discoveryError && availableDevelopersForActiveProject.length === 0 ? (
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleCode symbol="!" bgColor={COLORS.coralLight} color={COLORS.coral} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyTitle}>DISCOVERY ERROR</Text>
+            <Text style={styles.emptySubtitle}>
+              {discoveryError}
+            </Text>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => {
+                if (loadDiscoveryDevelopers) loadDiscoveryDevelopers();
+              }}
+              style={[styles.resetBtn, BRUTAL_SHADOWS.button]}
+            >
+              <Text style={styles.resetBtnText}>TRY AGAIN</Text>
+            </TouchableOpacity>
           </View>
         ) : isProjectClosed ? (
           <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
@@ -642,7 +604,7 @@ export default function HomeScreen({
         onRequestClose={() => setNotificationsVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.modal]}>
+          <View style={[styles.modalCard, styles.notificationsModalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
               <ComicBadge text="NOTIFICATIONS" color="#38BDF8" textColor="#000" size="sm" />
               <TouchableOpacity onPress={() => setNotificationsVisible(false)} style={styles.modalCloseBtn}>
@@ -795,7 +757,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     marginTop: 2,
-    marginBottom: 4,
+    marginBottom: 8,
     gap: 6,
   },
   projectSelectorCodeBadge: {
@@ -819,44 +781,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     color: COLORS.ink,
-  },
-
-  // Segmented row
-  segmentedRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: 'transparent',
-    gap: 10,
-  },
-  segmentPill: {
-    flex: 1,
-    height: 36,
-    borderTopLeftRadius: 14,
-    borderTopRightRadius: 10,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'transparent',
-  },
-  segmentPillActive: {
-    backgroundColor: COLORS.yellow,
-    borderWidth: 2.5,
-    borderColor: COLORS.ink,
-    ...BRUTAL_SHADOWS.xs,
-  },
-  segmentTextActive: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: COLORS.ink,
-    letterSpacing: 0.5,
-  },
-  segmentTextInactive: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: COLORS.inkMuted,
-    letterSpacing: 0.5,
   },
 
   toastContainer: {
@@ -957,6 +881,12 @@ const styles = StyleSheet.create({
   pickerModalCard: {
     maxHeight: 520,
     alignItems: 'stretch',
+  },
+  notificationsModalCard: {
+    height: '75%',
+    maxHeight: 560,
+    alignItems: 'stretch',
+    padding: 16,
   },
   pickerHeaderRow: {
     flexDirection: 'row',

@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react-native';
 import { COLORS, BORDERS, BRUTAL_SHADOWS, SHELL } from '../styles/theme';
-import { DoodleUser, DoodleStar, DoodleUnderline } from './DoodleElements';
+import { DoodleUser, DoodleFolder, DoodleStar, DoodleUnderline } from './DoodleElements';
 
 export default function BottomNav({ activeTab, onTabChange, matchesCount = 0 }) {
   const tabs = [
@@ -15,6 +15,17 @@ export default function BottomNav({ activeTab, onTabChange, matchesCount = 0 }) 
       label: 'Matches',
       image: require('../assets/match.png'),
       badge: matchesCount,
+    },
+    {
+      id: 'projects',
+      label: 'Projects',
+      renderCustomIcon: (isActive) => (
+        <DoodleFolder
+          size={22}
+          color={isActive ? COLORS.ink : SHELL.navInactiveColor}
+          fillColor={isActive ? SHELL.navActiveBg : COLORS.white}
+        />
+      ),
     },
     {
       id: 'profile',
@@ -96,7 +107,7 @@ export default function BottomNav({ activeTab, onTabChange, matchesCount = 0 }) 
                 {isActive && (
                   <View style={styles.underlineWrap}>
                     <DoodleUnderline
-                      width={32}
+                      width={26}
                       height={3}
                       color={COLORS.yellow}
                     />
@@ -140,8 +151,8 @@ const styles = StyleSheet.create({
   activePill: {
     position: 'absolute',
     top: 4,
-    left: '15%',
-    right: '15%',
+    left: 4,
+    right: 4,
     bottom: 2,
     backgroundColor: COLORS.yellowHighlight,
     borderWidth: 1.5,

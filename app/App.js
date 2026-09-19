@@ -205,7 +205,7 @@ function MainNavigator() {
             <BottomNav
               activeTab={activeTab === 'chats' ? 'matches' : activeTab}
               onTabChange={(tab) => {
-                if (tab === 'profile' || tab === 'discover') {
+                if (tab === 'profile' || tab === 'discover' || tab === 'projects') {
                   setSelectedDeveloperForProfile(null);
                 }
                 setActiveTab(tab);
