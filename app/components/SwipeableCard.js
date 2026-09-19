@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { View, Animated, PanResponder, StyleSheet, Text, Dimensions } from 'react-native';
-import { COLORS, BRUTAL_SHADOWS } from '../styles/theme';
+import { COLORS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
+import { DoodleCheck, DoodleCross } from './DoodleElements';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const SWIPE_THRESHOLD = 80;
@@ -115,19 +116,22 @@ export default function SwipeableCard({ children, onSwipeLeft, onSwipeRight, car
         ]}
         {...panResponder.panHandlers}
       >
-        {/* Visual Swipe Indicators */}
+        {/* Swipe Right Stamp — INVITE */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.stamp, styles.likeStamp, { opacity: likeOpacity }]}
+          style={[styles.stamp, styles.inviteStamp, { opacity: likeOpacity }]}
         >
-          <Text style={styles.likeStampText}>LIKE! 🤝</Text>
+          <DoodleCheck size={16} color={COLORS.ink} style={{ marginRight: 4 }} />
+          <Text style={styles.inviteStampText}>INVITE!</Text>
         </Animated.View>
 
+        {/* Swipe Left Stamp — PASS */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.stamp, styles.nopeStamp, { opacity: nopeOpacity }]}
+          style={[styles.stamp, styles.passStamp, { opacity: nopeOpacity }]}
         >
-          <Text style={styles.nopeStampText}>NOPE! ✖</Text>
+          <Text style={styles.passStampText}>PASS!</Text>
+          <DoodleCross size={14} color={COLORS.white} style={{ marginLeft: 4 }} />
         </Animated.View>
 
         {children}
@@ -147,35 +151,45 @@ const styles = StyleSheet.create({
   },
   stamp: {
     position: 'absolute',
-    top: 20,
+    top: 22,
     zIndex: 999,
-    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 3,
-    borderColor: COLORS.black,
-    ...BRUTAL_SHADOWS.md,
+    borderWidth: BORDERS.thick,
+    borderColor: COLORS.borderBlack,
+    ...BRUTAL_SHADOWS.sm,
   },
-  likeStamp: {
-    left: 20,
+  inviteStamp: {
+    left: 18,
     backgroundColor: COLORS.lime,
-    transform: [{ rotate: '-12deg' }],
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 12,
+    transform: [{ rotate: '-10deg' }],
   },
-  likeStampText: {
-    fontSize: 20,
+  inviteStampText: {
+    fontSize: 18,
     fontWeight: '900',
-    color: COLORS.black,
+    color: COLORS.ink,
     letterSpacing: 1,
   },
-  nopeStamp: {
-    right: 20,
-    backgroundColor: COLORS.pink,
-    transform: [{ rotate: '12deg' }],
+  passStamp: {
+    right: 18,
+    backgroundColor: COLORS.coral,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 7,
+    transform: [{ rotate: '10deg' }],
   },
-  nopeStampText: {
-    fontSize: 20,
+  passStampText: {
+    fontSize: 18,
     fontWeight: '900',
     color: COLORS.white,
     letterSpacing: 1,
   },
 });
+

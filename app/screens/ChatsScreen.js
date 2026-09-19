@@ -12,10 +12,17 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { COLORS, FONTS, SPACING, BORDER_RADIUS, BRUTAL_SHADOWS, COMIC_TEXT_SHADOW } from '../styles/theme';
+import { COLORS, FONTS, SPACING, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
+import { DoodleStar, DoodleCode, DoodleArrow, DoodleSparkle } from '../components/DoodleElements';
+import NotificationsList from '../components/NotificationsList';
 import { useApp } from '../context/AppContext';
+import { resolveProfileAvatar } from '../utils/avatar';
 
+/**
+ * DevDate ChatsScreen — Playful Pop Art x Doodle Art Communication Hub
+ * Zero Unicode Emojis.
+ */
 export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches }) {
   const {
     chats,
@@ -34,8 +41,12 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
     sendTyping,
     sendStopTyping,
     typingStatusByMatch,
+    notifications,
+    unreadNotificationsCount,
   } = useApp();
 
+  // Screen state
+  const [activeSegment, setActiveSegment] = useState('messages'); // 'messages' | 'notifications'
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState(null);
@@ -46,10 +57,10 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
   useEffect(() => {
     if (initialChatDeveloperName) {
       const match = chats.find(
-        (c) => c.developerName.toLowerCase() === initialChatDeveloperName.toLowerCase()
+        (c) => c.developerName?.toLowerCase() === initialChatDeveloperName.toLowerCase()
       );
       if (match) {
-        setActiveChatId(match.id);
+        setActiveChatId(match.id || match.matchId);
       }
     }
   }, [initialChatDeveloperName, chats]);
@@ -135,19 +146,23 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
         messageScrollRef.current?.scrollToEnd({ animated: true });
       }, 100);
     } else {
-      setSendError(result?.error || 'Failed to send message');
+      setSendError(result?.error || 'Failed to dispatch message');
       setTimeout(() => setSendError(null), 3500);
     }
     setIsSending(false);
   };
 
+  const handleQuickIcebreaker = (text) => {
+    setInputText(text);
+  };
+
   return (
     <View style={styles.container}>
       {activeChat ? (
-        /* ================== 1. PROJECT-SPECIFIC CHAT CONVERSATION VIEW ================== */
+        /* ================== 1. ACTIVE CHAT THREAD CONVERSATION VIEW ================== */
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.container}
+          style={styles.keyboardWrap}
         >
           {/* Thread Header with Back Button */}
           <View style={styles.threadHeader}>
@@ -155,40 +170,71 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
               activeOpacity={0.8}
               onPress={() => setActiveChatId(null)}
               style={[styles.backBtn, BRUTAL_SHADOWS.xs]}
+              accessibilityRole="button"
+              accessibilityLabel="Back to conversations"
             >
               <Text style={styles.backBtnIcon}>←</Text>
             </TouchableOpacity>
 
-            {activeChat.developerAvatar ? (
-              <Image source={{ uri: activeChat.developerAvatar }} style={styles.threadAvatar} onError={() => {}} />
-            ) : (
-              <View style={[styles.threadAvatar, styles.avatarFallback]}>
-                <Text style={styles.avatarFallbackText}>
-                  {activeChat.developerName?.charAt(0)?.toUpperCase() || '👤'}
-                </Text>
-              </View>
-            )}
+            <View style={styles.avatarWrap}>
+              <Image
+                source={{
+                  uri: resolveProfileAvatar(
+                    activeChat.developerAvatar,
+                    activeChat.developerName || 'Developer',
+                    'voxel-bot'
+                  ),
+                }}
+                style={styles.threadAvatar}
+                onError={() => {}}
+              />
+              {/* Online badge */}
+              <View
+                style={[
+                  styles.threadStatusDot,
+                  (activeChat.status === 'Online' || socketConnected) ? styles.dotOnline : styles.dotOffline,
+                ]}
+              />
+            </View>
 
             <View style={styles.threadHeaderInfo}>
               <View style={styles.threadNameRow}>
-                <Text style={styles.threadDevName}>{activeChat.developerName}</Text>
-                <View style={[styles.threadStatusDot, (activeChat.status === 'Online' || socketConnected) && styles.dotOnline]} />
+                <Text style={styles.threadDevName} numberOfLines={1}>
+                  {activeChat.developerName}
+                </Text>
+                <View style={styles.connectionStatusPill}>
+                  <View style={[styles.miniDot, socketConnected ? styles.miniDotGreen : styles.miniDotYellow]} />
+                  <Text style={styles.connectionStatusText}>
+                    {socketConnected ? 'ONLINE' : 'SYNCING'}
+                  </Text>
+                </View>
               </View>
-              <Text style={styles.threadProjectSubtitle}>{activeChat.projectName}</Text>
+
+              <View style={styles.projectContextRow}>
+                <Text style={styles.threadProjectSubtitle} numberOfLines={1}>
+                  // {activeChat.projectName || activeProject?.title || 'RIG SQUAD'}
+                </Text>
+              </View>
             </View>
 
             <View style={styles.threadHeaderActions}>
-              <TouchableOpacity style={[styles.threadHeaderIconBtn, BRUTAL_SHADOWS.xs]}>
-                <Text style={{ fontSize: 16 }}>📞</Text>
-              </TouchableOpacity>
+              <View style={[styles.chatBadgeWrap, BRUTAL_SHADOWS.xs]}>
+                <Text style={styles.chatBadgeText}>SQUAD</Text>
+              </View>
             </View>
           </View>
 
-          {/* Project / Security Header Banner */}
+          {/* Project / Channel Notice Bar */}
           <View style={styles.projectNoticeBar}>
-            <Text style={styles.projectNoticeText}>
-              📁 Dedicated squad channel for <Text style={{ fontWeight: '900' }}>{activeChat.projectName}</Text>
-            </Text>
+            <View style={styles.noticeLeft}>
+              <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.yellow} style={styles.miniNoticeCode} />
+              <Text style={styles.projectNoticeText}>
+                Squad channel for <Text style={styles.projectNoticeBold}>{activeChat.projectName || 'DevDate Rig'}</Text>
+              </Text>
+            </View>
+            <View style={styles.e2eBadge}>
+              <Text style={styles.e2eBadgeText}>256-BIT SECURE</Text>
+            </View>
           </View>
 
           {/* Message Thread Feed */}
@@ -198,59 +244,107 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
             contentContainerStyle={styles.messageContent}
             showsVerticalScrollIndicator={false}
           >
-            {/* Comic Decal Sticker in Thread */}
+            {/* Decal Sticker in Thread */}
             <View style={styles.threadStickerRow}>
               <ComicBadge
-                text="GOOD CONVOS BUILD GREAT THINGS ✈️"
+                text="GOOD CONVOS BUILD GREAT RIGS"
                 color={COLORS.yellow}
                 textColor={COLORS.black}
-                rotate="-2deg"
+                rotate="-1.5deg"
                 size="sm"
               />
             </View>
 
             {messagesLoading && (!activeChat.messages || activeChat.messages.length === 0) ? (
               <View style={styles.loadingMessagesContainer}>
-                <ActivityIndicator size="small" color={COLORS.primary} />
-                <Text style={styles.loadingMessagesText}>Loading messages...</Text>
+                <ActivityIndicator size="small" color={COLORS.black} />
+                <Text style={styles.loadingMessagesText}>Loading squad messages...</Text>
               </View>
             ) : null}
 
-            {activeChat.messages && activeChat.messages.map((msg) => (
-              <View
-                key={msg.id}
-                style={[
-                  styles.messageRow,
-                  msg.isMe ? styles.myMessageRow : styles.theirMessageRow,
-                ]}
-              >
-                {!msg.isMe && (
-                  <Text style={styles.senderLabel}>{(msg.sender || activeChat.developerName || 'Partner').split(' ')[0]}</Text>
-                )}
-                <View
-                  style={[
-                    styles.messageBubble,
-                    msg.isMe ? styles.myBubble : styles.theirBubble,
-                    BRUTAL_SHADOWS.xs,
-                  ]}
-                >
-                  <Text style={[styles.messageText, msg.isMe && styles.myMessageText]}>
-                    {msg.text}
-                  </Text>
-                  <View style={styles.timeRow}>
-                    <Text style={[styles.msgTime, msg.isMe && styles.myMsgTime]}>{msg.time}</Text>
-                    {msg.isMe && <Text style={styles.checkmarks}> ✓✓</Text>}
+            {/* Empty conversation placeholder */}
+            {!messagesLoading && (!activeChat.messages || activeChat.messages.length === 0) ? (
+              <View style={styles.emptyThreadContainer}>
+                <View style={styles.emptyThreadBox}>
+                  <View style={styles.emptyThreadIconRow}>
+                    <DoodleStar size={22} color={COLORS.yellow} />
+                    <DoodleCode symbol="HELLO" bgColor={COLORS.pillBlue} color={COLORS.blueDark || COLORS.ink} />
+                    <DoodleSparkle size={18} color={COLORS.coral} />
                   </View>
+
+                  <Text style={styles.emptyThreadTitle}>START THE TRANSMISSION!</Text>
+                  <Text style={styles.emptyThreadSub}>
+                    Say hello, pitch your project idea, or discuss your technical stack to squad up.
+                  </Text>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => handleQuickIcebreaker("Hey! I saw your profile and would love to collaborate.")}
+                    style={[styles.icebreakerBtn, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.icebreakerBtnText}>SAY HELLO --></Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-            ))}
+            ) : null}
+
+            {/* Message Bubbles List */}
+            {activeChat.messages &&
+              activeChat.messages.map((msg, index) => {
+                const prevMsg = activeChat.messages[index - 1];
+                const isSequence = prevMsg && prevMsg.isMe === msg.isMe;
+
+                return (
+                  <View
+                    key={msg.id || index}
+                    style={[
+                      styles.messageRow,
+                      msg.isMe ? styles.myMessageRow : styles.theirMessageRow,
+                      isSequence && styles.sequenceRow,
+                    ]}
+                  >
+                    {!msg.isMe && !isSequence && (
+                      <Text style={styles.senderLabel}>
+                        {(msg.sender || activeChat.developerName || 'Partner').split(' ')[0]}
+                      </Text>
+                    )}
+
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        msg.isMe ? styles.myBubble : styles.theirBubble,
+                        BRUTAL_SHADOWS.xs,
+                      ]}
+                    >
+                      <Text style={[styles.messageText, msg.isMe ? styles.myMessageText : styles.theirMessageText]}>
+                        {msg.text}
+                      </Text>
+
+                      <View style={styles.timeRow}>
+                        <Text style={[styles.msgTime, msg.isMe && styles.myMsgTime]}>
+                          {msg.time || 'Just now'}
+                        </Text>
+                        {msg.isMe && (
+                          <Text style={styles.checkmarks}> [READ]</Text>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              })}
 
             {/* Realtime Typing Indicator */}
             {activeChatId && typingStatusByMatch[activeChatId]?.isTyping ? (
               <View style={styles.typingIndicatorContainer}>
                 <View style={[styles.typingBubble, BRUTAL_SHADOWS.xs]}>
+                  {/* 3 Doodle Vector Dots */}
+                  <View style={styles.dotsRow}>
+                    <View style={styles.dotShape} />
+                    <View style={[styles.dotShape, { marginHorizontal: 3 }]} />
+                    <View style={styles.dotShape} />
+                  </View>
                   <Text style={styles.typingIndicatorText}>
-                    ✍️ {typingStatusByMatch[activeChatId]?.name || activeChat.developerName} is typing...
+                    {typingStatusByMatch[activeChatId]?.name || activeChat.developerName} is typing...
                   </Text>
                 </View>
               </View>
@@ -260,14 +354,20 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
           {/* Send Error Notice */}
           {sendError ? (
             <View style={styles.sendErrorBanner}>
-              <Text style={styles.sendErrorText}>⚠️ {sendError}</Text>
+              <Text style={styles.sendErrorText}>{sendError}</Text>
             </View>
           ) : null}
 
-          {/* Message Composer Input */}
+          {/* Message Composer Input Bar */}
           <View style={styles.composerBar}>
-            <TouchableOpacity style={styles.attachBtn}>
-              <Text style={styles.attachIcon}>📎</Text>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.attachBtn, BRUTAL_SHADOWS.xs]}
+              onPress={() => setInputText((prev) => prev ? `${prev} </> ` : '</> ')}
+              accessibilityRole="button"
+              accessibilityLabel="Insert code tag"
+            >
+              <Text style={styles.attachIcon}>+</Text>
             </TouchableOpacity>
 
             <TextInput
@@ -287,114 +387,197 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
               disabled={isSending || !inputText.trim()}
               style={[
                 styles.sendBtn,
-                BRUTAL_SHADOWS.xs,
-                (!inputText.trim() || isSending) && { opacity: 0.6 },
+                BRUTAL_SHADOWS.button,
+                (!inputText.trim() || isSending) && { opacity: 0.55 },
               ]}
+              accessibilityRole="button"
+              accessibilityLabel="Send message"
             >
               {isSending ? (
                 <ActivityIndicator size="small" color={COLORS.black} />
               ) : (
-                <Text style={styles.sendIcon}>🚀</Text>
+                <Text style={styles.sendIconText}>SEND</Text>
               )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       ) : (
-        /* ================== 2. CHATS DIRECTORY / LIST VIEW ================== */
-        <>
+        /* ================== 2. COMMUNICATIONS DIRECTORY (MESSAGES / NOTIFICATIONS) ================== */
+        <View style={styles.directoryWrapper}>
+          {/* Top Yellow Comic Header */}
           <View style={styles.header}>
             <View>
-              <Text style={styles.headerTitle}>Chats 💬</Text>
-              <Text style={styles.headerSubtitle}>Direct messages with matched devs</Text>
+              <Text style={styles.headerTitle}>COMMUNICATIONS</Text>
+              <Text style={styles.headerSubtitle}>Direct messages & squad dispatches</Text>
             </View>
 
             <ComicBadge
-              text="TALK IDEAS BUILD TOGETHER"
+              text="POW! // SQUAD UP"
               color={COLORS.yellow}
               textColor={COLORS.black}
-              rotate="2deg"
+              rotate="1.5deg"
               size="sm"
             />
           </View>
 
-          <ScrollView
-            contentContainerStyle={styles.chatListScroll}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl
-                refreshing={matchesLoading}
-                onRefresh={refreshMatchesAndInvitations}
-                tintColor={COLORS.primary}
-                colors={[COLORS.primary]}
-              />
-            }
-          >
-            {chats.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>💬</Text>
-                <Text style={styles.emptyTitle}>NO CONVERSATIONS YET!</Text>
-                <Text style={styles.emptySubtitle}>
-                  Swipe right on developers in Discover to send invites, or accept incoming invites in Matches to unlock squad chats!
-                </Text>
-                {onBackToMatches && (
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={onBackToMatches}
-                    style={[styles.emptyActionBtn, BRUTAL_SHADOWS.sm]}
-                  >
-                    <Text style={styles.emptyActionText}>GO TO MATCHES 🎯</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : (
-              chats.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  activeOpacity={0.85}
-                  onPress={() => {
-                    markChatAsRead(item.id);
-                    setActiveChatId(item.id);
-                  }}
-                  style={[styles.chatListItem, BRUTAL_SHADOWS.md]}
-                >
-                  <View style={styles.avatarContainer}>
-                    {item.developerAvatar ? (
-                      <Image source={{ uri: item.developerAvatar }} style={styles.listAvatar} onError={() => {}} />
-                    ) : (
-                      <View style={[styles.listAvatar, styles.avatarFallback]}>
-                        <Text style={styles.avatarFallbackText}>
-                          {item.developerName?.charAt(0)?.toUpperCase() || '👤'}
-                        </Text>
-                      </View>
-                    )}
-                    {item.status === 'Online' && <View style={styles.onlineBadge} />}
+          {/* Segmented Switcher: MESSAGES vs NOTIFICATIONS */}
+          <View style={styles.segmentContainer}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setActiveSegment('messages')}
+              style={[
+                styles.segmentTab,
+                activeSegment === 'messages' && styles.segmentTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.segmentTabText,
+                  activeSegment === 'messages' && styles.segmentTabTextActive,
+                ]}
+              >
+                MESSAGES ({chats.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => setActiveSegment('notifications')}
+              style={[
+                styles.segmentTab,
+                activeSegment === 'notifications' && styles.segmentTabActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.segmentTabText,
+                  activeSegment === 'notifications' && styles.segmentTabTextActive,
+                ]}
+              >
+                NOTIFICATIONS {unreadNotificationsCount > 0 ? `(${unreadNotificationsCount} NEW)` : `(${notifications.length})`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* SEGMENT CONTENT A: CONVERSATION LIST */}
+          {activeSegment === 'messages' && (
+            <ScrollView
+              contentContainerStyle={styles.chatListScroll}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={Boolean(matchesLoading)}
+                  onRefresh={refreshMatchesAndInvitations}
+                  tintColor={COLORS.black}
+                  colors={[COLORS.yellow, COLORS.cyan]}
+                />
+              }
+            >
+              {chats.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <View style={styles.emptyIconWrap}>
+                    <DoodleCode symbol="//" bgColor={COLORS.yellow} color={COLORS.black} style={{ paddingHorizontal: 12, paddingVertical: 6 }} />
                   </View>
-
-                  <View style={styles.chatListDetails}>
-                    <View style={styles.chatTitleRow}>
-                      <Text style={styles.listDevName}>{item.developerName}</Text>
-                      <Text style={styles.listTimeText}>{item.time}</Text>
-                    </View>
-
-                    <View style={styles.chatProjectBadgeRow}>
-                      <Text style={styles.listProjectTag}>{item.projectName}</Text>
-                    </View>
-
-                    <Text style={styles.listSnippetText} numberOfLines={1}>
-                      {item.lastMessage}
-                    </Text>
-                  </View>
-
-                  {item.unreadCount > 0 && (
-                    <View style={[styles.unreadBadgePill, BRUTAL_SHADOWS.xs]}>
-                      <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
-                    </View>
+                  <Text style={styles.emptyTitle}>NO CONVERSATIONS YET!</Text>
+                  <Text style={styles.emptySubtitle}>
+                    Swipe right on developers in Discover to send invites, or accept incoming invites in Matches to unlock squad chats!
+                  </Text>
+                  {onBackToMatches && (
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={onBackToMatches}
+                      style={[styles.emptyActionBtn, BRUTAL_SHADOWS.sm]}
+                    >
+                      <Text style={styles.emptyActionText}>GO TO MATCHES --></Text>
+                    </TouchableOpacity>
                   )}
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
-        </>
+                </View>
+              ) : (
+                chats.map((item) => (
+                  <TouchableOpacity
+                    key={item.id || item.matchId}
+                    activeOpacity={0.85}
+                    onPress={() => {
+                      if (markChatAsRead) markChatAsRead(item.id || item.matchId);
+                      setActiveChatId(item.id || item.matchId);
+                    }}
+                    style={[
+                      styles.chatListItem,
+                      item.unreadCount > 0 ? styles.chatListItemUnread : styles.chatListItemRead,
+                      BRUTAL_SHADOWS.sm,
+                    ]}
+                  >
+                    <View style={styles.avatarContainer}>
+                      <Image
+                        source={{
+                          uri: resolveProfileAvatar(
+                            item.developerAvatar,
+                            item.developerName || 'Developer',
+                            'voxel-bot'
+                          ),
+                        }}
+                        style={styles.listAvatar}
+                        onError={() => {}}
+                      />
+                      {item.status === 'Online' && <View style={styles.onlineBadge} />}
+                    </View>
+
+                    <View style={styles.chatListDetails}>
+                      <View style={styles.chatTitleRow}>
+                        <Text style={[styles.listDevName, item.unreadCount > 0 && styles.listDevNameUnread]} numberOfLines={1}>
+                          {item.developerName}
+                        </Text>
+                        <Text style={styles.listTimeText}>{item.time || 'Active'}</Text>
+                      </View>
+
+                      <View style={styles.chatProjectBadgeRow}>
+                        <View style={styles.projectChip}>
+                          <Text style={styles.listProjectTag} numberOfLines={1}>
+                            // {item.projectName || 'DevDate Rig'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.listSnippetText,
+                          item.unreadCount > 0 && styles.listSnippetTextUnread,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {item.lastMessage || 'Channel created. Tap to start chatting.'}
+                      </Text>
+                    </View>
+
+                    <View style={styles.listRightCol}>
+                      {item.unreadCount > 0 ? (
+                        <View style={[styles.unreadBadgePill, BRUTAL_SHADOWS.xs]}>
+                          <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+                        </View>
+                      ) : (
+                        <DoodleArrow direction="right" size={14} color={COLORS.textMuted} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          )}
+
+          {/* SEGMENT CONTENT B: NOTIFICATIONS FEED */}
+          {activeSegment === 'notifications' && (
+            <NotificationsList
+              showHeader={true}
+              onSelectNotification={(notif) => {
+                if (notif?.matchId) {
+                  setActiveChatId(notif.matchId);
+                } else if (notif?.type === 'INVITATION_RECEIVED' && onBackToMatches) {
+                  onBackToMatches();
+                }
+              }}
+            />
+          )}
+        </View>
       )}
     </View>
   );
@@ -403,8 +586,16 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.creamBg,
   },
+  keyboardWrap: {
+    flex: 1,
+  },
+  directoryWrapper: {
+    flex: 1,
+  },
+
+  // Directory Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -412,46 +603,521 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.yellow,
     paddingHorizontal: SPACING.md,
     paddingTop: SPACING.md,
-    paddingBottom: SPACING.sm,
-    borderBottomWidth: 3.5,
-    borderBottomColor: COLORS.black,
+    paddingBottom: 12,
+    borderBottomWidth: BORDERS.thick,
+    borderBottomColor: COLORS.borderBlack,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '900',
-    color: COLORS.black,
-    letterSpacing: 0.5,
+    color: COLORS.borderBlack,
+    letterSpacing: 0.8,
   },
   headerSubtitle: {
     fontSize: 10,
     fontWeight: '800',
-    color: COLORS.black,
+    color: COLORS.borderBlack,
+    marginTop: 2,
+    fontFamily: FONTS.mono,
+  },
+
+  // Segment Switcher
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    borderRadius: BORDER_RADIUS.pill,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    marginHorizontal: SPACING.md,
+    marginTop: 12,
+    marginBottom: 8,
+    padding: 3,
+  },
+  segmentTab: {
+    flex: 1,
+    height: 38,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentTabActive: {
+    backgroundColor: COLORS.cyan,
+    borderWidth: 2,
+    borderColor: COLORS.borderBlack,
+    ...BRUTAL_SHADOWS.xs,
+  },
+  segmentTabText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    letterSpacing: 0.4,
+  },
+  segmentTabTextActive: {
+    color: COLORS.borderBlack,
+    fontWeight: '900',
+  },
+
+  // Active Chat Thread Header
+  threadHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.yellow,
+    borderBottomWidth: BORDERS.thick,
+    borderBottomColor: COLORS.borderBlack,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 10,
+  },
+  backBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backBtnIcon: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    lineHeight: 22,
+    marginTop: -2,
+  },
+  avatarWrap: {
+    position: 'relative',
+  },
+  threadAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+  },
+  threadStatusDot: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: COLORS.borderBlack,
+  },
+  dotOnline: {
+    backgroundColor: COLORS.lime,
+  },
+  dotOffline: {
+    backgroundColor: COLORS.coral,
+  },
+  threadHeaderInfo: {
+    flex: 1,
+  },
+  threadNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  threadDevName: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    letterSpacing: 0.4,
+  },
+  connectionStatusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.white,
+    borderWidth: 1.2,
+    borderColor: COLORS.borderBlack,
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  miniDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+  },
+  miniDotGreen: {
+    backgroundColor: COLORS.green,
+  },
+  miniDotYellow: {
+    backgroundColor: COLORS.yellow,
+  },
+  connectionStatusText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    fontFamily: FONTS.mono,
+  },
+  projectContextRow: {
     marginTop: 2,
   },
+  threadProjectSubtitle: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.ink,
+    fontFamily: FONTS.mono,
+  },
+  threadHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  chatBadgeWrap: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  chatBadgeText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    letterSpacing: 0.5,
+  },
+
+  // Project Notice Bar
+  projectNoticeBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.creamLight,
+    borderBottomWidth: BORDERS.thin,
+    borderBottomColor: COLORS.borderBlack,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  noticeLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
+  miniNoticeCode: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  projectNoticeText: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.ink,
+  },
+  projectNoticeBold: {
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+  },
+  e2eBadge: {
+    backgroundColor: COLORS.pillGreen,
+    borderWidth: 1.2,
+    borderColor: COLORS.green,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  e2eBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#15803D',
+    letterSpacing: 0.4,
+    fontFamily: FONTS.mono,
+  },
+
+  // Message Scroll Feed
+  messageScroll: {
+    flex: 1,
+    backgroundColor: COLORS.creamBg,
+  },
+  messageContent: {
+    padding: 12,
+    gap: 8,
+    paddingBottom: 20,
+  },
+  threadStickerRow: {
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  messageRow: {
+    width: '100%',
+    marginBottom: 4,
+  },
+  sequenceRow: {
+    marginBottom: 2,
+  },
+  myMessageRow: {
+    alignItems: 'flex-end',
+  },
+  theirMessageRow: {
+    alignItems: 'flex-start',
+  },
+  senderLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+    marginBottom: 2,
+    marginLeft: 4,
+  },
+  messageBubble: {
+    maxWidth: '82%',
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  myBubble: {
+    backgroundColor: COLORS.yellow,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 3,
+  },
+  theirBubble: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 3,
+  },
+  messageText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  myMessageText: {
+    color: COLORS.borderBlack,
+    fontWeight: '700',
+  },
+  theirMessageText: {
+    color: COLORS.ink,
+  },
+  timeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    marginTop: 4,
+  },
+  msgTime: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#4B5563',
+  },
+  myMsgTime: {
+    color: '#4B5563',
+  },
+  checkmarks: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: '#0284C7',
+    fontFamily: FONTS.mono,
+  },
+
+  // Empty Thread State
+  emptyThreadContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+  },
+  emptyThreadBox: {
+    width: '100%',
+    maxWidth: 320,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: 20,
+    alignItems: 'center',
+    ...BRUTAL_SHADOWS.sm,
+  },
+  emptyThreadIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 10,
+  },
+  emptyThreadTitle: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  emptyThreadSub: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 16,
+    marginBottom: 14,
+  },
+  icebreakerBtn: {
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  icebreakerBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    letterSpacing: 0.5,
+  },
+
+  // Typing Indicator
+  typingIndicatorContainer: {
+    paddingVertical: 4,
+    paddingHorizontal: 4,
+    alignItems: 'flex-start',
+  },
+  typingBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FEF9C3',
+    borderWidth: 2,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dotShape: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: COLORS.borderBlack,
+  },
+  typingIndicatorText: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: COLORS.borderBlack,
+  },
+
+  // Composer Bar
+  composerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderTopWidth: BORDERS.thick,
+    borderTopColor: COLORS.borderBlack,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  attachBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: 2,
+    borderColor: COLORS.borderBlack,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachIcon: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    lineHeight: 22,
+  },
+  chatInput: {
+    flex: 1,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: Platform.OS === 'ios' ? 9 : 7,
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: COLORS.borderBlack,
+  },
+  sendBtn: {
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendIconText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
+    letterSpacing: 0.6,
+  },
+
+  // Errors and Loaders
+  sendErrorBanner: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 2,
+    borderColor: '#EF4444',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: BORDER_RADIUS.sm,
+    marginBottom: 6,
+    alignSelf: 'center',
+  },
+  sendErrorText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#B91C1C',
+  },
+  loadingMessagesContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingMessagesText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+  },
+
+  // Conversation Directory List
   chatListScroll: {
     padding: SPACING.md,
-    gap: 12,
-    paddingBottom: 24,
+    gap: 10,
+    paddingBottom: 32,
   },
   chatListItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 3.5,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.xl,
-    padding: SPACING.md,
+    borderRadius: BORDER_RADIUS.lg,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    padding: 12,
     gap: 12,
+  },
+  chatListItemUnread: {
+    backgroundColor: COLORS.white,
+  },
+  chatListItemRead: {
+    backgroundColor: '#FAF7EE',
   },
   avatarContainer: {
     position: 'relative',
   },
   listAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2.5,
-    borderColor: COLORS.black,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 2.2,
+    borderColor: COLORS.borderBlack,
   },
   onlineBadge: {
     position: 'absolute',
@@ -462,7 +1128,17 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: COLORS.lime,
     borderWidth: 2,
-    borderColor: COLORS.black,
+    borderColor: COLORS.borderBlack,
+  },
+  avatarFallback: {
+    backgroundColor: COLORS.yellow,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 17,
+    fontWeight: '900',
+    color: COLORS.borderBlack,
   },
   chatListDetails: {
     flex: 1,
@@ -474,331 +1150,111 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   listDevName: {
-    fontSize: 16,
+    fontSize: 14.5,
+    fontWeight: '800',
+    color: COLORS.ink,
+    flex: 1,
+    marginRight: 6,
+  },
+  listDevNameUnread: {
     fontWeight: '900',
-    color: COLORS.black,
+    color: COLORS.borderBlack,
   },
   listTimeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
   chatProjectBadgeRow: {
     marginBottom: 4,
   },
+  projectChip: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.creamDark,
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    maxWidth: '90%',
+  },
   listProjectTag: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: COLORS.pink,
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: COLORS.ink,
+    fontFamily: FONTS.mono,
   },
   listSnippetText: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: COLORS.textSecondary,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  listSnippetTextUnread: {
+    color: COLORS.borderBlack,
+    fontWeight: '700',
+  },
+  listRightCol: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   unreadBadgePill: {
-    width: 22,
+    minWidth: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: COLORS.pink,
-    borderWidth: 1.5,
-    borderColor: COLORS.black,
+    backgroundColor: COLORS.coral,
+    borderWidth: 1.8,
+    borderColor: COLORS.borderBlack,
+    paddingHorizontal: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   unreadBadgeText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '900',
     color: COLORS.white,
   },
-  threadHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.yellow,
-    borderBottomWidth: 3.5,
-    borderBottomColor: COLORS.black,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backBtnIcon: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: COLORS.black,
-  },
-  threadAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-  },
-  threadHeaderInfo: {
-    flex: 1,
-  },
-  threadNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  threadDevName: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: COLORS.black,
-  },
-  threadStatusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: COLORS.textSecondary,
-  },
-  dotOnline: {
-    backgroundColor: COLORS.lime,
-  },
-  threadProjectSubtitle: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: COLORS.textSecondary,
-  },
-  threadHeaderActions: {
-    flexDirection: 'row',
-  },
-  threadHeaderIconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  projectNoticeBar: {
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 2,
-    borderBottomColor: COLORS.black,
-    paddingVertical: 5,
-    paddingHorizontal: SPACING.md,
-  },
-  projectNoticeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: COLORS.black,
-  },
-  messageScroll: {
-    flex: 1,
-  },
-  messageContent: {
-    padding: SPACING.md,
-    gap: 12,
-    paddingBottom: 20,
-  },
-  threadStickerRow: {
-    alignItems: 'center',
-    marginVertical: 6,
-  },
-  messageRow: {
-    width: '100%',
-  },
-  myMessageRow: {
-    alignItems: 'flex-end',
-  },
-  theirMessageRow: {
-    alignItems: 'flex-start',
-  },
-  senderLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: COLORS.black,
-    marginBottom: 2,
-    marginLeft: 4,
-  },
-  messageBubble: {
-    maxWidth: '82%',
-    borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 2.5,
-    borderColor: COLORS.black,
-    padding: 10,
-  },
-  myBubble: {
-    backgroundColor: COLORS.pastelBlue,
-    borderBottomRightRadius: 2,
-  },
-  theirBubble: {
-    backgroundColor: COLORS.white,
-    borderBottomLeftRadius: 2,
-  },
-  messageText: {
-    fontSize: 13,
-    color: COLORS.black,
-    lineHeight: 18,
-    fontWeight: '600',
-  },
-  myMessageText: {
-    color: COLORS.black,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: 4,
-  },
-  msgTime: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-  },
-  myMsgTime: {
-    color: COLORS.textSecondary,
-  },
-  checkmarks: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: COLORS.cyan,
-  },
-  composerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderTopWidth: 3,
-    borderTopColor: COLORS.black,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  attachBtn: {
-    padding: 4,
-  },
-  attachIcon: {
-    fontSize: 20,
-  },
-  chatInput: {
-    flex: 1,
-    backgroundColor: COLORS.creamBg,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.black,
-  },
-  sendBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: COLORS.cyan,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sendIcon: {
-    fontSize: 18,
-  },
+
+  // Directory Empty State
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: SPACING.xl,
-    marginTop: 40,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: 24,
+    marginTop: 20,
+    ...BRUTAL_SHADOWS.sm,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: SPACING.md,
+  emptyIconWrap: {
+    marginBottom: 12,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '900',
-    color: COLORS.black,
-    letterSpacing: 0.5,
-    marginBottom: SPACING.xs,
+    color: COLORS.borderBlack,
+    letterSpacing: 0.6,
+    marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: COLORS.textSecondary,
     textAlign: 'center',
     lineHeight: 18,
-    marginBottom: SPACING.lg,
+    marginBottom: 18,
+    paddingHorizontal: 12,
   },
   emptyActionBtn: {
     backgroundColor: COLORS.yellow,
-    borderWidth: 3,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.md,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
   },
   emptyActionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    color: COLORS.black,
-  },
-  loadingMessagesContainer: {
-    paddingVertical: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  loadingMessagesText: {
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    textTransform: 'uppercase',
-  },
-  sendErrorBanner: {
-    backgroundColor: COLORS.pink,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: BORDER_RADIUS.sm,
-    borderWidth: 1.5,
-    borderColor: COLORS.black,
-    marginBottom: 8,
-    alignSelf: 'center',
-  },
-  sendErrorText: {
-    fontFamily: FONTS.bold,
-    fontSize: 12,
-    color: COLORS.black,
-  },
-  typingIndicatorContainer: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-    alignItems: 'flex-start',
-  },
-  typingBubble: {
-    backgroundColor: COLORS.pastelYellow || COLORS.yellow,
-    borderWidth: 2,
-    borderColor: COLORS.black,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  typingIndicatorText: {
-    fontFamily: FONTS.bold,
-    fontSize: 11,
-    color: COLORS.black,
-  },
-  avatarFallback: {
-    backgroundColor: COLORS.yellow,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarFallbackText: {
-    fontFamily: FONTS.black,
-    fontSize: 18,
-    color: COLORS.black,
+    color: COLORS.borderBlack,
+    letterSpacing: 0.5,
   },
 });
-

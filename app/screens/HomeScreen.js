@@ -10,12 +10,14 @@ import {
   FlatList,
   RefreshControl,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import DeveloperCard from '../components/DeveloperCard';
 import SwipeableCard from '../components/SwipeableCard';
 import SwipeControls from '../components/SwipeControls';
 import ComicBadge from '../components/ComicBadge';
+import { DoodleStar, DoodleSparkle, DoodleCode, DoodleArrow, DoodleUnderline } from '../components/DoodleElements';
 import { useApp } from '../context/AppContext';
+import NotificationsList from '../components/NotificationsList';
 import { getSkillLabels } from '../data/skillsDatabase';
 import { recordSwipeApi, createInvitationApi } from '../utils/api';
 
@@ -148,11 +150,20 @@ export default function HomeScreen({
         }
       }
 
+      setHistory((prev) => [
+        ...prev,
+        {
+          dev: currentDev,
+          action: 'PASS',
+          projectId: activeProject?.id,
+          invitationId: null,
+        },
+      ]);
       skipDeveloper(currentDev.id);
-      setHistory((prev) => [...prev, { dev: currentDev, action: 'PASS' }]);
-      showToast(`SKIPPED ${currentDev.name.split(' ')[0]} ✖`, COLORS.btnRed);
+      showToast('PASSED', '#94A3B8');
     } catch (err) {
-      showToast(err.message || 'Error processing pass', COLORS.btnRed);
+      console.error('handlePass error:', err);
+      showToast('Error recording pass', COLORS.btnRed);
     } finally {
       setIsProcessingSwipe(false);
     }
@@ -168,32 +179,59 @@ export default function HomeScreen({
 
     setIsProcessingSwipe(true);
     try {
-      // If active project is a real MongoDB ObjectId, dispatch invitation to backend
       const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
+      let createdInvitationId = null;
+
       if (isRealProject) {
         const token = currentUser?.token || null;
         const uid = currentUser?._id || currentUser?.id;
-        const res = await createInvitationApi(
-          {
-            projectId: activeProject.id,
-            developerId: currentDev._id || currentDev.id,
-            message: 'Invited to collaborate on project',
-            senderId: uid,
-          },
-          token
+
+        // 1. Record LIKE swipe
+        const swipeRes = await recordSwipeApi(
+          activeProject.id,
+          currentDev._id || currentDev.id,
+          'LIKE',
+          token,
+          uid
         );
-        if (!res.success) {
-          showToast(res.error || 'Failed to send invitation', COLORS.btnRed);
+        if (!swipeRes.success) {
+          showToast(swipeRes.error || 'Failed to record invite', COLORS.btnRed);
           setIsProcessingSwipe(false);
           return;
         }
+
+        // 2. Create pending Invitation record
+        const invRes = await createInvitationApi(
+          activeProject.id,
+          currentDev._id || currentDev.id,
+          'Hey! Would love to collaborate on this project.',
+          token,
+          uid
+        );
+        if (invRes.success && invRes.invitation?._id) {
+          createdInvitationId = invRes.invitation._id;
+        }
       }
 
-      inviteDeveloper(currentDev, false);
-      setHistory((prev) => [...prev, { dev: currentDev, action: 'LIKE' }]);
-      setInviteModalData(currentDev);
+      setHistory((prev) => [
+        ...prev,
+        {
+          dev: currentDev,
+          action: 'INVITE',
+          projectId: activeProject?.id,
+          invitationId: createdInvitationId,
+        },
+      ]);
+
+      inviteDeveloper(currentDev.id);
+      setInviteModalData({
+        name: currentDev.name,
+        role: currentDev.role,
+        isSuper: false,
+      });
     } catch (err) {
-      showToast(err.message || 'Error sending invitation', COLORS.btnRed);
+      console.error('handleLike error:', err);
+      showToast('Error sending invite', COLORS.btnRed);
     } finally {
       setIsProcessingSwipe(false);
     }
@@ -210,57 +248,83 @@ export default function HomeScreen({
     setIsProcessingSwipe(true);
     try {
       const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
+      let createdInvitationId = null;
+
       if (isRealProject) {
         const token = currentUser?.token || null;
         const uid = currentUser?._id || currentUser?.id;
-        const res = await createInvitationApi(
-          {
-            projectId: activeProject.id,
-            developerId: currentDev._id || currentDev.id,
-            message: '★ Super Liked your profile for this project!',
-            senderId: uid,
-          },
-          token
+
+        const swipeRes = await recordSwipeApi(
+          activeProject.id,
+          currentDev._id || currentDev.id,
+          'SUPERLIKE',
+          token,
+          uid
         );
-        if (!res.success) {
-          showToast(res.error || 'Failed to send invitation', COLORS.btnRed);
+        if (!swipeRes.success) {
+          showToast(swipeRes.error || 'Failed to record super invite', COLORS.btnRed);
           setIsProcessingSwipe(false);
           return;
         }
+
+        const invRes = await createInvitationApi(
+          activeProject.id,
+          currentDev._id || currentDev.id,
+          '⭐ Super-invited you to collaborate!',
+          token,
+          uid
+        );
+        if (invRes.success && invRes.invitation?._id) {
+          createdInvitationId = invRes.invitation._id;
+        }
       }
 
-      inviteDeveloper(currentDev, true);
-      setHistory((prev) => [...prev, { dev: currentDev, action: 'SUPER' }]);
-      setInviteModalData({ ...currentDev, isSuper: true });
+      setHistory((prev) => [
+        ...prev,
+        {
+          dev: currentDev,
+          action: 'SUPER',
+          projectId: activeProject?.id,
+          invitationId: createdInvitationId,
+        },
+      ]);
+
+      inviteDeveloper(currentDev.id);
+      setInviteModalData({
+        name: currentDev.name,
+        role: currentDev.role,
+        isSuper: true,
+      });
     } catch (err) {
-      showToast(err.message || 'Error sending invitation', COLORS.btnRed);
+      console.error('handleSuperLike error:', err);
+      showToast('Error sending super invite', COLORS.btnRed);
     } finally {
       setIsProcessingSwipe(false);
     }
   };
 
-  const handleRewind = () => {
-    if (history.length > 0) {
-      const lastAction = history[history.length - 1];
-      if (lastAction.action === 'PASS') {
-        unskipDeveloper(lastAction.dev.id);
-      } else {
-        uninviteDeveloper(lastAction.dev.id);
-      }
-      setHistory((prev) => prev.slice(0, -1));
-      showToast(`RESTORED ${lastAction.dev.name.split(' ')[0]} ↺`, COLORS.btnYellow);
-    } else {
-      showToast('AT DECK START', COLORS.white);
+  const handleRewind = async () => {
+    if (history.length === 0) {
+      showToast('NO ACTIONS TO UNDO', COLORS.btnRed);
+      return;
+    }
+    const last = history[history.length - 1];
+    setHistory((prev) => prev.slice(0, -1));
+
+    if (last.action === 'PASS') {
+      unskipDeveloper(last.dev.id);
+      showToast(`RESTORED ${last.dev.name.toUpperCase()}`, COLORS.btnYellow);
+    } else if (last.action === 'INVITE' || last.action === 'SUPER') {
+      uninviteDeveloper(last.dev.id);
+      showToast(`UNINVITED ${last.dev.name.toUpperCase()}`, COLORS.btnYellow);
     }
   };
 
   const handleResetDeck = () => {
-    resetDiscoveryForProject(activeProject?.id);
-    if (loadDiscoveryDevelopers) {
-      loadDiscoveryDevelopers();
+    if (activeProject) {
+      resetDiscoveryForProject(activeProject.id);
+      showToast('DISCOVERY DECK RESET', COLORS.btnYellow);
     }
-    setHistory([]);
-    showToast(`RESET DECK FOR ${activeProject?.title || 'PROJECT'} ↺`, COLORS.btnYellow);
   };
 
   const handleOpenDevProfile = (dev) => {
@@ -274,13 +338,16 @@ export default function HomeScreen({
 
   return (
     <View style={styles.container}>
-      {/* 1. TOP HEADER (DevDate 3D Logo + Bell + Sliders) */}
+      {/* 1. TOP HEADER (DevDate 3D Logo + Bell + Filter) */}
       <View style={styles.topHeader}>
-        <Image
-          source={require('../assets/devdate_logo.png')}
-          style={[styles.devdateLogo, { backgroundColor: 'transparent' }]}
-          resizeMode="contain"
-        />
+        <View style={styles.logoWrap}>
+          <Image
+            source={require('../assets/devdate_logo.png')}
+            style={[styles.devdateLogo, { backgroundColor: 'transparent' }]}
+            resizeMode="contain"
+          />
+          <DoodleStar size={14} color={COLORS.yellow} style={styles.headerStar} />
+        </View>
 
         <View style={styles.headerIconsRow}>
           {/* Notification Bell with Red Badge */}
@@ -301,13 +368,13 @@ export default function HomeScreen({
             )}
           </TouchableOpacity>
 
-          {/* Filter Sliders */}
+          {/* Filter Pill Button */}
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => setFilterModalVisible(true)}
-            style={styles.iconBtn}
+            style={[styles.filterBtn, BRUTAL_SHADOWS.xs]}
           >
-            <Text style={styles.headerIconText}>🎚️</Text>
+            <Text style={styles.filterBtnText}>FILTER</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -318,7 +385,7 @@ export default function HomeScreen({
         onPress={() => setProjectPickerVisible(true)}
         style={[styles.projectSelectorBadge, BRUTAL_SHADOWS.xs]}
       >
-        <Text style={styles.projectSelectorIcon}>{activeProject?.icon || '⚡'}</Text>
+        <DoodleCode symbol="</>" bgColor={COLORS.yellowHighlight} color={COLORS.ink} style={styles.projectSelectorCodeBadge} />
         <Text style={styles.projectSelectorPrefix}>DISCOVERING FOR:</Text>
         <Text style={styles.projectSelectorTitle} numberOfLines={1}>
           {activeProject?.title || 'StudySync'}
@@ -336,7 +403,9 @@ export default function HomeScreen({
             activeSegment === 'DISCOVER' && styles.segmentPillActive,
           ]}
         >
-          <Text style={styles.segmentTextActive}>DISCOVER</Text>
+          <Text style={activeSegment === 'DISCOVER' ? styles.segmentTextActive : styles.segmentTextInactive}>
+            DISCOVER
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -384,22 +453,25 @@ export default function HomeScreen({
         }
       >
         {discoveryLoading && availableDevelopersForActiveProject.length === 0 ? (
-          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
-            <Text style={styles.emptyTitle}>SCANNING SQUAD... ⚡</Text>
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleSparkle size={28} color={COLORS.yellow} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyTitle}>SCANNING SQUAD...</Text>
             <Text style={styles.emptySubtitle}>
               Connecting to real developer database...
             </Text>
           </View>
         ) : isProjectClosed ? (
-          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
-            <Text style={styles.emptyTitle}>PROJECT CLOSED 🔒</Text>
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleCode symbol="X" bgColor={COLORS.coralLight} color={COLORS.coral} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyTitle}>PROJECT CLOSED</Text>
             <Text style={styles.emptySubtitle}>
               New member recruitment has stopped.
             </Text>
           </View>
         ) : isProjectFull ? (
-          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
-            <Text style={styles.emptyTitle}>TEAM FULL 👥</Text>
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleStar size={26} color={COLORS.purple} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyTitle}>TEAM FULL</Text>
             <Text style={styles.emptySubtitle}>
               This project has reached its maximum team size.
             </Text>
@@ -414,17 +486,19 @@ export default function HomeScreen({
             <DeveloperCard developer={currentDev} onPress={() => handleOpenDevProfile(currentDev)} />
           </SwipeableCard>
         ) : (
-          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
-            <Text style={styles.emptyTitle}>NO MORE DEVELOPERS 🚀</Text>
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleSparkle size={30} color={COLORS.yellow} style={{ marginBottom: 10 }} />
+            <Text style={styles.emptyTitle}>NO MORE DEVELOPERS</Text>
+            <DoodleUnderline width={140} color={COLORS.yellow} height={3} style={{ marginBottom: 10 }} />
             <Text style={styles.emptySubtitle}>
               You've gone through everyone available for this project.
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleResetDeck}
-              style={[styles.resetBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.resetBtn, BRUTAL_SHADOWS.button]}
             >
-              <Text style={styles.resetBtnText}>↺ EXPLORE AGAIN</Text>
+              <Text style={styles.resetBtnText}>EXPLORE AGAIN</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -448,10 +522,10 @@ export default function HomeScreen({
         onRequestClose={() => setInviteModalData(null)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
+          <View style={[styles.modalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.modalSticker}>
               <ComicBadge
-                text={inviteModalData?.isSuper ? "★ SUPER INVITED! ★" : "MATCH INVITE SENT! ♥"}
+                text={inviteModalData?.isSuper ? "SUPER INVITED!" : "MATCH INVITE SENT!"}
                 color={inviteModalData?.isSuper ? COLORS.btnBlue : COLORS.btnGreen}
                 textColor="#000000"
                 rotate="-3deg"
@@ -501,11 +575,11 @@ export default function HomeScreen({
         onRequestClose={() => setProjectPickerVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.md]}>
+          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
-              <ComicBadge text="SELECT DISCOVERY PROJECT 🎯" color="#FFCC00" textColor="#000" size="sm" />
+              <ComicBadge text="SELECT DISCOVERY PROJECT" color="#FFCC00" textColor="#000" size="sm" />
               <TouchableOpacity onPress={() => setProjectPickerVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>✕</Text>
+                <Text style={styles.modalCloseText}>X</Text>
               </TouchableOpacity>
             </View>
 
@@ -523,7 +597,7 @@ export default function HomeScreen({
                     onPress={() => {
                       setActiveProjectId(proj.id);
                       setProjectPickerVisible(false);
-                      showToast(`DISCOVERING FOR: ${proj.title} 🎯`);
+                      showToast(`DISCOVERING FOR: ${proj.title}`);
                     }}
                     style={[
                       styles.projectPickerItem,
@@ -531,7 +605,7 @@ export default function HomeScreen({
                       BRUTAL_SHADOWS.xs,
                     ]}
                   >
-                    <Text style={styles.pickerItemIcon}>{proj.icon || '⚡'}</Text>
+                    <Text style={styles.pickerItemIcon}>{proj.icon || '</>'}</Text>
                     <View style={styles.pickerItemBody}>
                       <Text style={styles.pickerItemTitle}>{proj.title}</Text>
                       <Text style={styles.pickerItemTech}>{getSkillLabels(proj.techStack).join(' • ')}</Text>
@@ -552,9 +626,9 @@ export default function HomeScreen({
                 setProjectPickerVisible(false);
                 if (onNavigateToProjects) onNavigateToProjects();
               }}
-              style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.button]}
             >
-              <Text style={styles.createProjectPromptText}>➕ MANAGE OR CREATE PROJECT</Text>
+              <Text style={styles.createProjectPromptText}>+ MANAGE OR CREATE PROJECT</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -568,70 +642,20 @@ export default function HomeScreen({
         onRequestClose={() => setNotificationsVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.md]}>
+          <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
-              <ComicBadge text="NOTIFICATIONS 🔔" color="#38BDF8" textColor="#000" size="sm" />
+              <ComicBadge text="NOTIFICATIONS" color="#38BDF8" textColor="#000" size="sm" />
               <TouchableOpacity onPress={() => setNotificationsVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>✕</Text>
+                <Text style={styles.modalCloseText}>X</Text>
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              style={styles.pickerList}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={Boolean(notificationsLoading)}
-                  onRefresh={() => {
-                    if (loadNotifications) loadNotifications();
-                  }}
-                  tintColor="#000000"
-                />
-              }
-            >
-              {notifications.length === 0 ? (
-                <View style={styles.notifEmptyContainer}>
-                  <Text style={styles.notifEmptyIcon}>🔔</Text>
-                  <Text style={styles.notifEmptyTitle}>NO NOTIFICATIONS</Text>
-                  <Text style={styles.notifEmptySubtitle}>You're completely caught up!</Text>
-                </View>
-              ) : (
-                notifications.map((n) => (
-                  <TouchableOpacity
-                    key={n.id}
-                    activeOpacity={0.75}
-                    onPress={() => handleNotificationPress(n)}
-                    style={[
-                      styles.notificationCard,
-                      BRUTAL_SHADOWS.xs,
-                      !n.read && styles.notificationCardUnread,
-                    ]}
-                  >
-                    <View style={styles.notifHeaderRow}>
-                      <Text style={styles.notifTitle}>{n.title}</Text>
-                      {!n.read && (
-                        <View style={styles.notifUnreadBadge}>
-                          <Text style={styles.notifUnreadBadgeText}>NEW</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.notifMsg}>{n.message}</Text>
-                    <Text style={styles.notifTime}>{n.time}</Text>
-                  </TouchableOpacity>
-                ))
-              )}
-            </ScrollView>
-
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => {
-                markAllNotificationsRead();
-                setNotificationsVisible(false);
+            <NotificationsList
+              showHeader={true}
+              onSelectNotification={(n) => {
+                handleNotificationPress(n);
               }}
-              style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.createProjectPromptText}>MARK ALL READ</Text>
-            </TouchableOpacity>
+            />
           </View>
         </View>
       </Modal>
@@ -644,11 +668,11 @@ export default function HomeScreen({
         onRequestClose={() => setFilterModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
+          <View style={[styles.modalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
-              <ComicBadge text="DISCOVERY FILTERS 🎚️" color="#4ADE80" textColor="#000" size="sm" />
+              <ComicBadge text="DISCOVERY FILTERS" color="#4ADE80" textColor="#000" size="sm" />
               <TouchableOpacity onPress={() => setFilterModalVisible(false)} style={styles.modalCloseBtn}>
-                <Text style={styles.modalCloseText}>✕</Text>
+                <Text style={styles.modalCloseText}>X</Text>
               </TouchableOpacity>
             </View>
 
@@ -675,7 +699,7 @@ export default function HomeScreen({
 
             <TouchableOpacity
               onPress={() => setFilterModalVisible(false)}
-              style={[styles.createProjectPromptBtn, { marginTop: 20 }, BRUTAL_SHADOWS.xs]}
+              style={[styles.createProjectPromptBtn, { marginTop: 20 }, BRUTAL_SHADOWS.button]}
             >
               <Text style={styles.createProjectPromptText}>APPLY FILTERS</Text>
             </TouchableOpacity>
@@ -700,25 +724,32 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 2,
   },
+  logoWrap: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   devdateLogo: {
-    width: 140,
-    height: 48,
+    width: 135,
+    height: 44,
+  },
+  headerStar: {
+    position: 'absolute',
+    top: -2,
+    right: -10,
   },
   headerIconsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   iconBtn: {
     position: 'relative',
     padding: 6,
   },
-  headerIconText: {
-    fontSize: 22,
-  },
   notificationBellImg: {
-    width: 25,
-    height: 25,
+    width: 24,
+    height: 24,
   },
   notificationDot: {
     position: 'absolute',
@@ -727,9 +758,26 @@ const styles = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: '#EF4444',
+    backgroundColor: COLORS.coral,
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: COLORS.ink,
+  },
+  filterBtn: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  filterBtnText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
 
   // Project Selector Bar
@@ -737,35 +785,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     marginTop: 2,
     marginBottom: 4,
     gap: 6,
   },
-  projectSelectorIcon: {
-    fontSize: 13,
+  projectSelectorCodeBadge: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   projectSelectorPrefix: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#666666',
+    color: COLORS.textMuted,
     letterSpacing: 0.5,
   },
   projectSelectorTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
-    maxWidth: 160,
+    color: COLORS.ink,
+    maxWidth: 150,
   },
   projectSelectorArrow: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
 
   // Segmented row
@@ -779,26 +832,30 @@ const styles = StyleSheet.create({
   segmentPill: {
     flex: 1,
     height: 36,
-    borderRadius: 18,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
   segmentPillActive: {
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
     borderWidth: 2.5,
-    borderColor: '#000000',
+    borderColor: COLORS.ink,
+    ...BRUTAL_SHADOWS.xs,
   },
   segmentTextActive: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
   segmentTextInactive: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#000000',
+    color: COLORS.inkMuted,
     letterSpacing: 0.5,
   },
 
@@ -808,13 +865,16 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     zIndex: 999,
     borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 6,
   },
   toastText: {
-    color: '#000000',
+    color: COLORS.ink,
     fontSize: 11,
     fontWeight: '900',
   },
@@ -828,40 +888,49 @@ const styles = StyleSheet.create({
   },
   emptyCard: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3.5,
-    borderColor: '#000000',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: COLORS.white,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 26,
+    padding: 28,
     alignItems: 'center',
-    marginTop: 40,
-    marginBottom: 40,
+    marginTop: 36,
+    marginBottom: 36,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#000000',
-    marginBottom: 8,
+    color: COLORS.ink,
+    marginBottom: 6,
+    letterSpacing: 0.3,
   },
   emptySubtitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#555555',
+    color: COLORS.textMuted,
     textAlign: 'center',
     marginBottom: 16,
+    lineHeight: 18,
   },
   resetBtn: {
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
     borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 20,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    paddingHorizontal: 22,
     paddingVertical: 10,
   },
   resetBtnText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
 
   // Modal styling
@@ -875,10 +944,13 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#FAF6EB',
-    borderRadius: 24,
-    borderWidth: 3.5,
-    borderColor: '#000000',
+    backgroundColor: COLORS.cream,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 26,
+    borderWidth: 3,
+    borderColor: COLORS.ink,
     padding: 20,
     alignItems: 'center',
   },
@@ -896,20 +968,23 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 15,
-    backgroundColor: '#000000',
+    backgroundColor: COLORS.ink,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCloseText: {
-    color: '#FFFFFF',
+    color: COLORS.white,
     fontWeight: '900',
-    fontSize: 14,
+    fontSize: 13,
   },
   pickerSubtitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#555555',
+    color: COLORS.textMuted,
     marginBottom: 12,
+    lineHeight: 16,
   },
   pickerList: {
     maxHeight: 300,
@@ -917,20 +992,23 @@ const styles = StyleSheet.create({
   projectPickerItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
     padding: 12,
     marginBottom: 10,
     gap: 10,
   },
   projectPickerItemActive: {
-    backgroundColor: '#FEF9C3',
-    borderColor: '#000000',
+    backgroundColor: COLORS.yellowHighlight,
+    borderColor: COLORS.ink,
   },
   pickerItemIcon: {
-    fontSize: 24,
+    fontSize: 22,
   },
   pickerItemBody: {
     flex: 1,
@@ -938,33 +1016,36 @@ const styles = StyleSheet.create({
   pickerItemTitle: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   pickerItemTech: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#666666',
+    color: COLORS.textMuted,
     marginTop: 2,
   },
   activeCheckBadge: {
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
     borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 8,
+    borderColor: COLORS.ink,
+    borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   activeCheckText: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   createProjectPromptBtn: {
     height: 44,
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
     borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 22,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 12,
@@ -972,38 +1053,41 @@ const styles = StyleSheet.create({
   createProjectPromptText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
 
   // Notifications
   notificationCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 14,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 16,
     padding: 12,
     marginBottom: 8,
   },
   notifTitle: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     marginBottom: 2,
   },
   notifMsg: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#444444',
+    color: COLORS.textMuted,
     marginBottom: 4,
   },
   notifTime: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#888888',
+    color: COLORS.inkMuted,
   },
   notificationCardUnread: {
-    backgroundColor: '#FEF08A',
+    backgroundColor: COLORS.yellowHighlight,
   },
   notifHeaderRow: {
     flexDirection: 'row',
@@ -1012,9 +1096,9 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   notifUnreadBadge: {
-    backgroundColor: '#4ADE80',
+    backgroundColor: COLORS.greenLight,
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: COLORS.ink,
     borderRadius: 4,
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -1022,34 +1106,30 @@ const styles = StyleSheet.create({
   notifUnreadBadgeText: {
     fontSize: 8,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   notifEmptyContainer: {
     paddingVertical: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  notifEmptyIcon: {
-    fontSize: 32,
-    marginBottom: 8,
-  },
   notifEmptyTitle: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     marginBottom: 4,
   },
   notifEmptySubtitle: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#666666',
+    color: COLORS.textMuted,
   },
 
   // Filters
   filterSectionTitle: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     marginTop: 10,
     marginBottom: 10,
   },
@@ -1059,20 +1139,23 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   filterPill: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 16,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   filterPillActive: {
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
   },
   filterPillText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#000000',
+    color: COLORS.ink,
   },
   filterPillTextActive: {
     fontWeight: '900',
@@ -1084,18 +1167,18 @@ const styles = StyleSheet.create({
   modalDevName: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   modalDevRole: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#666666',
+    color: COLORS.textMuted,
     marginBottom: 10,
   },
   modalNotice: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#333333',
+    color: COLORS.inkMuted,
     textAlign: 'center',
     marginBottom: 16,
     lineHeight: 18,
@@ -1108,31 +1191,37 @@ const styles = StyleSheet.create({
   continueBtn: {
     flex: 1,
     height: 42,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 21,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   continueBtnText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   viewMatchesBtn: {
     flex: 1.2,
     height: 42,
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
     borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 21,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   viewMatchesBtnText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
 });

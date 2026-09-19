@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { COLORS, FONTS } from '../styles/theme';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react-native';
+import { COLORS, BORDERS, BRUTAL_SHADOWS, SHELL } from '../styles/theme';
+import { DoodleUser, DoodleStar, DoodleUnderline } from './DoodleElements';
 
-export default function BottomNav({ activeTab, onTabChange, matchesCount = 3 }) {
+export default function BottomNav({ activeTab, onTabChange, matchesCount = 0 }) {
   const tabs = [
     {
       id: 'discover',
@@ -18,133 +19,211 @@ export default function BottomNav({ activeTab, onTabChange, matchesCount = 3 }) 
     {
       id: 'profile',
       label: 'Profile',
-      icon: '👤',
+      renderCustomIcon: (isActive) => (
+        <DoodleUser
+          size={22}
+          color={isActive ? COLORS.ink : SHELL.navInactiveColor}
+          fillColor={isActive ? SHELL.navActiveBg : COLORS.white}
+        />
+      ),
     },
   ];
 
   return (
     <View style={styles.navContainer}>
-      {tabs.map((tab) => {
-        const isActive = activeTab === tab.id;
+      {/* Decorative top border accent — doodle-style uneven line */}
+      <View style={styles.topBorderAccent} />
 
-        return (
-          <TouchableOpacity
-            key={tab.id}
-            activeOpacity={0.75}
-            onPress={() => onTabChange(tab.id)}
-            style={styles.tabItem}
-          >
-            <View style={styles.iconContainer}>
-              {tab.image ? (
-                <Image
-                  source={tab.image}
-                  style={[
-                    styles.tabImg,
-                    isActive ? styles.tabImgActive : styles.tabImgInactive,
-                  ]}
-                  resizeMode="contain"
-                />
-              ) : (
+      <View style={styles.tabRow}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              activeOpacity={0.7}
+              onPress={() => onTabChange(tab.id)}
+              style={styles.tabItem}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={tab.label}
+            >
+              {/* Active background pill */}
+              {isActive && <View style={styles.activePill} />}
+
+              <View style={styles.iconLabelWrap}>
+                <View style={styles.iconContainer}>
+                  {tab.renderCustomIcon ? (
+                    <View style={styles.customIconWrap}>
+                      {tab.renderCustomIcon(isActive)}
+                    </View>
+                  ) : tab.image ? (
+                    <Image
+                      source={tab.image}
+                      style={[
+                        styles.tabImg,
+                        isActive ? styles.tabImgActive : styles.tabImgInactive,
+                      ]}
+                      resizeMode="contain"
+                    />
+                  ) : null}
+
+                  {/* Badge sticker */}
+                  {tab.badge !== undefined && tab.badge > 0 && (
+                    <View style={styles.badgeSticker}>
+                      <Text style={styles.badgeText}>{tab.badge}</Text>
+                    </View>
+                  )}
+
+                  {/* Sparkle accent on active tab */}
+                  {isActive && (
+                    <View style={styles.sparkleAccent}>
+                      <DoodleStar size={8} color={COLORS.coral} />
+                    </View>
+                  )}
+                </View>
+
                 <Text
                   style={[
-                    styles.tabIcon,
-                    isActive && styles.tabIconActive,
+                    styles.tabLabel,
+                    isActive && styles.tabLabelActive,
                   ]}
                 >
-                  {tab.icon}
+                  {tab.label}
                 </Text>
-              )}
 
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <View style={styles.badgeCircle}>
-                  <Text style={styles.badgeText}>{tab.badge}</Text>
-                </View>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabLabel,
-                isActive && styles.tabLabelActive,
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+                {/* Doodle underline on active tab */}
+                {isActive && (
+                  <View style={styles.underlineWrap}>
+                    <DoodleUnderline
+                      width={32}
+                      height={3}
+                      color={COLORS.yellow}
+                    />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   navContainer: {
+    backgroundColor: COLORS.creamBg,
+    height: SHELL.navHeight,
+  },
+  topBorderAccent: {
+    height: BORDERS.regular,
+    backgroundColor: COLORS.borderBlack,
+    // Slightly uneven to feel hand-drawn
+    marginHorizontal: -1,
+    borderRadius: 1,
+  },
+  tabRow: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    backgroundColor: '#FAF6EB',
-    borderTopWidth: 2,
-    borderTopColor: '#000000',
-    paddingVertical: 8,
-    height: 64,
+    paddingBottom: 4,
   },
   tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    position: 'relative',
+    paddingTop: 6,
+  },
+  activePill: {
+    position: 'absolute',
+    top: 4,
+    left: '15%',
+    right: '15%',
+    bottom: 2,
+    backgroundColor: COLORS.yellowHighlight,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 9,
+    borderBottomRightRadius: 14,
+    ...BRUTAL_SHADOWS.xs,
+  },
+  iconLabelWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
   },
   iconContainer: {
     position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabIcon: {
-    fontSize: 20,
-    marginBottom: 2,
-    opacity: 0.8,
-  },
-  tabIconActive: {
-    fontSize: 22,
-    opacity: 1,
+  customIconWrap: {
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 1,
   },
   tabImg: {
     width: 24,
     height: 24,
-    marginBottom: 2,
+    marginBottom: 1,
   },
   tabImgActive: {
     opacity: 1,
     transform: [{ scale: 1.08 }],
   },
   tabImgInactive: {
-    opacity: 0.72,
+    opacity: 0.45,
   },
   tabLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#374151',
-    letterSpacing: 0.2,
+    fontSize: 10,
+    fontWeight: '600',
+    color: SHELL.navInactiveColor,
+    letterSpacing: 0.3,
+    marginTop: 1,
   },
   tabLabelActive: {
-    fontWeight: '900',
-    color: '#000000',
+    fontWeight: '800',
+    color: SHELL.navActiveColor,
+    letterSpacing: 0.4,
   },
-  badgeCircle: {
+  underlineWrap: {
+    marginTop: 1,
+    alignItems: 'center',
+  },
+  badgeSticker: {
     position: 'absolute',
-    top: -4,
-    right: -8,
-    backgroundColor: '#EF4444',
+    top: -5,
+    right: -10,
+    backgroundColor: COLORS.coral,
     borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 8,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 9,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 6,
     paddingHorizontal: 4,
-    minWidth: 15,
-    height: 15,
+    minWidth: 16,
+    height: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    ...BRUTAL_SHADOWS.xs,
   },
   badgeText: {
     fontSize: 8,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: COLORS.white,
+    letterSpacing: 0.3,
+  },
+  sparkleAccent: {
+    position: 'absolute',
+    top: -4,
+    right: -12,
   },
 });
+

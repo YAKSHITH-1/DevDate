@@ -1,24 +1,29 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
-import { POP_PALETTE, POP_SHADOWS, BORDER_RADIUS } from '../styles/theme';
+import { COLORS, POP_PALETTE, POP_SHADOWS, BORDER_RADIUS, BORDERS } from '../styles/theme';
+import { DoodleStar } from './DoodleElements';
 
 export default function PopArtHeader({
   onBack,
   mode = 'login', // 'login' | 'signup' | 'otp'
-  rightBadgeText = '⚡ READY',
-  powText = 'POW! ★ SQUAD UP',
-  matchBadgeText = '⚡ 98% CO-FOUNDER MATCH',
+  rightBadgeText = 'READY',
+  powText = 'POW! // SQUAD UP',
+  matchBadgeText = '98% CO-FOUNDER MATCH',
   onSettingsPress,
 }) {
   const getBreadcrumb = () => {
     switch (mode) {
       case 'signup':
-        return '🔲 DEVDATE :: REGISTER';
+        return '// DEVDATE :: REGISTER';
       case 'otp':
-        return '🔲 DEVDATE :: VERIFY';
+        return '// DEVDATE :: VERIFY';
+      case 'forgot':
+        return '// DEVDATE :: RECOVER';
+      case 'reset':
+        return '// DEVDATE :: RESET';
       case 'login':
       default:
-        return '🔲 DEVDATE :: AUTH';
+        return '// DEVDATE :: AUTH';
     }
   };
 
@@ -41,7 +46,9 @@ export default function PopArtHeader({
         <View style={styles.brandTitleContainer}>
           <View style={styles.brandTitleRow}>
             <Text style={styles.brandTitleText}>DEVDATE</Text>
-            <Text style={styles.brandStarText}> ★</Text>
+            <View style={styles.brandStarWrap}>
+              <DoodleStar size={12} color={COLORS.coral} />
+            </View>
           </View>
           <Text style={styles.breadcrumbText}>{getBreadcrumb()}</Text>
         </View>
@@ -75,7 +82,7 @@ export default function PopArtHeader({
         </View>
       </View>
 
-      {/* 2. COMIC SPEECH BUBBLE & STAT PILL ROW */}
+      {/* 2. SPEECH BUBBLE & STAT PILL ROW */}
       <View style={styles.decalRow}>
         {/* POW! Speech Bubble */}
         <View style={[styles.powBubble, POP_SHADOWS.sm]}>
@@ -98,29 +105,29 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   topYellowBar: {
-    backgroundColor: POP_PALETTE.yellow,
+    backgroundColor: COLORS.btnYellow,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderBottomWidth: 3.5,
-    borderBottomColor: POP_PALETTE.inkBlack,
+    borderBottomWidth: BORDERS.thick,
+    borderBottomColor: COLORS.borderBlack,
   },
   circleBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     alignItems: 'center',
     justifyContent: 'center',
   },
   circleBtnText: {
     fontSize: 20,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.borderBlack,
     lineHeight: 22,
     marginTop: -2,
   },
@@ -135,22 +142,19 @@ const styles = StyleSheet.create({
   brandTitleText: {
     fontSize: 16,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.borderBlack,
     letterSpacing: 0.8,
-    fontStyle: 'italic',
   },
-  brandStarText: {
-    fontSize: 14,
-    color: POP_PALETTE.pink,
-    fontWeight: '900',
+  brandStarWrap: {
+    marginLeft: 4,
   },
   breadcrumbText: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#047857',
     letterSpacing: 0.6,
     marginTop: 1,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   rightActionsRow: {
     flexDirection: 'row',
@@ -158,9 +162,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   readyPill: {
-    backgroundColor: POP_PALETTE.pink,
-    borderWidth: 2.2,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.coral,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -168,16 +172,16 @@ const styles = StyleSheet.create({
   readyPillText: {
     fontSize: 10,
     fontWeight: '900',
-    color: POP_PALETTE.pureWhite,
+    color: COLORS.white,
     letterSpacing: 0.6,
   },
   slidersCircleBtn: {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#38BDF8',
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.btnBlue,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -189,7 +193,7 @@ const styles = StyleSheet.create({
   sliderLine: {
     width: '100%',
     height: 2,
-    backgroundColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.borderBlack,
     position: 'relative',
     justifyContent: 'center',
   },
@@ -198,9 +202,9 @@ const styles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: POP_PALETTE.pureWhite,
+    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: POP_PALETTE.inkBlack,
+    borderColor: COLORS.borderBlack,
   },
   decalRow: {
     flexDirection: 'row',
@@ -211,34 +215,30 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   powBubble: {
-    backgroundColor: POP_PALETTE.pink,
-    borderWidth: 2.8,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.coral,
+    borderWidth: BORDERS.thick,
+    borderColor: COLORS.borderBlack,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    transform: [{ rotate: '-2deg' }],
+    transform: [{ rotate: '-1.5deg' }],
   },
   powBubbleText: {
-    color: POP_PALETTE.pureWhite,
+    color: COLORS.white,
     fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.8,
-    fontStyle: 'italic',
-    textShadowColor: POP_PALETTE.inkBlack,
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 0,
   },
   matchPill: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.lime,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   matchPillText: {
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.borderBlack,
     fontSize: 10.5,
     fontWeight: '900',
     letterSpacing: 0.6,

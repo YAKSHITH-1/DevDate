@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Image,
-  ImageBackground,
   TouchableOpacity,
   Platform,
   TextInput,
@@ -13,16 +12,41 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { POP_PALETTE, POP_SHADOWS, BORDER_RADIUS } from '../styles/theme';
-import PopArtHalftoneView from '../components/PopArtHalftoneView';
+import {
+  COLORS,
+  FONTS,
+  SPACING,
+  BORDER_RADIUS,
+  BORDERS,
+  BRUTAL_SHADOWS,
+} from '../styles/theme';
+import ComicBadge from '../components/ComicBadge';
 import PopArtHeader from '../components/PopArtHeader';
 import OtpSuccessModal from '../components/OtpSuccessModal';
+import {
+  DoodleStar,
+  DoodleSparkle,
+  DoodleCode,
+  DoodleArrow,
+  DoodleCheck,
+  DoodleCross,
+  DoodleUnderline,
+  DoodleUser,
+  DoodleSeparator,
+} from '../components/DoodleElements';
 import { useApp } from '../context/AppContext';
+import { forgotPasswordApi, resetPasswordApi } from '../utils/api';
+import { getDiceBearAvatar, resolveProfileAvatar } from '../utils/avatar';
 
+/**
+ * DevDate LandingScreen & Authentication System — Chunk 8 Redesign
+ * Visual Language: Playful Developer Sketchbook + Pop Art Graphic Design + Modern Mobile Product
+ * Zero Unicode Emojis.
+ */
 export default function LandingScreen({ onGetStarted }) {
   const { login, register, verifyEmail } = useApp();
 
-  // Screen flow: 'landing' | 'login' | 'signup' | 'otp'
+  // Screen flow: 'landing' | 'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password'
   const [currentView, setCurrentView] = useState('landing');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
@@ -49,6 +73,13 @@ export default function LandingScreen({ onGetStarted }) {
   const [otpCountdown, setOtpCountdown] = useState(60);
   const otpInputRefs = useRef([]);
 
+  // Forgot & Reset Password Forms
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [confirmResetPassword, setConfirmResetPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+
   // Live countdown timer for OTP resend
   useEffect(() => {
     let timer;
@@ -73,20 +104,39 @@ export default function LandingScreen({ onGetStarted }) {
     setCurrentView('signup');
   };
 
+  const handleOpenForgotPassword = () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setForgotEmail(loginEmail || signupEmail || '');
+    setCurrentView('forgot_password');
+  };
+
+  const handleOpenResetPassword = (token = '') => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    if (token) setResetToken(token);
+    setCurrentView('reset_password');
+  };
+
   const handleBack = () => {
     setErrorMessage(null);
     setSuccessMessage(null);
     if (currentView === 'otp') {
+      setCurrentView('signup');
+    } else if (currentView === 'forgot_password' || currentView === 'reset_password') {
       setCurrentView('login');
     } else {
       setCurrentView('landing');
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // AUTH ACTION HANDLERS
+  // ---------------------------------------------------------------------------
   const handleLoginSubmit = async () => {
     if (isSubmitting) return;
     if (!loginEmail || !loginEmail.includes('@')) {
-      setErrorMessage('Enter a valid campus (.edu) email');
+      setErrorMessage('Enter a valid email address (e.g. user@gmail.com)');
       return;
     }
     if (!loginPassword) {
@@ -132,11 +182,15 @@ export default function LandingScreen({ onGetStarted }) {
       return;
     }
     if (!signupEmail.trim() || !signupEmail.includes('@')) {
-      setErrorMessage('Valid campus email is required');
+      setErrorMessage('Valid email address (e.g. user@gmail.com) is required');
       return;
     }
     if (!signupPassword || signupPassword.length < 6) {
       setErrorMessage('Access key must be at least 6 characters long');
+      return;
+    }
+    if (!agreeTerms) {
+      setErrorMessage('Please accept the developer collaboration pledge');
       return;
     }
 
@@ -155,12 +209,7 @@ export default function LandingScreen({ onGetStarted }) {
       if (res.success) {
         setVerificationEmail(signupEmail.trim().toLowerCase());
         setVerificationName(signupName.trim());
-        const devOtpCode = res.data?.devOtp;
-        if (devOtpCode && typeof devOtpCode === 'string' && devOtpCode.length === 6) {
-          setOtpDigits(devOtpCode.split(''));
-        } else {
-          setOtpDigits(['', '', '', '', '', '']);
-        }
+        setOtpDigits(['', '', '', '', '', '']);
         setOtpCountdown(60);
         setCurrentView('otp');
       } else {
@@ -175,10 +224,28 @@ export default function LandingScreen({ onGetStarted }) {
 
   const handleOtpDigitChange = (value, index) => {
     const sanitized = value.replace(/[^0-9]/g, '');
+    setErrorMessage(null);
+
+    // Support pasting the full code from email
+    if (sanitized.length > 1) {
+      const newDigits = [...otpDigits];
+      const chars = sanitized.slice(0, 6).split('');
+      chars.forEach((char, i) => {
+        if (index + i < 6) {
+          newDigits[index + i] = char;
+        }
+      });
+      setOtpDigits(newDigits);
+      const nextFocus = Math.min(index + chars.length, 5);
+      if (otpInputRefs.current[nextFocus]) {
+        otpInputRefs.current[nextFocus].focus();
+      }
+      return;
+    }
+
     const newDigits = [...otpDigits];
     newDigits[index] = sanitized.slice(-1);
     setOtpDigits(newDigits);
-    setErrorMessage(null);
 
     if (sanitized && index < 5 && otpInputRefs.current[index + 1]) {
       otpInputRefs.current[index + 1].focus();
@@ -239,6 +306,7 @@ export default function LandingScreen({ onGetStarted }) {
         password: signupPassword || 'DevDate2026!',
       });
       if (res.success) {
+        setOtpDigits(['', '', '', '', '', '']);
         setOtpCountdown(60);
         setSuccessMessage('A fresh verification code has been dispatched to your email.');
       } else {
@@ -261,60 +329,240 @@ export default function LandingScreen({ onGetStarted }) {
     setCurrentView('login');
   };
 
+  const handleForgotPasswordSubmit = async () => {
+    if (isSubmitting) return;
+    if (!forgotEmail || !forgotEmail.includes('@')) {
+      setErrorMessage('Please enter a valid registered email address');
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await forgotPasswordApi(forgotEmail.trim().toLowerCase());
+      if (res.success) {
+        setSuccessMessage('If an account exists, a recovery token has been sent to your email.');
+      } else {
+        setErrorMessage(res.error || 'Unable to process recovery request.');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Recovery request failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPasswordSubmit = async () => {
+    if (isSubmitting) return;
+    if (!resetToken.trim()) {
+      setErrorMessage('Please enter the recovery token from your email');
+      return;
+    }
+    if (!resetPassword || resetPassword.length < 6) {
+      setErrorMessage('New access key must be at least 6 characters long');
+      return;
+    }
+    if (resetPassword !== confirmResetPassword) {
+      setErrorMessage('Passwords do not match');
+      return;
+    }
+
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await resetPasswordApi({
+        token: resetToken.trim(),
+        password: resetPassword,
+      });
+
+      if (res.success) {
+        setSuccessMessage('Access key successfully updated! Please log in with your new key.');
+        setCurrentView('login');
+      } else {
+        setErrorMessage(res.error || 'Invalid or expired token.');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Reset password failed');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   /* ========================================================================= */
-  /* 1. GET STARTED / LANDING COVER VIEW                                       */
+  /* 1. PLAYFUL SKETCHBOOK LANDING VIEW                                        */
   /* ========================================================================= */
   if (currentView === 'landing') {
     return (
       <View style={styles.container}>
-        {/* Full-Cover Background Image with guaranteed rendering across Web & Native */}
-        <ImageBackground
-          source={require('../assets/landing_cover_clean.png')}
-          style={styles.coverImageBackground}
-          resizeMode="cover"
+        <ScrollView
+          style={styles.landingScroll}
+          contentContainerStyle={styles.landingScrollContent}
+          showsVerticalScrollIndicator={false}
         >
-          {/* Fallback & Web Image Tag */}
-          <Image
-            source={require('../assets/landing_cover_clean.png')}
-            style={styles.coverImage}
-            resizeMode="cover"
-          />
-
-          {/* Genuine Interactive Buttons Container */}
-          <SafeAreaView style={styles.bottomOverlay} edges={['bottom']}>
-            <View style={styles.buttonsWrapper}>
-              {/* Primary Button: GET STARTED */}
-              <TouchableOpacity
-                activeOpacity={0.85}
-                onPress={handleOpenSignup}
-                style={styles.getStartedButton}
-                accessibilityRole="button"
-                accessibilityLabel="Get Started"
-              >
-                <Text style={styles.getStartedText}>GET STARTED</Text>
-              </TouchableOpacity>
-
-              {/* Secondary Button: I ALREADY HAVE AN ACCOUNT */}
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={handleOpenLogin}
-                style={styles.alreadyAccountButton}
-                accessibilityRole="button"
-                accessibilityLabel="I Already Have An Account"
-              >
-                <Text style={styles.alreadyAccountText}>
-                  I ALREADY HAVE AN ACCOUNT
-                </Text>
-              </TouchableOpacity>
+          {/* Top Brand Bar */}
+          <View style={styles.topBrandBar}>
+            <View style={styles.logoBadge}>
+              <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.yellow} style={styles.logoCodeIcon} />
+              <Text style={styles.logoText}>DEVDATE</Text>
             </View>
-          </SafeAreaView>
-        </ImageBackground>
+
+            <ComicBadge
+              text="POW! // v1.0"
+              color={COLORS.coral}
+              textColor={COLORS.white}
+              rotate="2deg"
+              size="sm"
+            />
+          </View>
+
+          {/* Hero Section */}
+          <View style={styles.heroSection}>
+            <View style={[styles.heroPill, BRUTAL_SHADOWS.xs]}>
+              <DoodleStar size={12} color={COLORS.ink} />
+              <Text style={styles.heroPillText}>THE DEVELOPER SQUAD NETWORK</Text>
+            </View>
+
+            <Text style={styles.heroTitle}>
+              MATCH.{' '}
+              <Text style={{ color: COLORS.cyanDark || '#0284C7' }}>CODE.</Text>{' '}
+              <Text style={{ color: COLORS.coral }}>SHIP.</Text>
+            </Text>
+
+            <DoodleUnderline width="75%" color={COLORS.yellow} height={4} style={{ marginVertical: 6 }} />
+
+            <Text style={styles.heroSubtitle}>
+              The matchmaking platform built for builders. Swipe on projects, squad up with compatible developers, and ship real software together.
+            </Text>
+          </View>
+
+          {/* Sketchbook Graphic Area: Browser-like Frame */}
+          <View style={[styles.sketchWindowFrame, BRUTAL_SHADOWS.md]}>
+            {/* Window Top Bar with folder tab and dots */}
+            <View style={styles.windowTopBar}>
+              <View style={styles.windowDotsRow}>
+                <View style={[styles.windowDot, { backgroundColor: COLORS.coral }]} />
+                <View style={[styles.windowDot, { backgroundColor: COLORS.yellow }]} />
+                <View style={[styles.windowDot, { backgroundColor: COLORS.lime }]} />
+              </View>
+
+              <View style={styles.windowTitlePill}>
+                <DoodleCode symbol="rig.dev" color={COLORS.textMuted} bgColor={COLORS.white} style={styles.miniWindowCode} />
+                <Text style={styles.windowTitleText}>devdate.local/squad-up</Text>
+              </View>
+
+              <DoodleSparkle size={14} color={COLORS.ink} />
+            </View>
+
+            {/* Window Sketch Content */}
+            <View style={styles.windowContent}>
+              {/* Co-founder Match Card Preview */}
+              <View style={styles.previewCoFounders}>
+                <View style={[styles.miniDevCard, BRUTAL_SHADOWS.xs]}>
+                  <Image
+                    source={{ uri: resolveProfileAvatar('', 'Maya Lin', 'voxel-bot') }}
+                    style={styles.miniDevAvatar}
+                  />
+                  <Text style={styles.miniDevName}>MAYA LIN</Text>
+                  <Text style={styles.miniDevRole}>Full Stack</Text>
+                  <View style={[styles.miniTagPill, { backgroundColor: COLORS.cyan }]}>
+                    <Text style={styles.miniTagText}>REACT</Text>
+                  </View>
+                </View>
+
+                {/* Connection burst */}
+                <View style={styles.matchBurstWrap}>
+                  <View style={[styles.matchBurstCircle, BRUTAL_SHADOWS.xs]}>
+                    <Text style={styles.matchBurstPercent}>96%</Text>
+                    <Text style={styles.matchBurstLabel}>MATCH</Text>
+                  </View>
+                  <DoodleSparkle size={16} color={COLORS.yellow} style={styles.burstSparkle} />
+                </View>
+
+                <View style={[styles.miniDevCard, BRUTAL_SHADOWS.xs]}>
+                  <Image
+                    source={{ uri: resolveProfileAvatar('', 'Alex Chen', 'voxel-bot') }}
+                    style={styles.miniDevAvatar}
+                  />
+                  <Text style={styles.miniDevName}>ALEX CHEN</Text>
+                  <Text style={styles.miniDevRole}>Backend</Text>
+                  <View style={[styles.miniTagPill, { backgroundColor: COLORS.lime }]}>
+                    <Text style={styles.miniTagText}>PYTHON</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Doodle annotation below cards */}
+              <View style={styles.annotationBanner}>
+                <DoodleStar size={12} color={COLORS.ink} />
+                <Text style={styles.annotationText}>// 100% COLLAB-READY HACKERS</Text>
+                <DoodleCode symbol="</>" color={COLORS.ink} bgColor={COLORS.white} style={styles.miniWindowCode} />
+              </View>
+            </View>
+          </View>
+
+          {/* Feature Highlight Pills */}
+          <View style={styles.featuresRow}>
+            <View style={[styles.featurePill, BRUTAL_SHADOWS.xs]}>
+              <DoodleCheck size={11} color={COLORS.green} />
+              <Text style={styles.featurePillText}>SWIPE DEVS</Text>
+            </View>
+            <View style={[styles.featurePill, BRUTAL_SHADOWS.xs]}>
+              <DoodleCheck size={11} color={COLORS.green} />
+              <Text style={styles.featurePillText}>3D VOXEL RIGS</Text>
+            </View>
+            <View style={[styles.featurePill, BRUTAL_SHADOWS.xs]}>
+              <DoodleCheck size={11} color={COLORS.green} />
+              <Text style={styles.featurePillText}>LIVE CHAT</Text>
+            </View>
+          </View>
+
+          {/* Action CTAs */}
+          <View style={styles.actionButtonsWrap}>
+            {/* Primary Action Button */}
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handleOpenSignup}
+              style={[styles.primaryLandingBtn, BRUTAL_SHADOWS.md]}
+              accessibilityRole="button"
+              accessibilityLabel="Get Started"
+            >
+              <DoodleSparkle size={16} color={COLORS.ink} />
+              <Text style={styles.primaryLandingBtnText}>GET STARTED</Text>
+              <DoodleArrow direction="right" size={16} color={COLORS.ink} />
+            </TouchableOpacity>
+
+            {/* Secondary Action Button */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleOpenLogin}
+              style={[styles.secondaryLandingBtn, BRUTAL_SHADOWS.xs]}
+              accessibilityRole="button"
+              accessibilityLabel="I already have an account"
+            >
+              <Text style={styles.secondaryLandingBtnText}>
+                I ALREADY HAVE AN ACCOUNT
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer note */}
+          <View style={styles.landingFooter}>
+            <DoodleSeparator style={{ marginBottom: 8 }} />
+            <Text style={styles.landingFooterText}>
+              DEV ENVIRONMENT // BUILT FOR HACKERS & CREATORS
+            </Text>
+          </View>
+        </ScrollView>
       </View>
     );
   }
 
   /* ========================================================================= */
-  /* 2. SHARED TOP HEADER FOR POP ART AUTH VIEWS                               */
+  /* 2. AUTH SCREEN HEADER                                                     */
   /* ========================================================================= */
   const renderHeader = () => {
     switch (currentView) {
@@ -323,8 +571,8 @@ export default function LandingScreen({ onGetStarted }) {
           <PopArtHeader
             mode="signup"
             onBack={handleBack}
-            rightBadgeText=" READY"
-            powText="POW! ★ SQUAD UP"
+            rightBadgeText="REGISTER"
+            powText="POW! // SQUAD UP"
             matchBadgeText=""
           />
         );
@@ -334,8 +582,28 @@ export default function LandingScreen({ onGetStarted }) {
             mode="otp"
             onBack={handleBack}
             rightBadgeText="SECURE OTP"
-            powText="POW! ★ 2-STEP RIG AUTH"
+            powText="POW! // 2-STEP AUTH"
             matchBadgeText={`${otpCountdown}s EXPIRES`}
+          />
+        );
+      case 'forgot_password':
+        return (
+          <PopArtHeader
+            mode="forgot"
+            onBack={handleBack}
+            rightBadgeText="RECOVERY"
+            powText="POW! // RECOVER KEY"
+            matchBadgeText=""
+          />
+        );
+      case 'reset_password':
+        return (
+          <PopArtHeader
+            mode="reset"
+            onBack={handleBack}
+            rightBadgeText="RESET"
+            powText="POW! // NEW KEY"
+            matchBadgeText=""
           />
         );
       case 'login':
@@ -344,8 +612,8 @@ export default function LandingScreen({ onGetStarted }) {
           <PopArtHeader
             mode="login"
             onBack={handleBack}
-            rightBadgeText="READY"
-            powText="POW! ★ SQUAD UP"
+            rightBadgeText="AUTHENTICATE"
+            powText="POW! // SQUAD UP"
             matchBadgeText=""
           />
         );
@@ -353,7 +621,7 @@ export default function LandingScreen({ onGetStarted }) {
   };
 
   return (
-    <PopArtHalftoneView style={styles.fullScreenWrapper}>
+    <View style={styles.container}>
       <SafeAreaView style={styles.safeAreaContainer} edges={['top', 'bottom']}>
         {renderHeader()}
 
@@ -366,15 +634,18 @@ export default function LandingScreen({ onGetStarted }) {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Feedback Banners */}
             {errorMessage && (
-              <View style={[styles.errorBox, POP_SHADOWS.xs]}>
-                <Text style={styles.errorBoxText}> OOPS! {errorMessage}</Text>
+              <View style={[styles.errorBox, BRUTAL_SHADOWS.xs]}>
+                <DoodleCross size={14} color={COLORS.coral} style={{ marginRight: 6 }} />
+                <Text style={styles.errorBoxText}>{errorMessage}</Text>
               </View>
             )}
 
             {successMessage && (
-              <View style={[styles.successBox, POP_SHADOWS.xs]}>
-                <Text style={styles.successBoxText}>★ {successMessage}</Text>
+              <View style={[styles.successBox, BRUTAL_SHADOWS.xs]}>
+                <DoodleCheck size={14} color={COLORS.green} style={{ marginRight: 6 }} />
+                <Text style={styles.successBoxText}>{successMessage}</Text>
               </View>
             )}
 
@@ -382,22 +653,20 @@ export default function LandingScreen({ onGetStarted }) {
             {/* VIEW A: LOGIN SCREEN ('ENTER THE LAB')                         */}
             {/* ============================================================== */}
             {currentView === 'login' && (
-              <View style={[styles.popArtCard, POP_SHADOWS.md]}>
-                {/* 1. Cyan Hero Header Section */}
-                <View style={styles.cardCyanHeader}>
-                  <View style={styles.cyanHeaderTopRow}>
+              <View style={[styles.popArtCard, BRUTAL_SHADOWS.md]}>
+                {/* 1. Header Ribbon Section */}
+                <View style={styles.cardRibbonHeader}>
+                  <View style={styles.ribbonTopRow}>
                     <View style={styles.verifiedTagPill}>
-                      <Text style={styles.verifiedTagText}> VERIFIED BUILDERS ONLY</Text>
+                      <Text style={styles.verifiedTagText}>VERIFIED BUILDERS ONLY</Text>
                     </View>
-
                   </View>
 
                   <Text style={styles.comicHeroTitle}>ENTER THE LAB</Text>
+                  <Text style={styles.comicHeroSubtitle}>Sign in to squad up with developers & manage your rigs</Text>
 
-
-
-                  <View style={[styles.bamSticker, POP_SHADOWS.xs]}>
-                    <Text style={styles.bamStickerText}>BAM! ⚡</Text>
+                  <View style={[styles.bamSticker, BRUTAL_SHADOWS.xs]}>
+                    <Text style={styles.bamStickerText}>BAM!</Text>
                   </View>
                 </View>
 
@@ -407,7 +676,7 @@ export default function LandingScreen({ onGetStarted }) {
                     activeOpacity={0.9}
                     style={[styles.tabButton, styles.tabActive]}
                   >
-                    <Text style={styles.tabActiveText}>➔] LOG IN</Text>
+                    <Text style={styles.tabActiveText}>LOG IN</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -415,96 +684,105 @@ export default function LandingScreen({ onGetStarted }) {
                     onPress={handleOpenSignup}
                     style={[styles.tabButton, styles.tabInactive]}
                   >
-                    <Text style={styles.tabInactiveText}>👤+ SIGN UP</Text>
+                    <Text style={styles.tabInactiveText}>SIGN UP</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* 3. Input 1: Campus Email or GitHub ID */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}>CAMPUS EMAIL OR GITHUB ID</Text>
-
-                  </View>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.terminalPrompt}>{'>'}</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={loginEmail}
-                      onChangeText={(t) => {
-                        setLoginEmail(t);
-                        setErrorMessage(null);
-                      }}
-                      placeholder="rahul.patel@stanford.edu"
-                      placeholderTextColor="#9CA3AF"
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                    />
-
-                  </View>
-                </View>
-
-                {/* 4. Input 2: Access Key (Password) */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}>ACCESS KEY (PASSWORD)</Text>
-                    <TouchableOpacity onPress={() => alert('Demo Key: treehacks2025')}>
-                      <Text style={styles.forgotKeyLink}>Forgot key?</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={styles.inputWrapper}>
-
-                    <TextInput
-                      style={styles.textInput}
-                      value={loginPassword}
-                      onChangeText={(t) => {
-                        setLoginPassword(t);
-                        setErrorMessage(null);
-                      }}
-                      placeholder="••••••••••••"
-                      placeholderTextColor="#9CA3AF"
-                      secureTextEntry={!showPassword}
-                    />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                      <Text style={styles.inputRightIcon}>{showPassword ? '🐵' : '👁️'}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-
-                {/* 6. Primary Action CTA: BLAST OFF TO CANVAS */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={handleLoginSubmit}
-                  disabled={isSubmitting}
-                  style={[styles.blastOffBtn, POP_SHADOWS.md, isSubmitting && { opacity: 0.85 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Blast off to Canvas"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color={POP_PALETTE.inkBlack} size="small" />
-                  ) : (
-                    <Text style={styles.blastOffBtnText}>LOGIN</Text>
-                  )}
-                </TouchableOpacity>
-
-
-
-                {/* 9. Switch to Register Prompt Banner */}
-                <View style={styles.promptBanner}>
-                  <View style={styles.promptLeft}>
-                    <View style={styles.exclamationCircle}>
-                      <Text style={styles.exclamationText}>!</Text>
+                {/* Form Fields */}
+                <View style={styles.cardBody}>
+                  {/* Email Input */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>EMAIL ADDRESS</Text>
                     </View>
-                    <Text style={styles.promptText}>New to the campus hack scene?</Text>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.terminalPrompt}>{'>'}</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={loginEmail}
+                        onChangeText={(t) => {
+                          setLoginEmail(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="alex.chen@gmail.com"
+                        placeholderTextColor={COLORS.textLight}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                      />
+                    </View>
                   </View>
 
+                  {/* Password Input */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>ACCESS KEY (PASSWORD)</Text>
+                      <TouchableOpacity onPress={handleOpenForgotPassword}>
+                        <Text style={styles.forgotKeyLink}>Forgot key?</Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.textInput}
+                        value={loginPassword}
+                        onChangeText={(t) => {
+                          setLoginPassword(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="••••••••••••"
+                        placeholderTextColor={COLORS.textLight}
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.toggleVisibilityBtn}
+                      >
+                        <Text style={styles.toggleVisibilityText}>{showPassword ? 'HIDE' : 'SHOW'}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Remember Rig Checkbox */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setRememberRig(!rememberRig)}
+                    style={styles.checkboxRow}
+                  >
+                    <View style={[styles.checkboxSquare, rememberRig && styles.checkboxSquareActive]}>
+                      {rememberRig && <DoodleCheck size={11} color={COLORS.green} />}
+                    </View>
+                    <Text style={styles.checkboxLabel}>Remember my rig on this device</Text>
+                  </TouchableOpacity>
+
+                  {/* Primary Action Button */}
                   <TouchableOpacity
                     activeOpacity={0.85}
-                    onPress={handleOpenSignup}
-                    style={styles.registerPillBtn}
+                    onPress={handleLoginSubmit}
+                    disabled={isSubmitting}
+                    style={[styles.primarySubmitBtn, BRUTAL_SHADOWS.sm, isSubmitting && { opacity: 0.75 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Login"
                   >
-                    <Text style={styles.registerPillText}>REGISTER ➔</Text>
+                    {isSubmitting ? (
+                      <ActivityIndicator color={COLORS.ink} size="small" />
+                    ) : (
+                      <>
+                        <DoodleCheck size={14} color={COLORS.ink} />
+                        <Text style={styles.primarySubmitBtnText}>LOG IN TO LAB</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
+
+                  {/* Switch to Signup Prompt */}
+                  <View style={styles.promptBanner}>
+                    <Text style={styles.promptText}>New to the developer scene?</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={handleOpenSignup}
+                      style={[styles.registerPillBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.registerPillText}>REGISTER</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             )}
@@ -513,21 +791,21 @@ export default function LandingScreen({ onGetStarted }) {
             {/* VIEW B: SIGNUP SCREEN ('CLAIM YOUR RIG')                       */}
             {/* ============================================================== */}
             {currentView === 'signup' && (
-              <View style={[styles.popArtCard, POP_SHADOWS.md]}>
-                <View style={styles.cardCyanHeader}>
-                  <View style={styles.cyanHeaderTopRow}>
+              <View style={[styles.popArtCard, BRUTAL_SHADOWS.md]}>
+                <View style={[styles.cardRibbonHeader, { backgroundColor: COLORS.coral }]}>
+                  <View style={styles.ribbonTopRow}>
                     <View style={styles.verifiedTagPill}>
-                      <Text style={styles.verifiedTagText}>★ NEW BUILDER REGISTRATION</Text>
+                      <Text style={styles.verifiedTagText}>NEW BUILDER REGISTRATION</Text>
                     </View>
-
                   </View>
 
-                  <Text style={styles.comicHeroTitle}>CLAIM YOUR RIG</Text>
+                  <Text style={[styles.comicHeroTitle, { color: COLORS.white }]}>CLAIM YOUR RIG</Text>
+                  <Text style={[styles.comicHeroSubtitle, { color: COLORS.white }]}>
+                    Create your profile, select your tracks, and squad up
+                  </Text>
 
-
-
-                  <View style={[styles.bamSticker, POP_SHADOWS.xs]}>
-                    <Text style={styles.bamStickerText}>BAM! ⚡</Text>
+                  <View style={[styles.bamSticker, BRUTAL_SHADOWS.xs, { backgroundColor: COLORS.yellow }]}>
+                    <Text style={styles.bamStickerText}>POW!</Text>
                   </View>
                 </View>
 
@@ -538,152 +816,165 @@ export default function LandingScreen({ onGetStarted }) {
                     onPress={handleOpenLogin}
                     style={[styles.tabButton, styles.tabInactive]}
                   >
-                    <Text style={styles.tabInactiveText}>➔] LOG IN</Text>
+                    <Text style={styles.tabInactiveText}>LOG IN</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     activeOpacity={0.9}
                     style={[styles.tabButton, styles.tabActive]}
                   >
-                    <Text style={styles.tabActiveText}> SIGN UP</Text>
+                    <Text style={styles.tabActiveText}>SIGN UP</Text>
                   </TouchableOpacity>
                 </View>
 
-                {/* Input: Full Name */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}>FULL NAME</Text>
-                    <View style={styles.inlineYellowBadge}>
-                      <Text style={styles.inlineYellowBadgeText}>DISPLAY NAME</Text>
+                <View style={styles.cardBody}>
+                  {/* Name Input */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>FULL NAME / ALIAS</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.terminalPrompt}>{'>'}</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={signupName}
+                        onChangeText={(t) => {
+                          setSignupName(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="Alex Chen"
+                        placeholderTextColor={COLORS.textLight}
+                      />
                     </View>
                   </View>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.terminalPrompt}>{'>'}</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={signupName}
-                      onChangeText={(t) => {
-                        setSignupName(t);
-                        setErrorMessage(null);
-                      }}
-                      placeholder="Alex Chen"
-                      placeholderTextColor="#9CA3AF"
-                    />
-                    <Text style={styles.inputRightIcon}></Text>
+
+                  {/* Email Input */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>EMAIL ADDRESS</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.terminalPrompt}>{'>'}</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={signupEmail}
+                        onChangeText={(t) => {
+                          setSignupEmail(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="alex.chen@gmail.com"
+                        placeholderTextColor={COLORS.textLight}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                      />
+                    </View>
                   </View>
-                </View>
 
-                {/* Input: Campus Email */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}> EMAIL</Text>
-
+                  {/* Password Input */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>CREATE ACCESS KEY (PASSWORD)</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.textInput}
+                        value={signupPassword}
+                        onChangeText={(t) => {
+                          setSignupPassword(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="At least 6 characters"
+                        placeholderTextColor={COLORS.textLight}
+                        secureTextEntry={!showPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowPassword(!showPassword)}
+                        style={styles.toggleVisibilityBtn}
+                      >
+                        <Text style={styles.toggleVisibilityText}>{showPassword ? 'HIDE' : 'SHOW'}</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.inputWrapper}>
-                    <Text style={styles.terminalPrompt}>{'>'}</Text>
-                    <TextInput
-                      style={styles.textInput}
-                      value={signupEmail}
-                      onChangeText={(t) => {
-                        setSignupEmail(t);
-                        setErrorMessage(null);
-                      }}
-                      placeholder="alex.chen@stanford.edu"
-                      placeholderTextColor="#9CA3AF"
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                    />
 
+                  {/* Role Selector */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>PRIMARY HACKER TRACK / ROLE</Text>
+                      <Text style={styles.pickOneText}>PICK ONE</Text>
+                    </View>
+                    <View style={styles.rolePillsGrid}>
+                      {['FRONTEND', 'BACKEND', 'AI / ML', 'DESIGN', 'MOBILE', 'FULLSTACK'].map((role) => {
+                        const isSelected = selectedRole === role;
+                        return (
+                          <TouchableOpacity
+                            key={role}
+                            activeOpacity={0.85}
+                            onPress={() => setSelectedRole(role)}
+                            style={[
+                              styles.rolePill,
+                              isSelected && styles.rolePillActive,
+                              isSelected && BRUTAL_SHADOWS.xs,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.rolePillText,
+                                isSelected && styles.rolePillTextActive,
+                              ]}
+                            >
+                              {role}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
 
-                {/* Input: Password */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}>CREATE ACCESS KEY (PASSWORD)</Text>
+                  {/* Agreement Checkbox */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setAgreeTerms(!agreeTerms)}
+                    style={styles.checkboxRow}
+                  >
+                    <View style={[styles.checkboxSquare, agreeTerms && styles.checkboxSquareActive]}>
+                      {agreeTerms && <DoodleCheck size={11} color={COLORS.green} />}
+                    </View>
+                    <Text style={styles.checkboxLabel}>
+                      I agree to collaborate honestly & build cool software
+                    </Text>
+                  </TouchableOpacity>
 
-                  </View>
-                  <View style={styles.inputWrapper}>
+                  {/* Primary Action Button */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleSignupSubmit}
+                    disabled={isSubmitting}
+                    style={[styles.primarySubmitBtn, BRUTAL_SHADOWS.sm, isSubmitting && { opacity: 0.75 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create Account"
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color={COLORS.ink} size="small" />
+                    ) : (
+                      <>
+                        <DoodleStar size={14} color={COLORS.ink} />
+                        <Text style={styles.primarySubmitBtnText}>CREATE ACCOUNT & VERIFY</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
 
-                    <TextInput
-                      style={styles.textInput}
-                      value={signupPassword}
-                      onChangeText={(t) => {
-                        setSignupPassword(t);
-                        setErrorMessage(null);
-                      }}
-                      placeholder="••••••••••••"
-                      placeholderTextColor="#9CA3AF"
-                      secureTextEntry={!showPassword}
-                    />
-                    <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                      <Text style={styles.inputRightIcon}>{showPassword ? '👀' : '👁️'}</Text>
+                  {/* Switch to Login */}
+                  <View style={styles.promptBanner}>
+                    <Text style={styles.promptText}>Already registered?</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={handleOpenLogin}
+                      style={[styles.registerPillBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.registerPillText}>LOG IN</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-
-                {/* Role Selector */}
-                <View style={styles.inputGroup}>
-                  <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}>PRIMARY HACKER TRACK / ROLE</Text>
-                    <Text style={styles.pickOneText}>PICK ONE</Text>
-                  </View>
-                  <View style={styles.rolePillsGrid}>
-                    {['FRONTEND', 'BACKEND', 'AI / ML', 'DESIGN'].map((role) => {
-                      const isSelected = selectedRole === role;
-                      return (
-                        <TouchableOpacity
-                          key={role}
-                          activeOpacity={0.85}
-                          onPress={() => setSelectedRole(role)}
-                          style={[
-                            styles.rolePill,
-                            isSelected && styles.rolePillActive,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.rolePillText,
-                              isSelected && styles.rolePillTextActive,
-                            ]}
-                          >
-                            {role}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {/* Agreement */}
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setAgreeTerms(!agreeTerms)}
-                  style={styles.agreementRow}
-                >
-
-                </TouchableOpacity>
-
-                {/* CTA */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={handleSignupSubmit}
-                  disabled={isSubmitting}
-                  style={[styles.claimPassBtn, POP_SHADOWS.md, isSubmitting && { opacity: 0.85 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Claim your pass"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color={POP_PALETTE.inkBlack} size="small" />
-                  ) : (
-                    <Text style={styles.claimPassBtnText}>Signup</Text>
-                  )}
-                </TouchableOpacity>
-
-
-
-
-
               </View>
             )}
 
@@ -691,74 +982,56 @@ export default function LandingScreen({ onGetStarted }) {
             {/* VIEW C: OTP VERIFICATION SCREEN ('ENTER ACCESS CODE')          */}
             {/* ============================================================== */}
             {currentView === 'otp' && (
-              <View style={[styles.popArtCard, POP_SHADOWS.md]}>
-                <View style={styles.cardCyanHeader}>
-                  <View style={styles.cyanHeaderTopRow}>
+              <View style={[styles.popArtCard, BRUTAL_SHADOWS.md]}>
+                <View style={[styles.cardRibbonHeader, { backgroundColor: COLORS.yellow }]}>
+                  <View style={styles.ribbonTopRow}>
                     <View style={styles.verifiedTagPill}>
-                      <Text style={styles.verifiedTagText}>★ SECURE PROTOCOL</Text>
+                      <Text style={styles.verifiedTagText}>2-STEP VERIFICATION</Text>
                     </View>
-                    <View style={[styles.verifiedTagPill, { backgroundColor: POP_PALETTE.pink }]}>
-                      <Text style={[styles.verifiedTagText, { color: POP_PALETTE.pureWhite }]}>
-                        DEVDATE #2026
-                      </Text>
+                    <View style={[styles.verifiedTagPill, { backgroundColor: COLORS.cyan }]}>
+                      <Text style={styles.verifiedTagText}>DEVDATE #2026</Text>
                     </View>
                   </View>
 
                   {/* Profile Preview Chip */}
-                  <View style={styles.otpProfileChip}>
-                    <View style={styles.otpAvatarContainer}>
-                      <Image
-                        source={{
-                          uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-                        }}
-                        style={styles.otpAvatar}
-                      />
-                      <View style={styles.otpGradBadge}>
-                        <Text style={styles.otpGradText}>CS '26</Text>
-                      </View>
-                    </View>
+                  <View style={[styles.otpProfileChip, BRUTAL_SHADOWS.xs]}>
+                    <Image
+                      source={{
+                        uri: resolveProfileAvatar('', verificationName || 'Builder', 'voxel-bot'),
+                      }}
+                      style={styles.otpAvatar}
+                    />
 
                     <View style={styles.otpProfileInfo}>
-                      <View style={styles.otpNameRow}>
-                        <Text style={styles.otpProfileName}>
-                          {verificationName ? verificationName.toUpperCase() : 'NEW BUILDER'}
-                        </Text>
-                        <Text style={styles.otpVerifiedCheck}>✔</Text>
-                      </View>
-                      <Text style={styles.otpProjectText}>Project: DevDate Rig</Text>
-                      <Text style={styles.otpEmailText}>
-                        {verificationEmail || signupEmail || loginEmail || 'builder@campus.edu'}
+                      <Text style={styles.otpProfileName} numberOfLines={1}>
+                        {verificationName ? verificationName.toUpperCase() : 'NEW BUILDER'}
+                      </Text>
+                      <Text style={styles.otpEmailText} numberOfLines={1}>
+                        {verificationEmail || signupEmail || loginEmail || 'builder@gmail.com'}
                       </Text>
                     </View>
 
                     <TouchableOpacity
                       activeOpacity={0.8}
-                      onPress={() => setCurrentView('login')}
-                      style={styles.otpEditCircle}
+                      onPress={() => setCurrentView(signupEmail ? 'signup' : 'login')}
+                      style={[styles.otpEditCircle, BRUTAL_SHADOWS.xs]}
                     >
-                      <Text style={styles.otpEditIcon}>✏️</Text>
+                      <Text style={styles.otpEditIcon}>EDIT</Text>
                     </TouchableOpacity>
                   </View>
 
-                  <Text style={[styles.comicHeroTitle, { marginTop: 8 }]}>
-                    ENTER ACCESS CODE
+                  <Text style={[styles.comicHeroTitle, { marginTop: 8 }]}>ENTER ACCESS CODE</Text>
+                  <Text style={styles.comicHeroSubtitle}>
+                    6-digit verification code transmitted to your inbox
                   </Text>
-
-                  <Text style={styles.otpRelaySubtext}>
-                    Transmitted via Stanford 2FA Relay node to your verified inbox
-                  </Text>
-
-                  <View style={[styles.bamSticker, POP_SHADOWS.xs]}>
-                    <Text style={styles.bamStickerText}>BAM! ⚡</Text>
-                  </View>
                 </View>
 
                 {/* OTP Body */}
-                <View style={styles.otpBodyContainer}>
+                <View style={styles.cardBody}>
                   <View style={styles.labelRow}>
-                    <Text style={styles.inputLabelText}>🪪 6-DIGIT RIG TOKEN:</Text>
+                    <Text style={styles.inputLabelText}>6-DIGIT VERIFICATION TOKEN</Text>
                     <View style={styles.inlineYellowBadge}>
-                      <Text style={styles.inlineYellowBadgeText}>CASE SENSITIVE</Text>
+                      <Text style={styles.inlineYellowBadgeText}>NUMERIC</Text>
                     </View>
                   </View>
 
@@ -766,7 +1039,8 @@ export default function LandingScreen({ onGetStarted }) {
                   <View style={styles.otpTokensRow}>
                     {otpDigits.map((digit, idx) => {
                       const isFilled = Boolean(digit);
-                      const isActive = otpDigits.findIndex((d) => !d) === idx || (idx === 5 && isFilled);
+                      const isActive =
+                        otpDigits.findIndex((d) => !d) === idx || (idx === 5 && isFilled);
                       return (
                         <View
                           key={idx}
@@ -774,6 +1048,7 @@ export default function LandingScreen({ onGetStarted }) {
                             styles.otpBox,
                             isFilled && styles.otpBoxFilled,
                             isActive && styles.otpBoxActive,
+                            BRUTAL_SHADOWS.xs,
                           ]}
                         >
                           <TextInput
@@ -794,400 +1069,683 @@ export default function LandingScreen({ onGetStarted }) {
                     })}
                   </View>
 
-                  {/* Hardware Encrypted Status */}
-                  <View style={styles.hardwareEncryptedRow}>
-
-                    <View style={styles.onlineBadgePill}>
-                      <Text style={styles.onlineBadgeText}>ONLINE</Text>
-                    </View>
-                  </View>
-
                   {/* Resend Row */}
                   <View style={styles.resendRow}>
-                    <Text style={styles.didntCatchText}>Didn't catch it?</Text>
-                    <View style={styles.resendActions}>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={handleResendOtp}
-                        disabled={otpCountdown > 0 || isSubmitting}
-                        style={[
-                          styles.resendPillBtn,
-                          (otpCountdown > 0 || isSubmitting) && { opacity: 0.65 },
-                        ]}
-                      >
-                        <Text style={styles.resendPillText}>
-                          {otpCountdown > 0 ? ` RESEND IN ${otpCountdown}S` : ' RESEND CODE'}
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity activeOpacity={0.8} style={styles.smsPillBtn}>
-                        <Text style={styles.smsPillText}>SMS</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <Text style={styles.didntCatchText}>Didn't receive it?</Text>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={handleResendOtp}
+                      disabled={otpCountdown > 0 || isSubmitting}
+                      style={[
+                        styles.resendPillBtn,
+                        (otpCountdown > 0 || isSubmitting) && { opacity: 0.65 },
+                        BRUTAL_SHADOWS.xs,
+                      ]}
+                    >
+                      <Text style={styles.resendPillText}>
+                        {otpCountdown > 0 ? `RESEND IN ${otpCountdown}S` : 'RESEND CODE'}
+                      </Text>
+                    </TouchableOpacity>
                   </View>
 
-                  {/* Step Ribbon */}
-                  <View style={styles.stepRibbonRow}>
-                    <View style={styles.stepRibbonLeft}>
-                      <View style={styles.stepBadgePink}>
-                        <Text style={styles.stepBadgePinkText}>DEVDATE</Text>
-                      </View>
-                    </View>
-                    <Text style={styles.stepCountText}>STEP 2 OF 2</Text>
-                  </View>
-                </View>
-
-                {/* Primary Button */}
-                <TouchableOpacity
-                  activeOpacity={0.85}
-                  onPress={handleVerifyOtp}
-                  disabled={isSubmitting}
-                  style={[styles.claimPassBtn, POP_SHADOWS.md, { marginTop: 6 }, isSubmitting && { opacity: 0.85 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Verify"
-                >
-                  {isSubmitting ? (
-                    <ActivityIndicator color={POP_PALETTE.inkBlack} size="small" />
-                  ) : (
-                    <Text style={styles.claimPassBtnText}> VERIFY</Text>
-                  )}
-                </TouchableOpacity>
-
-                {/* Action Links */}
-                <View style={styles.otpActionLinksRow}>
-                  <TouchableOpacity onPress={() => setCurrentView('login')}>
-                    <Text style={styles.returnLoginLink}>{'<- LOGIN'}</Text>
+                  {/* Primary Verify Button */}
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleVerifyOtp}
+                    disabled={isSubmitting}
+                    style={[styles.primarySubmitBtn, BRUTAL_SHADOWS.sm, { marginTop: 12 }, isSubmitting && { opacity: 0.75 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Verify OTP"
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color={COLORS.ink} size="small" />
+                    ) : (
+                      <>
+                        <DoodleCheck size={14} color={COLORS.ink} />
+                        <Text style={styles.primarySubmitBtnText}>VERIFY & SQUAD UP</Text>
+                      </>
+                    )}
                   </TouchableOpacity>
 
-                </View>
-
-                {/* TreeHacks Verified Stamp */}
-                <View style={styles.treeHacksVerifiedBox}>
-                  <View style={styles.treeHacksCirclesGroup}>
-                    <View style={[styles.treeHacksCircle, { backgroundColor: '#38BDF8', zIndex: 3 }]} />
-                    <View style={[styles.treeHacksCircle, { backgroundColor: '#F43F5E', marginLeft: -8, zIndex: 2 }]} />
-                    <View style={[styles.treeHacksCircle, { backgroundColor: '#FACC15', marginLeft: -8, zIndex: 1 }]} />
-                  </View>
-
-                  <View style={styles.treeHacksTextCol}>
-                    <Text style={styles.treeHacksPortalTitle}>DEVDATE PLATFORM 2026</Text>
-                    <Text style={styles.treeHacksPortalSub}>End-to-End Encrypted Squad Portal</Text>
-                  </View>
-
-                  <View style={styles.verifiedYellowBadge}>
-                    <Text style={styles.verifiedYellowText}>VERIFIED</Text>
-                  </View>
+                  {/* Action Link: Return */}
+                  <TouchableOpacity
+                    onPress={() => setCurrentView('login')}
+                    style={styles.returnLoginLinkWrap}
+                  >
+                    <Text style={styles.returnLoginLink}>{'<- RETURN TO LOGIN'}</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
 
+            {/* ============================================================== */}
+            {/* VIEW D: FORGOT PASSWORD ('RECOVER ACCESS KEY')                 */}
+            {/* ============================================================== */}
+            {currentView === 'forgot_password' && (
+              <View style={[styles.popArtCard, BRUTAL_SHADOWS.md]}>
+                <View style={[styles.cardRibbonHeader, { backgroundColor: COLORS.yellow }]}>
+                  <View style={styles.ribbonTopRow}>
+                    <View style={styles.verifiedTagPill}>
+                      <Text style={styles.verifiedTagText}>KEY RECOVERY</Text>
+                    </View>
+                  </View>
 
+                  <Text style={styles.comicHeroTitle}>RECOVER ACCESS KEY</Text>
+                  <Text style={styles.comicHeroSubtitle}>
+                    Enter your email to receive a password recovery token
+                  </Text>
+                </View>
 
-            {/* Legal Pledge Footer */}
-            <View style={styles.footerLegalWrap}>
-              <Text style={styles.footerLegalText}>
-                By launching, you pledge to abide by the{' '}
-                <Text style={styles.footerUnderline}>Hacker Code of Conduct</Text> &{' '}
-                <Text style={styles.footerUnderline}>Squad Collaboration Rules</Text>.
-              </Text>
-              <Text style={styles.footerTreeHacksTag}>
-                DevDate
-              </Text>
-            </View>
+                <View style={styles.cardBody}>
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>REGISTERED EMAIL</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={styles.terminalPrompt}>{'>'}</Text>
+                      <TextInput
+                        style={styles.textInput}
+                        value={forgotEmail}
+                        onChangeText={(t) => {
+                          setForgotEmail(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="alex.chen@gmail.com"
+                        placeholderTextColor={COLORS.textLight}
+                        autoCapitalize="none"
+                        keyboardType="email-address"
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleForgotPasswordSubmit}
+                    disabled={isSubmitting}
+                    style={[styles.primarySubmitBtn, BRUTAL_SHADOWS.sm, isSubmitting && { opacity: 0.75 }]}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color={COLORS.ink} size="small" />
+                    ) : (
+                      <>
+                        <DoodleArrow direction="right" size={14} color={COLORS.ink} />
+                        <Text style={styles.primarySubmitBtnText}>SEND RECOVERY TOKEN</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Have token shortcut */}
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleOpenResetPassword()}
+                    style={[styles.secondarySubmitBtn, BRUTAL_SHADOWS.xs, { marginTop: 10 }]}
+                  >
+                    <Text style={styles.secondarySubmitBtnText}>I HAVE A TOKEN -> RESET KEY</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setCurrentView('login')}
+                    style={styles.returnLoginLinkWrap}
+                  >
+                    <Text style={styles.returnLoginLink}>{'<- RETURN TO LOGIN'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* ============================================================== */}
+            {/* VIEW E: RESET PASSWORD ('SET NEW ACCESS KEY')                  */}
+            {/* ============================================================== */}
+            {currentView === 'reset_password' && (
+              <View style={[styles.popArtCard, BRUTAL_SHADOWS.md]}>
+                <View style={[styles.cardRibbonHeader, { backgroundColor: COLORS.cyan }]}>
+                  <View style={styles.ribbonTopRow}>
+                    <View style={styles.verifiedTagPill}>
+                      <Text style={styles.verifiedTagText}>SECURE RESET</Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.comicHeroTitle}>SET NEW ACCESS KEY</Text>
+                  <Text style={styles.comicHeroSubtitle}>
+                    Enter the token from your email and your new password
+                  </Text>
+                </View>
+
+                <View style={styles.cardBody}>
+                  {/* Token Input */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>RECOVERY TOKEN</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.textInput}
+                        value={resetToken}
+                        onChangeText={(t) => {
+                          setResetToken(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="Paste token from email"
+                        placeholderTextColor={COLORS.textLight}
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  </View>
+
+                  {/* New Password */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>NEW ACCESS KEY (PASSWORD)</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.textInput}
+                        value={resetPassword}
+                        onChangeText={(t) => {
+                          setResetPassword(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="At least 6 characters"
+                        placeholderTextColor={COLORS.textLight}
+                        secureTextEntry={!showResetPassword}
+                      />
+                      <TouchableOpacity
+                        onPress={() => setShowResetPassword(!showResetPassword)}
+                        style={styles.toggleVisibilityBtn}
+                      >
+                        <Text style={styles.toggleVisibilityText}>
+                          {showResetPassword ? 'HIDE' : 'SHOW'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Confirm Password */}
+                  <View style={styles.inputGroup}>
+                    <View style={styles.labelRow}>
+                      <Text style={styles.inputLabelText}>CONFIRM NEW KEY</Text>
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <TextInput
+                        style={styles.textInput}
+                        value={confirmResetPassword}
+                        onChangeText={(t) => {
+                          setConfirmResetPassword(t);
+                          setErrorMessage(null);
+                        }}
+                        placeholder="Re-enter new key"
+                        placeholderTextColor={COLORS.textLight}
+                        secureTextEntry={!showResetPassword}
+                      />
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={handleResetPasswordSubmit}
+                    disabled={isSubmitting}
+                    style={[styles.primarySubmitBtn, BRUTAL_SHADOWS.sm, isSubmitting && { opacity: 0.75 }]}
+                  >
+                    {isSubmitting ? (
+                      <ActivityIndicator color={COLORS.ink} size="small" />
+                    ) : (
+                      <>
+                        <DoodleCheck size={14} color={COLORS.ink} />
+                        <Text style={styles.primarySubmitBtnText}>UPDATE ACCESS KEY</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => setCurrentView('login')}
+                    style={styles.returnLoginLinkWrap}
+                  >
+                    <Text style={styles.returnLoginLink}>{'<- RETURN TO LOGIN'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Success Modal */}
+        {/* Celebratory Modal on OTP Success */}
         <OtpSuccessModal
           visible={showSuccessModal}
           onClose={handleOtpSuccessModalDone}
           onEnterDiscord={handleOtpSuccessModalDone}
           onViewProfile={handleOtpSuccessModalDone}
+          primaryButtonText="PROCEED TO LOGIN"
+          secondaryButtonText="VIEW SQUAD DETAILS"
         />
       </SafeAreaView>
-    </PopArtHalftoneView>
+    </View>
   );
 }
 
+// ============================================================================
+// STYLES — Pop Art x Doodle Art Aesthetic System
+// ============================================================================
 const styles = StyleSheet.create({
-  // 1. GET STARTED / COVER VIEW STYLES
   container: {
     flex: 1,
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#071224',
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  coverImageBackground: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    position: 'relative',
-  },
-  coverImage: {
-    ...StyleSheet.absoluteFillObject,
-    width: '100%',
-    height: '100%',
-  },
-  bottomOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    zIndex: 10,
-    elevation: 10,
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    backgroundColor: 'transparent',
-  },
-  buttonsWrapper: {
-    width: '100%',
-    maxWidth: 420,
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 20 : 28,
-    alignItems: 'center',
-  },
-  getStartedButton: {
-    width: '100%',
-    height: 56,
-    backgroundColor: '#FFCC00',
-    borderRadius: 28,
-    borderWidth: 3.5,
-    borderColor: '#000000',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 6,
-    marginBottom: 12,
-  },
-  getStartedText: {
-    color: '#000000',
-    fontSize: 19,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    fontFamily: Platform.OS === 'ios' ? 'Impact' : undefined,
-  },
-  alreadyAccountButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alreadyAccountText: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    textDecorationLine: 'underline',
-    textDecorationColor: '#FFFFFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.8)',
-    textShadowOffset: { width: 0, height: 1.5 },
-    textShadowRadius: 3,
-  },
-
-  // 2. POP ART AUTH WRAPPER
-  fullScreenWrapper: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
+    backgroundColor: COLORS.creamBg,
   },
   safeAreaContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
   },
   keyboardAvoid: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 14,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
     paddingBottom: 40,
-    alignItems: 'center',
   },
 
-  // Error Banner
-  errorBox: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#FEE2E2',
-    borderWidth: 2.5,
-    borderColor: '#EF4444',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 10,
+  // ========= LANDING VIEW STYLES =========
+  landingScroll: {
+    flex: 1,
   },
-  errorBoxText: {
-    color: '#B91C1C',
-    fontSize: 12,
-    fontWeight: '900',
+  landingScrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 40,
   },
-  successBox: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#DCFCE7',
-    borderWidth: 2.5,
-    borderColor: '#22C55E',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 10,
-  },
-  successBoxText: {
-    color: '#15803D',
-    fontSize: 12,
-    fontWeight: '900',
-  },
-
-  // Pop Art Card
-  popArtCard: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 3.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 24,
-    overflow: 'hidden',
-    marginBottom: 14,
-  },
-
-  // Cyan Header
-  cardCyanHeader: {
-    backgroundColor: POP_PALETTE.cyan,
-    padding: 14,
-    borderBottomWidth: 3.5,
-    borderBottomColor: POP_PALETTE.inkBlack,
-    position: 'relative',
-  },
-  cyanHeaderTopRow: {
+  topBrandBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  verifiedTagPill: {
-    backgroundColor: POP_PALETTE.yellow,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  logoBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  verifiedTagText: {
-    fontSize: 9.5,
+  logoCodeIcon: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: BORDER_RADIUS.xs,
+    borderWidth: BORDERS.thin,
+  },
+  logoText: {
+    fontSize: 18,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
+    color: COLORS.ink,
+    letterSpacing: 1,
   },
-  gradCapCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
+  heroSection: {
+    alignItems: 'center',
+    marginBottom: 18,
+  },
+  heroPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 10,
+  },
+  heroPillText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  heroTitle: {
+    fontSize: 34,
+    fontWeight: '900',
+    color: COLORS.ink,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+    lineHeight: 38,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    textAlign: 'center',
+    lineHeight: 18,
+    marginTop: 4,
+    maxWidth: 340,
+  },
+
+  // Browser Frame
+  sketchWindowFrame: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+    marginBottom: 18,
+  },
+  windowTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.yellow,
+    borderBottomWidth: BORDERS.regular,
+    borderBottomColor: COLORS.borderBlack,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  windowDotsRow: {
+    flexDirection: 'row',
+    gap: 5,
+  },
+  windowDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 5,
+    borderWidth: 1.2,
+    borderColor: COLORS.borderBlack,
+  },
+  windowTitlePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  miniWindowCode: {
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    borderRadius: 2,
+  },
+  windowTitleText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+  windowContent: {
+    backgroundColor: COLORS.creamDark,
+    padding: 14,
+  },
+  previewCoFounders: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    marginBottom: 10,
+  },
+  miniDevCard: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 8,
+    alignItems: 'center',
+  },
+  miniDevAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    marginBottom: 4,
+    backgroundColor: COLORS.creamDark,
+  },
+  miniDevName: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.ink,
+    textAlign: 'center',
+  },
+  miniDevRole: {
+    fontSize: 9.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginBottom: 4,
+  },
+  miniTagPill: {
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  miniTagText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  matchBurstWrap: {
+    alignItems: 'center',
+    position: 'relative',
+  },
+  matchBurstCircle: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  gradCapIcon: {
-    fontSize: 14,
-  },
-  comicHeroTitle: {
-    fontSize: 26,
+  matchBurstPercent: {
+    fontSize: 12,
     fontWeight: '900',
-    fontStyle: 'italic',
-    color: POP_PALETTE.pureWhite,
-    letterSpacing: 1.2,
-    textAlign: 'center',
-    textShadowColor: POP_PALETTE.inkBlack,
-    textShadowOffset: { width: 2.5, height: 2.5 },
-    textShadowRadius: 0,
+    color: COLORS.ink,
+    lineHeight: 13,
+  },
+  matchBurstLabel: {
+    fontSize: 7.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  burstSparkle: {
+    position: 'absolute',
+    top: -8,
+    right: -6,
+  },
+  annotationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  annotationText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+
+  // Feature highlight pills
+  featuresRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  featurePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  featurePillText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
+  },
+
+  // Action Buttons
+  actionButtonsWrap: {
+    gap: 10,
+    marginBottom: 20,
+  },
+  primaryLandingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 14,
+  },
+  primaryLandingBtnText: {
+    fontSize: 15,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 1,
+  },
+  secondaryLandingBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 12,
+  },
+  secondaryLandingBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  landingFooter: {
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  landingFooterText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+  },
+
+  // ========= AUTH CARD & FORM STYLES =========
+  popArtCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
+    overflow: 'hidden',
+  },
+  cardRibbonHeader: {
+    backgroundColor: COLORS.cyan,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 14,
+    borderBottomWidth: BORDERS.heavy,
+    borderBottomColor: COLORS.borderBlack,
+    position: 'relative',
+  },
+  ribbonTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 6,
   },
-  taglinePill: {
-    alignSelf: 'center',
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
+  verifiedTagPill: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
   },
-  taglinePillText: {
-    fontSize: 10.5,
+  verifiedTagText: {
+    fontSize: 9,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
     letterSpacing: 0.5,
+  },
+  comicHeroTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  comicHeroSubtitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.ink,
+    marginTop: 2,
   },
   bamSticker: {
     position: 'absolute',
-    bottom: -14,
     right: 14,
-    backgroundColor: POP_PALETTE.yellow,
-    borderWidth: 2.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 4,
-    paddingHorizontal: 8,
+    bottom: -10,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    transform: [{ rotate: '5deg' }],
-    zIndex: 10,
+    transform: [{ rotate: '8deg' }],
   },
   bamStickerText: {
     fontSize: 11,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
     fontStyle: 'italic',
   },
 
-  // Toggle Tabs
+  // Dual Tabs
   tabsContainer: {
     flexDirection: 'row',
-    marginHorizontal: 12,
-    marginTop: 18,
-    marginBottom: 14,
-    backgroundColor: '#F3F4F6',
-    borderRadius: 24,
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
-    padding: 3,
+    borderBottomWidth: BORDERS.regular,
+    borderBottomColor: COLORS.borderBlack,
   },
   tabButton: {
     flex: 1,
-    height: 42,
-    borderRadius: 20,
+    paddingVertical: 11,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabActive: {
-    backgroundColor: POP_PALETTE.cyan,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-  },
-  tabInactive: {
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 3,
+    borderBottomColor: COLORS.yellow,
   },
   tabActiveText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.6,
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  tabInactive: {
+    backgroundColor: COLORS.creamDark,
   },
   tabInactiveText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#6B7280',
-    letterSpacing: 0.4,
+    color: COLORS.textMuted,
   },
 
-  // Form Inputs
+  // Card Form Body
+  cardBody: {
+    padding: 16,
+  },
   inputGroup: {
-    marginHorizontal: 14,
     marginBottom: 12,
   },
   labelRow: {
@@ -1199,711 +1757,338 @@ const styles = StyleSheet.create({
   inputLabelText: {
     fontSize: 10.5,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.6,
-  },
-  eduRequiredText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: POP_PALETTE.pink,
+    color: COLORS.ink,
     letterSpacing: 0.4,
   },
   forgotKeyLink: {
-    fontSize: 10,
+    fontSize: 10.5,
     fontWeight: '800',
-    color: '#0284C7',
+    color: COLORS.coral,
     textDecorationLine: 'underline',
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    backgroundColor: '#FAF6EB',
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-  },
-  terminalPrompt: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    marginRight: 6,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  inputLeftIcon: {
-    fontSize: 13,
-    marginRight: 8,
-  },
-  textInput: {
-    flex: 1,
-    height: '100%',
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: POP_PALETTE.inkBlack,
-    padding: 0,
-  },
-  inputRightIcon: {
-    fontSize: 14,
-    marginLeft: 6,
-  },
-
-  // Badges
-  inlineYellowBadge: {
-    backgroundColor: POP_PALETTE.yellow,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  inlineYellowBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-  inlineGreenBadge: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  inlineGreenBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
   },
   pickOneText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
-
-  // Role Pills
-  rolePillsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
-  },
-  rolePill: {
-    flex: 1,
-    height: 36,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rolePillActive: {
-    backgroundColor: POP_PALETTE.yellow,
-  },
-  rolePillText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-  rolePillTextActive: {
-    fontWeight: '900',
-  },
-
-  // Agreement
-  agreementRow: {
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 14,
-    marginBottom: 14,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 10,
+    minHeight: 44,
   },
-  agreementText: {
+  terminalPrompt: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: COLORS.coral,
+    marginRight: 6,
+  },
+  textInput: {
     flex: 1,
-    fontSize: 10,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
-    lineHeight: 14,
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.ink,
+    paddingVertical: 8,
+  },
+  toggleVisibilityBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+  },
+  toggleVisibilityText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
 
   // Checkbox
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginHorizontal: 14,
-    marginBottom: 14,
+    gap: 8,
+    marginVertical: 8,
   },
-  checkboxTouch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkboxCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    backgroundColor: POP_PALETTE.pureWhite,
+  checkboxSquare: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    backgroundColor: COLORS.white,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 8,
   },
-  checkmarkIcon: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    marginTop: -2,
+  checkboxSquareActive: {
+    backgroundColor: COLORS.lime,
   },
   checkboxLabel: {
     fontSize: 11,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
+    fontWeight: '700',
+    color: COLORS.ink,
+    flex: 1,
   },
-  fastPassPill: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 1.8,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
+
+  // Role selector pills
+  rolePillsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
-  fastPassText: {
-    fontSize: 9,
+  rolePill: {
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  rolePillActive: {
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+  },
+  rolePillText: {
+    fontSize: 10,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.textMuted,
+  },
+  rolePillTextActive: {
+    color: COLORS.ink,
+  },
+
+  // Action Buttons
+  primarySubmitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 13,
+    marginTop: 6,
+  },
+  primarySubmitBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
-
-  // CTA Buttons
-  blastOffBtn: {
-    marginHorizontal: 14,
-    height: 48,
-    backgroundColor: POP_PALETTE.cyan,
-    borderWidth: 3.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
+  secondarySubmitBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 14,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 11,
   },
-  blastOffBtnText: {
-    fontSize: 14.5,
+  secondarySubmitBtnText: {
+    fontSize: 11,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.8,
-  },
-  claimPassBtn: {
-    marginHorizontal: 14,
-    height: 48,
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 3.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  claimPassBtnText: {
-    fontSize: 20.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.8,
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
 
-  // Divider
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 14,
-    marginBottom: 12,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 2,
-    backgroundColor: '#D1D5DB',
-  },
-  dividerPill: {
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 1.8,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginHorizontal: 6,
-  },
-  dividerPillText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
-  },
-
-  // Social SSO Pills
-  socialButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: 14,
-    gap: 8,
-    marginBottom: 14,
-  },
-  socialPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 38,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 6,
-    gap: 5,
-  },
-  socialIcon: {
-    fontSize: 13,
-  },
-  socialPillText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-
-  // Prompt Banner
+  // Prompt banner
   promptBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: 14,
-    marginBottom: 14,
-    backgroundColor: '#FAF6EB',
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 16,
-    padding: 10,
-  },
-  promptLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  exclamationCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: POP_PALETTE.pink,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  exclamationText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: POP_PALETTE.pureWhite,
+    backgroundColor: COLORS.creamDark,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginTop: 14,
   },
   promptText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
-    flex: 1,
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: COLORS.ink,
   },
   registerPillBtn: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   registerPillText: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
   },
 
-  // OTP Profile Chip
+  // ========= OTP SPECIFIC STYLES =========
   otpProfileChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 16,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
     padding: 8,
-    marginTop: 6,
-  },
-  otpAvatarContainer: {
-    position: 'relative',
-    marginRight: 10,
+    marginTop: 8,
+    gap: 8,
   },
   otpAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-  },
-  otpGradBadge: {
-    position: 'absolute',
-    bottom: -3,
-    alignSelf: 'center',
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 1.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 0.5,
-  },
-  otpGradText: {
-    fontSize: 7.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    backgroundColor: COLORS.creamDark,
   },
   otpProfileInfo: {
     flex: 1,
   },
-  otpNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   otpProfileName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
-  },
-  otpVerifiedCheck: {
-    fontSize: 10,
-    color: '#0284C7',
-    fontWeight: '900',
-    marginLeft: 4,
-  },
-  otpProjectText: {
-    fontSize: 9.5,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
   },
   otpEmailText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#6B7280',
+    color: COLORS.textMuted,
   },
   otpEditCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 1.8,
-    borderColor: POP_PALETTE.inkBlack,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
   otpEditIcon: {
-    fontSize: 11,
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
-  otpRelaySubtext: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: POP_PALETTE.inkBlack,
-    textAlign: 'center',
-    lineHeight: 14,
-    paddingHorizontal: 8,
+  inlineYellowBadge: {
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
   },
-  otpBodyContainer: {
-    padding: 14,
+  inlineYellowBadgeText: {
+    fontSize: 8.5,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
   otpTokensRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    gap: 6,
     marginVertical: 10,
   },
   otpBox: {
-    width: 44,
-    height: 52,
-    borderRadius: 14,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
+    flex: 1,
+    aspectRatio: 0.88,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  otpBoxFilled: {
-    backgroundColor: POP_PALETTE.yellow,
-  },
   otpBoxActive: {
-    borderColor: POP_PALETTE.cyanDark,
-    borderWidth: 3,
+    backgroundColor: COLORS.yellow,
+    borderColor: COLORS.borderBlack,
+  },
+  otpBoxFilled: {
+    backgroundColor: COLORS.lime,
   },
   otpInputText: {
     fontSize: 20,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
     width: '100%',
+    textAlign: 'center',
   },
   otpInputTextFilled: {
-    color: POP_PALETTE.inkBlack,
-  },
-  hardwareEncryptedRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F3F4F6',
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginBottom: 12,
-  },
-  hwStatusLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lockIcon: {
-    fontSize: 12,
-    marginRight: 6,
-  },
-  hwStatusText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
-  },
-  onlineBadgePill: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  onlineBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
   },
   resendRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginVertical: 8,
   },
   didntCatchText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
-  },
-  resendActions: {
-    flexDirection: 'row',
-    gap: 6,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
   resendPillBtn: {
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 1.8,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
     paddingHorizontal: 8,
-    paddingVertical: 3,
+    paddingVertical: 4,
   },
   resendPillText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
   },
-  smsPillBtn: {
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 1.8,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  smsPillText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-  stepRibbonRow: {
-    flexDirection: 'row',
+  returnLoginLinkWrap: {
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: 1.5,
-    borderTopColor: '#E5E7EB',
-    paddingTop: 8,
-  },
-  stepRibbonLeft: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  stepBadgeCyan: {
-    backgroundColor: POP_PALETTE.cyan,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  stepBadgeCyanText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-  stepBadgePink: {
-    backgroundColor: POP_PALETTE.pink,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  stepBadgePinkText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: POP_PALETTE.pureWhite,
-  },
-  stepCountText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#6B7280',
-  },
-  otpActionLinksRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    marginBottom: 12,
+    marginTop: 14,
   },
   returnLoginLink: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    textDecorationLine: 'underline',
-  },
-  needHelpLink: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-  treeHacksVerifiedBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FAF6EB',
-    borderTopWidth: 2.5,
-    borderTopColor: POP_PALETTE.inkBlack,
-    padding: 10,
-  },
-  treeHacksCirclesGroup: {
-    flexDirection: 'row',
-    marginRight: 8,
-  },
-  treeHacksCircle: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    borderWidth: 1.2,
-    borderColor: POP_PALETTE.inkBlack,
-  },
-  treeHacksTextCol: {
-    flex: 1,
-  },
-  treeHacksPortalTitle: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-  treeHacksPortalSub: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#6B7280',
-  },
-  verifiedYellowBadge: {
-    backgroundColor: POP_PALETTE.yellow,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  verifiedYellowText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-  },
-
-  // Social Proof Footer
-  socialProofCard: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 18,
-    padding: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  avatarsGroup: {
-    flexDirection: 'row',
-    marginRight: 10,
-  },
-  proofAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-  },
-  proofTextCol: {
-    flex: 1,
-  },
-  proofNumber: {
     fontSize: 11,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
-  },
-  proofSub: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#4B5563',
-  },
-  liveIndicatorPill: {
-    backgroundColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  liveIndicatorText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: POP_PALETTE.lime,
-    letterSpacing: 0.5,
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
 
-  // Legal Footer
-  footerLegalWrap: {
-    width: '100%',
-    maxWidth: 380,
+  // ========= FEEDBACK BANNERS =========
+  errorBox: {
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    borderWidth: BORDERS.regular,
+    borderColor: '#EF4444',
+    borderRadius: BORDER_RADIUS.sm,
     paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 12,
   },
-  footerLegalText: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#4B5563',
-    textAlign: 'center',
-    lineHeight: 14,
-    marginBottom: 6,
+  errorBoxText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#991B1B',
   },
-  footerUnderline: {
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    textDecorationLine: 'underline',
+  successBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DCFCE7',
+    borderWidth: BORDERS.regular,
+    borderColor: '#22C55E',
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    marginBottom: 12,
   },
-  footerTreeHacksTag: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.6,
+  successBoxText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#166534',
   },
 });

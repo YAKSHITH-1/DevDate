@@ -11,10 +11,10 @@ const startServer = async () => {
     initSocket(httpServer);
 
     httpServer.listen(PORT, () => {
-      console.log(`🚀 DevDate Server & Socket.IO running on http://localhost:${PORT}`);
+      console.log(` DevDate Server & Socket.IO running on http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error(`❌ Failed to start server: ${error.message}`);
+    console.error(` Failed to start server: ${error.message}`);
     process.exit(1);
   }
 };

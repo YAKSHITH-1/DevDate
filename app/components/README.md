@@ -1,13 +1,20 @@
 # Components Directory
 
-This directory contains reusable components for the Collab Match application.
+This directory contains reusable components for the DevDate application.
 
-## Ponytail Principles Applied:
-- Reuse existing React Native components instead of creating custom ones when possible
-- Create components only when there's a clear reuse pattern
-- Keep components simple and focused on a single responsibility
+## Design System: Playful Pop Art x Doodle Art
 
-## UI/UX Pro Max Guidelines:
-- All components follow accessibility guidelines (touch targets ≥44x44dp)
-- Consistent use of design system tokens (COLORS, FONTS, SPACING, BORDER_RADIUS)
+All components follow the DevDate visual system:
+
+- **Pop Art elements**: Bold borders, offset shadows, comic-inspired badges and cards
+- **Doodle accents**: Hand-drawn sparkles, stars, arrows, code symbols, and terminals
+- **DiceBear voxel avatars**: 3D generated profile images via DiceBear API
+- **Design tokens**: Consistent use of `COLORS`, `BORDERS`, `BORDER_RADIUS`, `BRUTAL_SHADOWS`, `TYPOGRAPHY` from `styles/theme.js`
+
+## Component Guidelines
+
+- Reuse existing React Native components when possible
+- Keep components focused on a single responsibility
+- All interactive elements use accessible touch targets
 - Proper visual feedback and interaction states
+- Zero Unicode emojis — use DoodleElements for visual accents

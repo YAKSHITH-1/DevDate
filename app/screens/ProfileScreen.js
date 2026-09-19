@@ -13,10 +13,26 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import { COLORS, FONTS, SPACING, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS, TYPOGRAPHY } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
+import {
+  DoodleStar,
+  DoodleSparkle,
+  DoodleCode,
+  DoodleArrow,
+  DoodleCheck,
+  DoodleCross,
+  DoodleUnderline,
+  DoodleUser,
+  DoodleSeparator,
+} from '../components/DoodleElements';
 import { useApp } from '../context/AppContext';
+import { getDiceBearAvatar, resolveProfileAvatar, DICEBEAR_STYLES } from '../utils/avatar';
 
+/**
+ * DevDate ProfileScreen — Creative Developer Identity Card + Settings Notebook
+ * Pop Art x Doodle Art visual system. ZERO Unicode emojis.
+ */
 export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }) {
   const {
     currentUser,
@@ -40,6 +56,9 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   const isThirdParty = Boolean(selectedDeveloperForProfile);
   const dev = selectedDeveloperForProfile || currentUser || {};
 
+  const ownAvatarUri = resolveProfileAvatar(currentUser?.avatar, currentUser?.name || currentUser?.email || 'Developer', 'voxel-bot');
+  const devAvatarUri = resolveProfileAvatar(dev?.avatar, dev?.name || dev?.id || 'Developer', 'voxel-bot');
+
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
@@ -61,7 +80,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   const [editPortfolio, setEditPortfolio] = useState(currentUser?.portfolio || '');
   const [isSaving, setIsSaving] = useState(false);
 
-  const showToast = (msg, color = '#FCD34D') => {
+  const showToast = (msg, color = COLORS.yellow) => {
     setToastMessage({ text: msg, color });
     setTimeout(() => setToastMessage(null), 1600);
   };
@@ -79,7 +98,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   const handleThirdPartySkip = () => {
     if (!dev) return;
     skipDeveloper(dev.id);
-    showToast(`SKIPPED ${dev.name.split(' ')[0]} ✕`, '#FF4B4B');
+    showToast(`SKIPPED ${dev.name.split(' ')[0]}`, COLORS.coral);
     if (setSelectedDeveloperForProfile) setSelectedDeveloperForProfile(null);
     if (onBackToDiscover) onBackToDiscover();
   };
@@ -87,7 +106,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   const handleThirdPartyLike = () => {
     if (!dev) return;
     inviteDeveloper(dev, false);
-    showToast(`INVITED ${dev.name.split(' ')[0]}! ♥`, '#4ADE80');
+    showToast(`INVITED ${dev.name.split(' ')[0]}!`, COLORS.lime);
     if (setSelectedDeveloperForProfile) setSelectedDeveloperForProfile(null);
     if (onBackToDiscover) onBackToDiscover();
   };
@@ -95,7 +114,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   const handleThirdPartyLetsBuild = () => {
     if (!dev) return;
     inviteDeveloper(dev, true);
-    showToast("LET'S BUILD TOGETHER! ⚡", '#FCD34D');
+    showToast("LET'S BUILD TOGETHER!", COLORS.yellow);
 
     // Create / retrieve chat thread and navigate to it
     const chat = getOrCreateChatForMatch({
@@ -113,7 +132,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
 
   // --- OWN PROFILE ACTIONS ---
   const handleOpenEditModal = () => {
-    setEditAvatar(currentUser?.avatar || '');
+    setEditAvatar(resolveProfileAvatar(currentUser?.avatar, currentUser?.name || 'Developer', 'voxel-bot'));
     setEditName(currentUser?.name || '');
     setEditRole(currentUser?.role || currentUser?.preferredRole || '');
     setEditExperience(currentUser?.experience || '');
@@ -162,9 +181,9 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
     if (res?.success) {
       setOwnAvatarError(false);
       setEditModalVisible(false);
-      showToast('PROFILE SAVED! ★', '#FCD34D');
+      showToast('PROFILE SAVED!', COLORS.yellow);
     } else {
-      showToast(res?.error || 'FAILED TO SAVE PROFILE ✕', '#FF4B4B');
+      showToast(res?.error || 'FAILED TO SAVE PROFILE', COLORS.coral);
     }
   };
 
@@ -180,48 +199,72 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
       idx === index ? { ...item, selected: !item.selected } : item
     );
     updateProfile({ lookingTo: updated });
-    showToast('GOALS UPDATED ✔');
+    showToast('GOALS UPDATED');
+  };
+
+  // =============================
+  // AVAILABILITY STATUS HELPER
+  // =============================
+  const getAvailabilityStatus = () => {
+    const avail = (dev?.availability || '').toLowerCase();
+    if (avail.includes('full') || avail.includes('available') || avail.includes('open')) {
+      return { label: 'AVAILABLE', color: COLORS.lime, borderColor: COLORS.green, textColor: '#15803D' };
+    }
+    if (avail.includes('part') || avail.includes('limited') || avail.includes('few')) {
+      return { label: 'PART-TIME', color: COLORS.pillYellow, borderColor: COLORS.yellow, textColor: '#854D0E' };
+    }
+    if (avail.includes('not') || avail.includes('busy') || avail.includes('unavailable')) {
+      return { label: 'UNAVAILABLE', color: COLORS.pillCoral, borderColor: COLORS.coral, textColor: '#DC2626' };
+    }
+    return { label: dev?.availability || 'OPEN', color: COLORS.pillBlue, borderColor: COLORS.cyan, textColor: '#0284C7' };
   };
 
   return (
     <View style={styles.container}>
-      {/* 1. TOP HEADER */}
+      {/* ========== 1. TOP HEADER BAR ========== */}
       <View style={styles.headerBar}>
         <TouchableOpacity
-          activeOpacity={0.75}
+          activeOpacity={0.8}
           onPress={handleBack}
-          style={styles.headerIconBtn}
+          style={[styles.headerBackBtn, BRUTAL_SHADOWS.xs]}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
-          <Text style={styles.headerIconText}>←</Text>
+          <Text style={styles.headerBackIcon}>{'<-'}</Text>
         </TouchableOpacity>
 
         {isThirdParty ? (
-          <View style={[styles.headerPillCenter, BRUTAL_SHADOWS.xs]}>
-            <Text style={styles.headerPillCenterText}>DEVELOPER PROFILE</Text>
+          <View style={[styles.headerCenterPill, BRUTAL_SHADOWS.xs]}>
+            <DoodleUser size={14} color={COLORS.ink} />
+            <Text style={styles.headerCenterText}>DEVELOPER PROFILE</Text>
           </View>
         ) : (
           <TouchableOpacity
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             onPress={handleOpenEditModal}
-            style={[styles.editHeaderPill, BRUTAL_SHADOWS.xs]}
+            style={[styles.headerEditPill, BRUTAL_SHADOWS.xs]}
           >
-            <Text style={styles.editHeaderPillText}>✏️ EDIT PROFILE</Text>
+            <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.white} style={styles.miniHeaderCode} />
+            <Text style={styles.headerEditText}>EDIT PROFILE</Text>
           </TouchableOpacity>
         )}
 
         {isThirdParty ? (
-          <View style={[styles.matchScorePillHeader, BRUTAL_SHADOWS.xs]}>
-            <Text style={styles.matchScorePillHeaderText}>
-              ⚡ {dev?.matchScore || 95}%
+          <View style={[styles.headerMatchScorePill, BRUTAL_SHADOWS.xs]}>
+            <DoodleStar size={10} color={COLORS.ink} />
+            <Text style={styles.headerMatchScoreText}>
+              {dev?.matchScore || 95}% MATCH
             </Text>
           </View>
         ) : (
           <TouchableOpacity
-            activeOpacity={0.75}
+            activeOpacity={0.8}
             onPress={() => setSettingsModalVisible(true)}
-            style={styles.headerIconBtn}
+            style={[styles.headerSettingsBtn, BRUTAL_SHADOWS.xs]}
+            accessibilityRole="button"
+            accessibilityLabel="Open settings"
           >
-            <Text style={styles.headerIconText}>⚙️</Text>
+            <Text style={styles.headerSettingsIcon}>//</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -233,229 +276,335 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
         </View>
       )}
 
-      {/* 2. PROFILE SCROLL CONTENT */}
+      {/* ========== 2. PROFILE SCROLL CONTENT ========== */}
       <ScrollView
         style={styles.scrollArea}
         contentContainerStyle={[
           styles.scrollContent,
-          isThirdParty && { paddingBottom: 110 },
+          isThirdParty && { paddingBottom: 120 },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Banner Area */}
+        {/* ===== PROFILE HERO CARD ===== */}
         {isThirdParty ? (
-          /* Phone 4 Alex Chen artwork if Alex, else custom comic banner */
+          /* Third-Party Developer Banner */
           dev?.name === 'Alex Chen' ? (
-            <View style={styles.bannerContainer}>
+            <View style={[styles.heroBannerCard, BRUTAL_SHADOWS.sm]}>
               <Image
                 source={require('../assets/alex_banner_clean.png')}
-                style={styles.bannerImage}
+                style={styles.heroBannerImage}
                 resizeMode="cover"
               />
             </View>
           ) : (
-            <View style={styles.customDevBannerWrap}>
-              {dev?.avatar && !devAvatarError ? (
-                <Image
-                  source={{ uri: dev.avatar }}
-                  style={styles.customDevBannerAvatar}
-                  onError={() => setDevAvatarError(true)}
-                />
-              ) : (
-                <View style={[styles.customDevBannerAvatar, styles.avatarFallbackWrap]}>
-                  <Text style={styles.avatarFallbackText}>
-                    {dev?.name?.charAt(0)?.toUpperCase() || '👤'}
-                  </Text>
+            <View style={[styles.heroCard, BRUTAL_SHADOWS.sm]}>
+              <View style={styles.heroTopRow}>
+                {/* Avatar */}
+                <View style={styles.heroAvatarWrap}>
+                  {!devAvatarError ? (
+                    <Image
+                      source={{ uri: devAvatarUri }}
+                      style={styles.heroAvatar}
+                      onError={() => setDevAvatarError(true)}
+                    />
+                  ) : (
+                    <View style={[styles.heroAvatar, styles.avatarFallbackWrap]}>
+                      <Text style={styles.avatarFallbackLetter}>
+                        {dev?.name?.charAt(0)?.toUpperCase() || 'D'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.avatarOnlineDot} />
                 </View>
-              )}
-              <View style={styles.customDevBannerTextGroup}>
-                <Text style={styles.customDevBannerName}>{dev?.name}</Text>
-                <Text style={styles.customDevBannerRole}>{dev?.role}</Text>
-                <Text style={styles.customDevBannerExp}>⚡ {dev?.experience || '3+ yrs'}</Text>
+
+                {/* Name + Role Block */}
+                <View style={styles.heroInfoCol}>
+                  <Text style={styles.heroName} numberOfLines={2}>{dev?.name}</Text>
+                  <View style={styles.heroRolePill}>
+                    <Text style={styles.heroRoleText}>{dev?.role || dev?.preferredRole || 'Developer'}</Text>
+                  </View>
+                </View>
+
+                {/* Decorative corner sticker */}
+                <View style={styles.heroCornerAccent}>
+                  <DoodleStar size={16} color={COLORS.yellow} />
+                </View>
+              </View>
+
+              {/* Meta Row */}
+              <View style={styles.heroMetaRow}>
+                {dev?.experience ? (
+                  <View style={styles.metaPill}>
+                    <Text style={styles.metaPillLabel}>EXP</Text>
+                    <Text style={styles.metaPillValue}>{dev.experience}</Text>
+                  </View>
+                ) : null}
+                {dev?.availability ? (
+                  <View style={[styles.metaPill, { backgroundColor: getAvailabilityStatus().color, borderColor: getAvailabilityStatus().borderColor }]}>
+                    <Text style={[styles.metaPillLabel, { color: getAvailabilityStatus().textColor }]}>{getAvailabilityStatus().label}</Text>
+                  </View>
+                ) : null}
+                {dev?.location ? (
+                  <View style={styles.metaPill}>
+                    <Text style={styles.metaPillLabel}>LOC</Text>
+                    <Text style={styles.metaPillValue}>{dev.location}</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
           )
         ) : (
-          /* User's Own Hero Banner Card */
-          <View style={[styles.ownHeroCard, BRUTAL_SHADOWS.sm]}>
-            <View style={styles.ownHeroRow}>
-              {currentUser?.avatar && !ownAvatarError ? (
-                <Image
-                  source={{ uri: currentUser.avatar }}
-                  style={styles.ownHeroAvatar}
-                  onError={() => setOwnAvatarError(true)}
-                />
-              ) : (
-                <View style={[styles.ownHeroAvatar, styles.avatarFallbackWrap]}>
-                  <Text style={styles.avatarFallbackText}>
-                    {currentUser?.name?.charAt(0)?.toUpperCase() || '👤'}
+          /* ===== OWN PROFILE HERO CARD ===== */
+          <View style={[styles.heroCard, BRUTAL_SHADOWS.sm]}>
+            {/* Yellow accent stripe */}
+            <View style={styles.heroYellowStripe} />
+
+            <View style={styles.heroTopRow}>
+              {/* Avatar */}
+              <View style={styles.heroAvatarWrap}>
+                {!ownAvatarError ? (
+                  <Image
+                    source={{ uri: ownAvatarUri }}
+                    style={styles.heroAvatar}
+                    onError={() => setOwnAvatarError(true)}
+                  />
+                ) : (
+                  <View style={[styles.heroAvatar, styles.avatarFallbackWrap]}>
+                    <Text style={styles.avatarFallbackLetter}>
+                      {currentUser?.name?.charAt(0)?.toUpperCase() || 'D'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.avatarOnlineDot} />
+              </View>
+
+              {/* Name + Role */}
+              <View style={styles.heroInfoCol}>
+                <Text style={styles.heroName} numberOfLines={2}>{currentUser?.name || 'Developer'}</Text>
+                <View style={styles.heroRolePill}>
+                  <Text style={styles.heroRoleText}>
+                    {currentUser?.role || currentUser?.preferredRole || 'Full Stack Developer'}
                   </Text>
                 </View>
-              )}
-              <View style={styles.ownHeroInfo}>
-                <View style={styles.nameRow}>
-                  <Text style={styles.devName}>{currentUser?.name || 'Developer'}</Text>
-                  <View style={styles.onlineDot} />
-                </View>
-                <Text style={styles.devRole}>{currentUser?.role || currentUser?.preferredRole || 'Full Stack Developer'}</Text>
                 {currentUser?.experience ? (
-                  <Text style={styles.experienceText}>⚡ {currentUser.experience}</Text>
-                ) : null}
-                {currentUser?.availability ? (
-                  <Text style={styles.experienceText}>🕒 {currentUser.availability}</Text>
+                  <Text style={styles.heroSubMeta}>EXP: {currentUser.experience}</Text>
                 ) : null}
                 {currentUser?.location ? (
-                  <Text style={styles.locationText}>📍 {currentUser.location}</Text>
+                  <Text style={styles.heroSubMeta}>LOC: {currentUser.location}</Text>
                 ) : null}
+              </View>
+
+              {/* Doodle Accent */}
+              <View style={styles.heroCornerAccent}>
+                <DoodleSparkle size={18} color={COLORS.yellow} />
               </View>
             </View>
 
-            {/* User Quick Stats Card */}
-            <View style={styles.userStatsRow}>
-              <View style={styles.userStatBox}>
-                <Text style={styles.userStatNumber}>{projects.length}</Text>
-                <Text style={styles.userStatLabel}>PROJECTS</Text>
+            {/* Availability Status Bar */}
+            {currentUser?.availability ? (
+              <View style={[styles.availabilityBar, { backgroundColor: getAvailabilityStatus().color, borderColor: getAvailabilityStatus().borderColor }]}>
+                <DoodleCheck size={11} color={getAvailabilityStatus().textColor} />
+                <Text style={[styles.availabilityBarText, { color: getAvailabilityStatus().textColor }]}>
+                  {getAvailabilityStatus().label} -- {currentUser.availability}
+                </Text>
               </View>
-              <View style={styles.userStatDivider} />
-              <View style={styles.userStatBox}>
-                <Text style={styles.userStatNumber}>{matches.length}</Text>
-                <Text style={styles.userStatLabel}>MATCHES</Text>
+            ) : null}
+
+            {/* Quick Stats Bar */}
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{projects.length}</Text>
+                <Text style={styles.statLabel}>PROJECTS</Text>
               </View>
-              <View style={styles.userStatDivider} />
-              <View style={styles.userStatBox}>
-                <Text style={styles.userStatNumber}>{invitations.length}</Text>
-                <Text style={styles.userStatLabel}>INVITES</Text>
+              <View style={styles.statDivider} />
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{matches.length}</Text>
+                <Text style={styles.statLabel}>MATCHES</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statBox}>
+                <Text style={styles.statNumber}>{invitations.length}</Text>
+                <Text style={styles.statLabel}>INVITES</Text>
               </View>
             </View>
           </View>
         )}
 
-        {/* Third-party Name & Info Row */}
-        {isThirdParty && (
-          <>
-            <View style={styles.nameRow}>
-              <Text style={styles.devName}>{dev?.name}</Text>
-              <View style={styles.onlineDot} />
-            </View>
-            <Text style={styles.devRole}>{dev?.role || dev?.preferredRole || 'Developer'}</Text>
-            <View style={styles.metaRow}>
-              {dev?.experience ? <Text style={styles.experienceText}>⚡ {dev.experience}</Text> : null}
-              {dev?.availability ? <Text style={styles.experienceText}>🕒 {dev.availability}</Text> : null}
-              {dev?.location ? <Text style={styles.locationText}>📍 {dev.location}</Text> : null}
-            </View>
-          </>
-        )}
-
-        {/* Bio */}
-        <Text style={styles.bioText}>
-          {dev?.bio || 'Passionate about building products that create real impact. Always open to collaborate on exciting ideas!'}
-        </Text>
-
-        {/* Tech Tag Pills */}
-        <Text style={styles.sectionHeader}>CORE TECH & SKILLS</Text>
-        <View style={styles.tagsRow}>
-          {(dev?.skills || ['React', 'Node.js', 'Python', 'MongoDB', 'OpenAI', 'TypeScript']).map((t) => (
-            <View key={t} style={styles.blueTag}>
-              <Text style={styles.blueTagText}>{t}</Text>
-            </View>
-          ))}
+        {/* ===== BIO SECTION ===== */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.creamDark} style={styles.sectionIcon} />
+            <Text style={styles.sectionTitle}>ABOUT</Text>
+          </View>
+          <DoodleUnderline width="100%" color={COLORS.yellow} height={3} style={styles.sectionUnderline} />
+          <Text style={styles.bioText}>
+            {dev?.bio || dev?.introduction || 'Passionate about building products that create real impact. Always open to collaborate on exciting ideas!'}
+          </Text>
         </View>
 
-        {/* LOOKING TO Section */}
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeader}>LOOKING TO</Text>
-          {!isThirdParty && (
-            <Text style={styles.sectionSubhint}>(Tap to update goals)</Text>
-          )}
+        {/* ===== SKILLS SECTION ===== */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <DoodleStar size={14} color={COLORS.cyan} />
+            <Text style={styles.sectionTitle}>CORE TECH & SKILLS</Text>
+          </View>
+          <DoodleUnderline width="100%" color={COLORS.cyan} height={3} style={styles.sectionUnderline} />
+          <View style={styles.chipsRow}>
+            {(dev?.skills || ['React', 'Node.js', 'Python', 'MongoDB', 'OpenAI', 'TypeScript']).map((skill) => (
+              <View key={skill} style={[styles.skillChip, BRUTAL_SHADOWS.xs]}>
+                <Text style={styles.skillChipText}>{skill}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-        <View style={styles.lookingToGrid}>
-          {(dev?.lookingTo || [
-            { label: 'Join a project', selected: true },
-            { label: 'Find co-founders', selected: false },
-            { label: 'Contribute to open source', selected: true },
-            { label: 'Just meet devs', selected: false },
-          ]).map((item, idx) => {
-            const label = typeof item === 'string' ? item : item.label;
-            const selected = typeof item === 'string' ? true : item.selected;
 
-            return (
-              <TouchableOpacity
-                key={label || idx}
-                activeOpacity={isThirdParty ? 1 : 0.75}
-                onPress={() => handleToggleLookingTo(idx)}
-                style={[
-                  styles.lookingToPill,
-                  selected && styles.lookingToPillActive,
-                ]}
-              >
-                <Text style={styles.radioSymbol}>{selected ? '✔' : '○'}</Text>
-                <Text
+        {/* ===== LOOKING TO SECTION ===== */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <DoodleArrow direction="right" size={14} color={COLORS.ink} />
+            <Text style={styles.sectionTitle}>LOOKING TO</Text>
+            {!isThirdParty && (
+              <Text style={styles.sectionHint}>(Tap to update)</Text>
+            )}
+          </View>
+          <DoodleUnderline width="100%" color={COLORS.lime} height={3} style={styles.sectionUnderline} />
+          <View style={styles.lookingToGrid}>
+            {(dev?.lookingTo || [
+              { label: 'Join a project', selected: true },
+              { label: 'Find co-founders', selected: false },
+              { label: 'Contribute to open source', selected: true },
+              { label: 'Just meet devs', selected: false },
+            ]).map((item, idx) => {
+              const label = typeof item === 'string' ? item : item.label;
+              const selected = typeof item === 'string' ? true : item.selected;
+
+              return (
+                <TouchableOpacity
+                  key={label || idx}
+                  activeOpacity={isThirdParty ? 1 : 0.8}
+                  onPress={() => handleToggleLookingTo(idx)}
                   style={[
-                    styles.lookingToText,
-                    selected && styles.lookingToTextActive,
+                    styles.lookingToPill,
+                    selected && styles.lookingToPillActive,
+                    selected && BRUTAL_SHADOWS.xs,
                   ]}
                 >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+                  {selected ? (
+                    <DoodleCheck size={11} color={COLORS.green} />
+                  ) : (
+                    <View style={styles.emptyCheckbox} />
+                  )}
+                  <Text
+                    style={[
+                      styles.lookingToText,
+                      selected && styles.lookingToTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
-        {/* INTERESTS Section */}
-        <Text style={styles.sectionHeader}>INTERESTS</Text>
-        <View style={styles.tagsRow}>
-          {(dev?.interests && dev.interests.length > 0
-            ? dev.interests
-            : ['AI/ML', 'Developer Tools', 'Open Source', 'Product Design', 'Indie Hacking']
-          ).map((interest) => (
-            <View key={interest} style={styles.blueTag}>
-              <Text style={styles.blueTagText}>{interest}</Text>
-            </View>
-          ))}
+        {/* ===== INTERESTS SECTION ===== */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <DoodleSparkle size={14} color={COLORS.coral} />
+            <Text style={styles.sectionTitle}>INTERESTS</Text>
+          </View>
+          <DoodleUnderline width="100%" color={COLORS.coral} height={3} style={styles.sectionUnderline} />
+          <View style={styles.chipsRow}>
+            {(dev?.interests && dev.interests.length > 0
+              ? dev.interests
+              : ['AI/ML', 'Developer Tools', 'Open Source', 'Product Design', 'Indie Hacking']
+            ).map((interest) => (
+              <View key={interest} style={[styles.interestChip, BRUTAL_SHADOWS.xs]}>
+                <Text style={styles.interestChipText}>{interest}</Text>
+              </View>
+            ))}
+          </View>
         </View>
 
-        {/* Social / Portfolio Links Section (Part 8) */}
+        {/* ===== SOCIAL LINKS SECTION ===== */}
         {(Boolean(dev?.github) || Boolean(dev?.linkedin) || Boolean(dev?.portfolio)) && (
-          <>
-            <Text style={styles.sectionHeader}>LINKS & PORTFOLIO</Text>
-            <View style={styles.socialLinksRow}>
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <DoodleCode symbol="<>" color={COLORS.ink} bgColor={COLORS.pillBlue} style={styles.sectionIcon} />
+              <Text style={styles.sectionTitle}>LINKS & PORTFOLIO</Text>
+            </View>
+            <DoodleUnderline width="100%" color={COLORS.purple || COLORS.cyan} height={3} style={styles.sectionUnderline} />
+
+            <View style={styles.socialLinksCol}>
               {Boolean(dev?.github) && (
-                <View style={[styles.socialPill, BRUTAL_SHADOWS.xs]}>
-                  <Text style={styles.socialPillText}>🐙 GitHub: {dev.github}</Text>
+                <View style={[styles.socialLinkCard, BRUTAL_SHADOWS.xs]}>
+                  <View style={styles.socialLinkLeft}>
+                    <View style={[styles.socialIconCircle, { backgroundColor: COLORS.creamDark }]}>
+                      <Text style={styles.socialIconLabel}>gh</Text>
+                    </View>
+                    <View style={styles.socialLinkTextCol}>
+                      <Text style={styles.socialLinkType}>GITHUB</Text>
+                      <Text style={styles.socialLinkUrl} numberOfLines={1}>{dev.github}</Text>
+                    </View>
+                  </View>
+                  <DoodleArrow direction="right" size={12} color={COLORS.textMuted} />
                 </View>
               )}
               {Boolean(dev?.linkedin) && (
-                <View style={[styles.socialPill, BRUTAL_SHADOWS.xs]}>
-                  <Text style={styles.socialPillText}>💼 LinkedIn: {dev.linkedin}</Text>
+                <View style={[styles.socialLinkCard, BRUTAL_SHADOWS.xs]}>
+                  <View style={styles.socialLinkLeft}>
+                    <View style={[styles.socialIconCircle, { backgroundColor: COLORS.pillBlue }]}>
+                      <Text style={styles.socialIconLabel}>in</Text>
+                    </View>
+                    <View style={styles.socialLinkTextCol}>
+                      <Text style={styles.socialLinkType}>LINKEDIN</Text>
+                      <Text style={styles.socialLinkUrl} numberOfLines={1}>{dev.linkedin}</Text>
+                    </View>
+                  </View>
+                  <DoodleArrow direction="right" size={12} color={COLORS.textMuted} />
                 </View>
               )}
               {Boolean(dev?.portfolio) && (
-                <View style={[styles.socialPill, BRUTAL_SHADOWS.xs]}>
-                  <Text style={styles.socialPillText}>🌐 Portfolio: {dev.portfolio}</Text>
+                <View style={[styles.socialLinkCard, BRUTAL_SHADOWS.xs]}>
+                  <View style={styles.socialLinkLeft}>
+                    <View style={[styles.socialIconCircle, { backgroundColor: COLORS.pillYellow }]}>
+                      <Text style={styles.socialIconLabel}>web</Text>
+                    </View>
+                    <View style={styles.socialLinkTextCol}>
+                      <Text style={styles.socialLinkType}>PORTFOLIO</Text>
+                      <Text style={styles.socialLinkUrl} numberOfLines={1}>{dev.portfolio}</Text>
+                    </View>
+                  </View>
+                  <DoodleArrow direction="right" size={12} color={COLORS.textMuted} />
                 </View>
               )}
             </View>
-          </>
+          </View>
         )}
 
-        {/* Own Profile Quick Action Buttons */}
+        {/* ===== OWN PROFILE ACTION BUTTONS ===== */}
         {!isThirdParty && (
-          <View style={styles.ownProfileActionsWrap}>
+          <View style={styles.ownActionsWrap}>
+            {/* Doodle separator */}
+            <DoodleSeparator style={{ marginBottom: 14 }} />
+
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleOpenEditModal}
-              style={[styles.ownActionPrimaryBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.primaryActionBtn, BRUTAL_SHADOWS.sm]}
             >
-              <Text style={styles.ownActionPrimaryText}>✏️ EDIT DEVELOPER PROFILE</Text>
+              <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.white} style={styles.btnIcon} />
+              <Text style={styles.primaryActionText}>EDIT DEVELOPER PROFILE</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setSettingsModalVisible(true)}
-              style={[styles.ownActionSecondaryBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.secondaryActionBtn, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.ownActionSecondaryText}>⚙️ SETTINGS & PREFERENCES</Text>
+              <Text style={styles.secondaryActionText}>SETTINGS & PREFERENCES</Text>
+              <DoodleArrow direction="right" size={12} color={COLORS.ink} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -464,21 +613,33 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
                 if (onLogout) onLogout();
                 else logout();
               }}
-              style={[styles.ownLogoutBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.logoutActionBtn, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.ownLogoutText}>🚪 LOGOUT</Text>
+              <DoodleCross size={12} color="#DC2626" />
+              <Text style={styles.logoutActionText}>LOGOUT</Text>
             </TouchableOpacity>
+
+            {/* Bottom badge */}
+            <View style={styles.bottomBadgeRow}>
+              <ComicBadge
+                text="DEV IDENTITY CARD // v1.0"
+                color={COLORS.creamDark}
+                textColor={COLORS.textMuted}
+                size="sm"
+                rotate="-1deg"
+              />
+            </View>
           </View>
         )}
       </ScrollView>
 
-      {/* 3. FLOATING ACTION CONTROLS (ONLY ON THIRD-PARTY DEVELOPER PROFILES) */}
+      {/* ========== 3. FLOATING ACTIONS (THIRD-PARTY ONLY) ========== */}
       {isThirdParty && (
         <View style={styles.floatingActionsRow}>
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleThirdPartySkip}
-            style={[styles.actionBtnRound, styles.bgRed, BRUTAL_SHADOWS.xs]}
+            style={[styles.actionBtnRound, styles.actionBtnSkip, BRUTAL_SHADOWS.sm]}
           >
             <Image
               source={require('../assets/reject.png')}
@@ -490,7 +651,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleThirdPartyLike}
-            style={[styles.actionBtnRound, styles.bgGreen, BRUTAL_SHADOWS.xs]}
+            style={[styles.actionBtnRound, styles.actionBtnLike, BRUTAL_SHADOWS.sm]}
           >
             <Image
               source={require('../assets/like.png')}
@@ -513,7 +674,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
         </View>
       )}
 
-      {/* 4. SETTINGS & PREFERENCES MODAL */}
+      {/* ========== 4. SETTINGS MODAL ========== */}
       <Modal
         visible={settingsModalVisible}
         transparent
@@ -522,32 +683,46 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
       >
         <View style={styles.modalBackdrop}>
           <View style={[styles.settingsModalCard, BRUTAL_SHADOWS.md]}>
+            {/* Settings Header */}
             <View style={styles.settingsHeader}>
-              <Text style={styles.settingsTitle}>Settings & Preferences</Text>
+              <View style={styles.settingsHeaderLeft}>
+                <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.yellow} style={styles.settingsHeaderIcon} />
+                <Text style={styles.settingsHeaderTitle}>SETTINGS</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setSettingsModalVisible(false)}
-                style={styles.closeBtn}
+                style={[styles.modalCloseBtn, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.closeBtnText}>✕</Text>
+                <Text style={styles.modalCloseText}>X</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Quick Edit Profile Action */}
+            <DoodleUnderline width="100%" color={COLORS.yellow} height={3} style={{ marginBottom: 14 }} />
+
+            {/* Quick Edit Profile */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => {
                 setSettingsModalVisible(false);
                 handleOpenEditModal();
               }}
-              style={[styles.settingsActionBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.settingsQuickEditBtn, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.settingsActionText}>✏️ Edit Full Developer Profile</Text>
+              <DoodleUser size={14} color={COLORS.ink} />
+              <Text style={styles.settingsQuickEditText}>EDIT FULL DEVELOPER PROFILE</Text>
+              <DoodleArrow direction="right" size={12} color={COLORS.ink} />
             </TouchableOpacity>
 
-            <View style={styles.settingsItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.settingsItemTitle}>Push Notifications</Text>
-                <Text style={styles.settingsItemSubtitle}>Alerts for squad invites & matches</Text>
+            {/* Notification Settings Section */}
+            <View style={styles.settingsSectionLabel}>
+              <DoodleStar size={10} color={COLORS.cyan} />
+              <Text style={styles.settingsSectionLabelText}>NOTIFICATION PREFERENCES</Text>
+            </View>
+
+            <View style={styles.settingsToggleItem}>
+              <View style={styles.settingsToggleInfo}>
+                <Text style={styles.settingsToggleTitle}>PUSH NOTIFICATIONS</Text>
+                <Text style={styles.settingsToggleSub}>Alerts for squad invites & matches</Text>
               </View>
               <Switch
                 value={pushNotificationsEnabled}
@@ -555,40 +730,58 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
                   setPushNotificationsEnabled(val);
                   showToast(val ? 'NOTIFICATIONS ENABLED' : 'MUTED');
                 }}
-                trackColor={{ false: '#9CA3AF', true: '#4ADE80' }}
+                trackColor={{ false: COLORS.borderLight, true: COLORS.lime }}
+                thumbColor={pushNotificationsEnabled ? COLORS.white : COLORS.textLight}
+                style={styles.switchStyle}
               />
             </View>
 
-            <View style={styles.settingsItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.settingsItemTitle}>Comic Audio Effects</Text>
-                <Text style={styles.settingsItemSubtitle}>Play SFX on swipe match & bursts</Text>
+            <View style={styles.settingsToggleItem}>
+              <View style={styles.settingsToggleInfo}>
+                <Text style={styles.settingsToggleTitle}>COMIC AUDIO EFFECTS</Text>
+                <Text style={styles.settingsToggleSub}>Play SFX on swipe match & bursts</Text>
               </View>
               <Switch
                 value={soundEnabled}
                 onValueChange={(val) => {
                   setSoundEnabled(val);
-                  showToast(val ? 'SOUND ON 🔊' : 'MUTED 🔇');
+                  showToast(val ? 'SOUND ON' : 'MUTED');
                 }}
-                trackColor={{ false: '#9CA3AF', true: '#4ADE80' }}
+                trackColor={{ false: COLORS.borderLight, true: COLORS.lime }}
+                thumbColor={soundEnabled ? COLORS.white : COLORS.textLight}
+                style={styles.switchStyle}
               />
             </View>
 
+            <DoodleSeparator style={{ marginVertical: 10 }} />
+
+            {/* Logout */}
             <TouchableOpacity
               onPress={() => {
                 setSettingsModalVisible(false);
                 if (onLogout) onLogout();
                 else logout();
               }}
-              style={[styles.logoutBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.settingsLogoutBtn, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.logoutBtnText}>LOGOUT</Text>
+              <DoodleCross size={12} color="#DC2626" />
+              <Text style={styles.settingsLogoutText}>LOGOUT</Text>
             </TouchableOpacity>
+
+            {/* Footer badge */}
+            <View style={styles.settingsFooterBadge}>
+              <ComicBadge
+                text="DEVDATE // SETTINGS v1.0"
+                color={COLORS.creamDark}
+                textColor={COLORS.textMuted}
+                size="sm"
+              />
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* 5. EDIT PROFILE MODAL */}
+      {/* ========== 5. EDIT PROFILE MODAL ========== */}
       <Modal
         visible={editModalVisible}
         transparent
@@ -600,189 +793,272 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
           style={styles.modalBackdrop}
         >
           <View style={[styles.editModalCard, BRUTAL_SHADOWS.md]}>
-            <View style={styles.settingsHeader}>
-              <Text style={styles.settingsTitle}>Edit Developer Profile ✏️</Text>
+            {/* Edit Header */}
+            <View style={styles.editHeader}>
+              <View style={styles.editHeaderLeft}>
+                <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.cyan} style={styles.editHeaderIcon} />
+                <Text style={styles.editHeaderTitle}>EDIT PROFILE</Text>
+              </View>
               <TouchableOpacity
                 onPress={() => setEditModalVisible(false)}
-                style={styles.closeBtn}
+                style={[styles.modalCloseBtn, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.closeBtnText}>✕</Text>
+                <Text style={styles.modalCloseText}>X</Text>
               </TouchableOpacity>
             </View>
 
+            <DoodleUnderline width="100%" color={COLORS.cyan} height={3} style={{ marginBottom: 12 }} />
+
             <ScrollView style={styles.editFormScroll} showsVerticalScrollIndicator={false}>
-              {/* Avatar Section with Live Preview & Presets */}
-              <Text style={styles.inputLabel}>AVATAR IMAGE (URL OR PRESET)</Text>
-              <View style={styles.editAvatarWrap}>
-                {editAvatar.trim() ? (
-                  <Image
-                    source={{ uri: editAvatar.trim() }}
-                    style={styles.editAvatarPreview}
-                    onError={() => {}}
-                  />
-                ) : (
-                  <View style={[styles.editAvatarPreview, styles.avatarFallbackWrap]}>
-                    <Text style={styles.avatarFallbackText}>
-                      {editName?.charAt(0)?.toUpperCase() || '👤'}
-                    </Text>
+              {/* Avatar Section */}
+              <View style={styles.editFieldGroup}>
+                <View style={styles.avatarLabelRow}>
+                  <Text style={styles.editFieldLabel}>VOXEL-ART AVATAR (DICEBEAR)</Text>
+                  <View style={styles.voxelTagPill}>
+                    <Text style={styles.voxelTagText}>3D VOXEL</Text>
                   </View>
-                )}
-                <View style={styles.editAvatarControls}>
-                  <TextInput
-                    value={editAvatar}
-                    onChangeText={setEditAvatar}
-                    placeholder="https://... image URL or select preset"
-                    placeholderTextColor="#9CA3AF"
-                    autoCapitalize="none"
-                    style={[styles.formInput, { marginBottom: 8 }]}
-                  />
-                  <View style={styles.presetRow}>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => setEditAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80')}
-                      style={[styles.presetBtn, BRUTAL_SHADOWS.xs]}
-                    >
-                      <Text style={styles.presetBtnText}>⚡ DEV 1</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => setEditAvatar('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80')}
-                      style={[styles.presetBtn, BRUTAL_SHADOWS.xs]}
-                    >
-                      <Text style={styles.presetBtnText}>🚀 DEV 2</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => setEditAvatar('https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80')}
-                      style={[styles.presetBtn, BRUTAL_SHADOWS.xs]}
-                    >
-                      <Text style={styles.presetBtnText}>💻 DEV 3</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      activeOpacity={0.8}
-                      onPress={() => setEditAvatar('')}
-                      style={[styles.presetClearBtn, BRUTAL_SHADOWS.xs]}
-                    >
-                      <Text style={styles.presetClearBtnText}>✕ CLEAR</Text>
-                    </TouchableOpacity>
+                </View>
+
+                <View style={[styles.editAvatarWrap, BRUTAL_SHADOWS.xs]}>
+                  {editAvatar.trim() ? (
+                    <Image
+                      source={{ uri: editAvatar.trim() }}
+                      style={styles.editAvatarPreview}
+                      onError={() => {}}
+                    />
+                  ) : (
+                    <View style={[styles.editAvatarPreview, styles.avatarFallbackWrap]}>
+                      <Text style={styles.avatarFallbackLetter}>
+                        {editName?.charAt(0)?.toUpperCase() || 'D'}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.editAvatarControls}>
+                    <TextInput
+                      value={editAvatar}
+                      onChangeText={setEditAvatar}
+                      placeholder="DiceBear Avatar URL"
+                      placeholderTextColor={COLORS.textLight}
+                      autoCapitalize="none"
+                      style={[styles.formInput, { marginBottom: 8, fontSize: 11 }]}
+                    />
+
+                    {/* Voxel & Pop Art Styles */}
+                    <View style={styles.presetRow}>
+                      {DICEBEAR_STYLES.map((styleObj) => {
+                        const isSelected = editAvatar.includes(`/${styleObj.id}/`);
+                        return (
+                          <TouchableOpacity
+                            key={styleObj.id}
+                            activeOpacity={0.8}
+                            onPress={() => {
+                              const newAv = getDiceBearAvatar(editName || currentUser?.name || 'Developer', styleObj.id);
+                              setEditAvatar(newAv);
+                            }}
+                            style={[
+                              styles.presetBtn,
+                              isSelected && styles.presetBtnActive,
+                              BRUTAL_SHADOWS.xs,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.presetBtnText,
+                                isSelected && styles.presetBtnTextActive,
+                              ]}
+                            >
+                              {styleObj.name}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+
+                    {/* Quick Voxel Actions */}
+                    <View style={styles.voxelActionsRow}>
+                      <TouchableOpacity
+                        activeOpacity={0.85}
+                        onPress={() => {
+                          const randSeed = `dev-${Math.random().toString(36).substring(2, 7)}`;
+                          setEditAvatar(getDiceBearAvatar(randSeed, 'voxel-bot'));
+                        }}
+                        style={[styles.randomVoxelBtn, BRUTAL_SHADOWS.xs]}
+                      >
+                        <DoodleSparkle size={12} color={COLORS.ink} />
+                        <Text style={styles.randomVoxelText}>RANDOMIZE VOXEL</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setEditAvatar(getDiceBearAvatar(editName || currentUser?.name || 'Developer', 'voxel-bot'));
+                        }}
+                        style={[styles.presetClearBtn, BRUTAL_SHADOWS.xs]}
+                      >
+                        <Text style={styles.presetClearText}>RESET</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>
 
-              <Text style={styles.inputLabel}>FULL NAME</Text>
-              <TextInput
-                value={editName}
-                onChangeText={setEditName}
-                placeholder="e.g. Rahul Patel"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Name */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>FULL NAME</Text>
+                <TextInput
+                  value={editName}
+                  onChangeText={setEditName}
+                  placeholder="e.g. Rahul Patel"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>HEADLINE ROLE</Text>
-              <TextInput
-                value={editRole}
-                onChangeText={setEditRole}
-                placeholder="e.g. Backend Developer"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Role */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>HEADLINE ROLE</Text>
+                <TextInput
+                  value={editRole}
+                  onChangeText={setEditRole}
+                  placeholder="e.g. Backend Developer"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>EXPERIENCE LEVEL</Text>
-              <TextInput
-                value={editExperience}
-                onChangeText={setEditExperience}
-                placeholder="e.g. 3+ Years (Senior)"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Experience */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>EXPERIENCE LEVEL</Text>
+                <TextInput
+                  value={editExperience}
+                  onChangeText={setEditExperience}
+                  placeholder="e.g. 3+ Years (Senior)"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>LOCATION / REMOTE</Text>
-              <TextInput
-                value={editLocation}
-                onChangeText={setEditLocation}
-                placeholder="e.g. Bangalore / Remote"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Location */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>LOCATION / REMOTE</Text>
+                <TextInput
+                  value={editLocation}
+                  onChangeText={setEditLocation}
+                  placeholder="e.g. Bangalore / Remote"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>BIO / PITCH</Text>
-              <TextInput
-                value={editBio}
-                onChangeText={setEditBio}
-                placeholder="Tell developers what you love building..."
-                placeholderTextColor="#9CA3AF"
-                multiline
-                numberOfLines={3}
-                style={[styles.formInput, styles.multilineInput]}
-              />
+              {/* Bio */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>BIO / PITCH</Text>
+                <TextInput
+                  value={editBio}
+                  onChangeText={setEditBio}
+                  placeholder="Tell developers what you love building..."
+                  placeholderTextColor={COLORS.textLight}
+                  multiline
+                  numberOfLines={3}
+                  style={[styles.formInput, styles.multilineInput]}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>SKILLS (COMMA-SEPARATED)</Text>
-              <TextInput
-                value={editSkills}
-                onChangeText={setEditSkills}
-                placeholder="Python, Go, Docker, AWS, React"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Skills */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>SKILLS (COMMA-SEPARATED)</Text>
+                <TextInput
+                  value={editSkills}
+                  onChangeText={setEditSkills}
+                  placeholder="Python, Go, Docker, AWS, React"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>INTERESTS (COMMA-SEPARATED)</Text>
-              <TextInput
-                value={editInterests}
-                onChangeText={setEditInterests}
-                placeholder="AI/ML, Open Source, DevTools, Startups"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Interests */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>INTERESTS (COMMA-SEPARATED)</Text>
+                <TextInput
+                  value={editInterests}
+                  onChangeText={setEditInterests}
+                  placeholder="AI/ML, Open Source, DevTools, Startups"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>AVAILABILITY</Text>
-              <TextInput
-                value={editAvailability}
-                onChangeText={setEditAvailability}
-                placeholder="e.g. Full-time, 15-20 hrs/week, Open to hackathons"
-                placeholderTextColor="#9CA3AF"
-                style={styles.formInput}
-              />
+              {/* Availability */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>AVAILABILITY</Text>
+                <TextInput
+                  value={editAvailability}
+                  onChangeText={setEditAvailability}
+                  placeholder="e.g. Full-time, 15-20 hrs/week, Open to hackathons"
+                  placeholderTextColor={COLORS.textLight}
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>GITHUB PROFILE / URL</Text>
-              <TextInput
-                value={editGithub}
-                onChangeText={setEditGithub}
-                placeholder="https://github.com/username"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                style={styles.formInput}
-              />
+              {/* Social Links Section Header */}
+              <View style={styles.editSocialDivider}>
+                <DoodleStar size={10} color={COLORS.cyan} />
+                <Text style={styles.editSocialDividerText}>SOCIAL & PORTFOLIO LINKS</Text>
+              </View>
 
-              <Text style={styles.inputLabel}>LINKEDIN PROFILE / URL</Text>
-              <TextInput
-                value={editLinkedin}
-                onChangeText={setEditLinkedin}
-                placeholder="https://linkedin.com/in/username"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                style={styles.formInput}
-              />
+              {/* GitHub */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>GITHUB PROFILE / URL</Text>
+                <TextInput
+                  value={editGithub}
+                  onChangeText={setEditGithub}
+                  placeholder="https://github.com/username"
+                  placeholderTextColor={COLORS.textLight}
+                  autoCapitalize="none"
+                  style={styles.formInput}
+                />
+              </View>
 
-              <Text style={styles.inputLabel}>PORTFOLIO / WEBSITE URL</Text>
-              <TextInput
-                value={editPortfolio}
-                onChangeText={setEditPortfolio}
-                placeholder="https://yourportfolio.dev"
-                placeholderTextColor="#9CA3AF"
-                autoCapitalize="none"
-                style={styles.formInput}
-              />
+              {/* LinkedIn */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>LINKEDIN PROFILE / URL</Text>
+                <TextInput
+                  value={editLinkedin}
+                  onChangeText={setEditLinkedin}
+                  placeholder="https://linkedin.com/in/username"
+                  placeholderTextColor={COLORS.textLight}
+                  autoCapitalize="none"
+                  style={styles.formInput}
+                />
+              </View>
 
+              {/* Portfolio */}
+              <View style={styles.editFieldGroup}>
+                <Text style={styles.editFieldLabel}>PORTFOLIO / WEBSITE URL</Text>
+                <TextInput
+                  value={editPortfolio}
+                  onChangeText={setEditPortfolio}
+                  placeholder="https://yourportfolio.dev"
+                  placeholderTextColor={COLORS.textLight}
+                  autoCapitalize="none"
+                  style={styles.formInput}
+                />
+              </View>
+
+              {/* Save Button */}
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={handleSaveProfile}
                 disabled={isSaving}
-                style={[styles.saveProfileBtn, BRUTAL_SHADOWS.xs, isSaving && { opacity: 0.7 }]}
+                style={[styles.saveProfileBtn, BRUTAL_SHADOWS.sm, isSaving && { opacity: 0.65 }]}
               >
                 {isSaving ? (
-                  <ActivityIndicator color="#000000" size="small" />
+                  <ActivityIndicator color={COLORS.ink} size="small" />
                 ) : (
-                  <Text style={styles.saveProfileBtnText}>SAVE PROFILE CHANGES 💾</Text>
+                  <>
+                    <DoodleCheck size={14} color={COLORS.ink} />
+                    <Text style={styles.saveProfileBtnText}>SAVE PROFILE CHANGES</Text>
+                  </>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -793,74 +1069,123 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   );
 }
 
+// ============================================================================
+// STYLES — Pop Art x Doodle Art Design System
+// ============================================================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: COLORS.creamBg,
   },
+
+  // ========= HEADER BAR =========
   headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'transparent',
-    paddingHorizontal: 16,
+    backgroundColor: COLORS.yellow,
+    paddingHorizontal: SPACING.md,
     paddingVertical: 10,
+    borderBottomWidth: BORDERS.thick,
+    borderBottomColor: COLORS.borderBlack,
   },
-  headerIconBtn: {
-    padding: 4,
+  headerBackBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  headerIconText: {
-    fontSize: 22,
+  headerBackIcon: {
+    fontSize: 14,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
-  headerPillCenter: {
-    backgroundColor: '#FFCC00',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-  },
-  headerPillCenterText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  matchScorePillHeader: {
-    backgroundColor: '#BBF7D0',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  matchScorePillHeaderText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#15803D',
-  },
-  editHeaderPill: {
-    backgroundColor: '#FDE047',
-    borderWidth: 2,
-    borderColor: '#000000',
+  headerCenterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 12,
     paddingVertical: 4,
   },
-  editHeaderPillText: {
-    fontSize: 11,
+  headerCenterText: {
+    fontSize: 10.5,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
+  headerEditPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  miniHeaderCode: {
+    paddingHorizontal: 3,
+    paddingVertical: 0,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  headerEditText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  headerMatchScorePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.pillGreen,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.green,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  headerMatchScoreText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#15803D',
+    letterSpacing: 0.4,
+  },
+  headerSettingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSettingsIcon: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: COLORS.ink,
+    fontFamily: FONTS.mono,
+  },
+
+  // ========= TOAST =========
   toastContainer: {
     position: 'absolute',
-    top: 55,
+    top: 60,
     alignSelf: 'center',
     zIndex: 999,
-    borderWidth: 2,
-    borderColor: '#000000',
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 16,
     paddingVertical: 6,
@@ -868,284 +1193,445 @@ const styles = StyleSheet.create({
   toastText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.4,
   },
+
+  // ========= SCROLL AREA =========
   scrollArea: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.md,
     paddingBottom: 30,
   },
-  bannerContainer: {
+
+  // ========= HERO CARD =========
+  heroCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: 16,
+    marginBottom: 14,
+    overflow: 'hidden',
+  },
+  heroBannerCard: {
     width: '100%',
     height: 245,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    borderColor: '#000000',
+    borderRadius: BORDER_RADIUS.xl,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
     overflow: 'hidden',
-    backgroundColor: '#FAF6EB',
-    marginBottom: 12,
+    backgroundColor: COLORS.creamBg,
+    marginBottom: 14,
   },
-  bannerImage: {
+  heroBannerImage: {
     width: '100%',
     height: '100%',
   },
-  customDevBannerWrap: {
+  heroYellowStripe: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 6,
+    backgroundColor: COLORS.yellow,
+  },
+  heroTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 18,
-    padding: 16,
     gap: 14,
     marginBottom: 12,
   },
-  customDevBannerAvatar: {
+  heroAvatarWrap: {
+    position: 'relative',
+  },
+  heroAvatar: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    borderWidth: 2.5,
-    borderColor: '#000000',
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
   },
-  customDevBannerTextGroup: {
+  avatarFallbackWrap: {
+    backgroundColor: COLORS.yellow,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackLetter: {
+    fontSize: 26,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  avatarOnlineDot: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: COLORS.lime,
+    borderWidth: 2.5,
+    borderColor: COLORS.borderBlack,
+  },
+  heroInfoCol: {
     flex: 1,
   },
-  customDevBannerName: {
-    fontSize: 20,
+  heroName: {
+    fontSize: 21,
     fontWeight: '900',
-    color: '#000000',
-  },
-  customDevBannerRole: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#666666',
-    marginTop: 2,
-  },
-  customDevBannerExp: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#B45309',
-    marginTop: 4,
-  },
-  ownHeroCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-  },
-  ownHeroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    marginBottom: 14,
-  },
-  ownHeroAvatar: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-  },
-  ownHeroInfo: {
-    flex: 1,
-  },
-  userStatsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    backgroundColor: '#FAF6EB',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 14,
-    paddingVertical: 10,
-  },
-  userStatBox: {
-    alignItems: 'center',
-  },
-  userStatNumber: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  userStatLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    color: '#666666',
-    marginTop: 2,
-  },
-  userStatDivider: {
-    width: 2,
-    height: 24,
-    backgroundColor: '#000000',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 2,
-  },
-  devName: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.2,
-  },
-  onlineDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#22C55E',
-  },
-  devRole: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#111827',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
     marginBottom: 4,
   },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 10,
+  heroRolePill: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.creamDark,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginBottom: 4,
   },
-  experienceText: {
-    fontSize: 12,
+  heroRoleText: {
+    fontSize: 11,
     fontWeight: '800',
-    color: '#B45309',
+    color: COLORS.ink,
+    fontFamily: FONTS.mono,
   },
-  locationText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
+  heroSubMeta: {
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: COLORS.textSecondary,
+    marginTop: 2,
+    fontFamily: FONTS.mono,
   },
-  bioText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#374151',
-    lineHeight: 18,
-    marginBottom: 14,
+  heroCornerAccent: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
   },
-  tagsRow: {
+  heroMetaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 16,
+    marginBottom: 4,
   },
-  blueTag: {
-    backgroundColor: '#E0F2FE',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 4,
+  metaPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: COLORS.creamDark,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  blueTagText: {
-    fontSize: 11,
+  metaPillLabel: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
+  },
+  metaPillValue: {
+    fontSize: 9.5,
     fontWeight: '700',
-    color: '#000000',
+    color: COLORS.textSecondary,
+  },
+
+  // Availability Bar
+  availabilityBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: BORDERS.thin,
+    borderRadius: BORDER_RADIUS.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginBottom: 12,
+  },
+  availabilityBarText: {
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.4,
+  },
+
+  // Stats Row
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 10,
+  },
+  statBox: {
+    alignItems: 'center',
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  statLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: COLORS.textMuted,
+    marginTop: 2,
+    letterSpacing: 0.3,
+  },
+  statDivider: {
+    width: 2,
+    height: 24,
+    backgroundColor: COLORS.borderBlack,
+  },
+
+  // ========= SECTION CARDS =========
+  sectionCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: 14,
+    marginBottom: 12,
+    ...BRUTAL_SHADOWS.xs,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
+    gap: 6,
   },
-  sectionHeader: {
+  sectionIcon: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  sectionTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-    marginBottom: 10,
+    color: COLORS.ink,
+    letterSpacing: 0.6,
   },
-  sectionSubhint: {
-    fontSize: 10,
+  sectionHint: {
+    fontSize: 9.5,
     fontWeight: '700',
-    color: '#666666',
+    color: COLORS.textMuted,
+    marginLeft: 4,
+  },
+  sectionUnderline: {
+    marginTop: 6,
     marginBottom: 10,
   },
+
+  // Bio
+  bioText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+    lineHeight: 19,
+  },
+
+  // Chips
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  skillChip: {
+    backgroundColor: COLORS.pillBlue,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.cyan,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  skillChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+  interestChip: {
+    backgroundColor: COLORS.pillYellow,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.yellow,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  interestChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+
+  // Looking To
   lookingToGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 16,
   },
   lookingToPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   lookingToPillActive: {
-    backgroundColor: '#FDE047',
+    backgroundColor: COLORS.yellow,
+    borderColor: COLORS.borderBlack,
+    borderWidth: BORDERS.regular,
   },
-  radioSymbol: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
+  emptyCheckbox: {
+    width: 11,
+    height: 11,
+    borderRadius: 2,
+    borderWidth: 1.5,
+    borderColor: COLORS.textMuted,
   },
   lookingToText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#374151',
+    color: COLORS.textSecondary,
   },
   lookingToTextActive: {
-    color: '#000000',
+    color: COLORS.ink,
     fontWeight: '900',
   },
-  ownProfileActionsWrap: {
-    marginTop: 8,
+
+  // Social Links
+  socialLinksCol: {
+    gap: 8,
+  },
+  socialLinkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  socialLinkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  socialIconCircle: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  socialIconLabel: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+    fontFamily: FONTS.mono,
+  },
+  socialLinkTextCol: {
+    flex: 1,
+  },
+  socialLinkType: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+    marginBottom: 1,
+  },
+  socialLinkUrl: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+
+  // ========= OWN PROFILE ACTIONS =========
+  ownActionsWrap: {
+    marginTop: 4,
     gap: 10,
   },
-  ownActionPrimaryBtn: {
-    backgroundColor: '#FFCC00',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 14,
-    paddingVertical: 12,
+  primaryActionBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 13,
   },
-  ownActionPrimaryText: {
+  btnIcon: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    borderWidth: 1,
+  },
+  primaryActionText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
-  ownActionSecondaryBtn: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 14,
-    paddingVertical: 12,
+  secondaryActionBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 12,
   },
-  ownActionSecondaryText: {
+  secondaryActionText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.4,
   },
-  ownLogoutBtn: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 2,
-    borderColor: '#DC2626',
-    borderRadius: 14,
-    paddingVertical: 12,
+  logoutActionBtn: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.pillCoral,
+    borderWidth: BORDERS.regular,
+    borderColor: '#DC2626',
+    borderRadius: BORDER_RADIUS.lg,
+    paddingVertical: 12,
     marginTop: 4,
   },
-  ownLogoutText: {
+  logoutActionText: {
     fontSize: 12,
     fontWeight: '900',
     color: '#DC2626',
+    letterSpacing: 0.5,
   },
+  bottomBadgeRow: {
+    alignItems: 'center',
+    marginTop: 14,
+    marginBottom: 4,
+  },
+
+  // ========= FLOATING ACTIONS (3rd PARTY) =========
   floatingActionsRow: {
     position: 'absolute',
     bottom: 8,
@@ -1159,25 +1645,16 @@ const styles = StyleSheet.create({
     width: 54,
     height: 54,
     borderRadius: 27,
-    borderWidth: 2.5,
-    borderColor: '#000000',
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  bgRed: {
-    backgroundColor: '#FF4B4B',
+  actionBtnSkip: {
+    backgroundColor: COLORS.coral,
   },
-  bgGreen: {
-    backgroundColor: '#4ADE80',
-  },
-  actionIconText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  actionIconHeart: {
-    fontSize: 24,
-    color: '#000000',
+  actionBtnLike: {
+    backgroundColor: COLORS.lime,
   },
   actionIconImg: {
     width: 28,
@@ -1193,6 +1670,8 @@ const styles = StyleSheet.create({
     width: 100,
     height: 75,
   },
+
+  // ========= MODAL SHARED =========
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
@@ -1200,183 +1679,218 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  settingsModalCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    borderRadius: 20,
-    padding: 20,
-    width: '100%',
-    maxWidth: 340,
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  editModalCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    borderRadius: 20,
+  modalCloseText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+
+  // ========= SETTINGS MODAL =========
+  settingsModalCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xl,
     padding: 20,
     width: '100%',
     maxWidth: 360,
-    maxHeight: '85%',
   },
   settingsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: '#000000',
-    paddingBottom: 8,
-    marginBottom: 14,
+    marginBottom: 4,
   },
-  settingsTitle: {
-    fontSize: 16,
+  settingsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  settingsHeaderIcon: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1.5,
+  },
+  settingsHeaderTitle: {
+    fontSize: 18,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.6,
   },
-  closeBtn: {
-    padding: 4,
-  },
-  closeBtnText: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  settingsActionBtn: {
-    backgroundColor: '#FDE047',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 10,
+  settingsQuickEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
     paddingVertical: 10,
     paddingHorizontal: 12,
-    alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: 16,
   },
-  settingsActionText: {
-    fontSize: 12,
+  settingsQuickEditText: {
+    fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.4,
+    flex: 1,
   },
-  settingsItem: {
+  settingsSectionLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 10,
+  },
+  settingsSectionLabelText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+  },
+  settingsToggleItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-    marginBottom: 12,
+    paddingHorizontal: 12,
+    marginBottom: 10,
   },
-  settingsItemTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#000000',
+  settingsToggleInfo: {
+    flex: 1,
+    marginRight: 10,
   },
-  settingsItemSubtitle: {
-    fontSize: 11,
-    color: '#6B7280',
-    marginTop: 2,
-  },
-  logoutBtn: {
-    backgroundColor: '#FF4B4B',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  logoutBtnText: {
+  settingsToggleTitle: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
+  },
+  settingsToggleSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  switchStyle: {
+    transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }],
+  },
+  settingsLogoutBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.pillCoral,
+    borderWidth: BORDERS.regular,
+    borderColor: '#DC2626',
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 10,
+  },
+  settingsLogoutText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#DC2626',
     letterSpacing: 0.5,
+  },
+  settingsFooterBadge: {
+    alignItems: 'center',
+    marginTop: 14,
+  },
+
+  // ========= EDIT PROFILE MODAL =========
+  editModalCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xl,
+    padding: 20,
+    width: '100%',
+    maxWidth: 380,
+    maxHeight: '85%',
+  },
+  editHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  editHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editHeaderIcon: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1.5,
+  },
+  editHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.6,
   },
   editFormScroll: {
     width: '100%',
   },
-  inputLabel: {
+  editFieldGroup: {
+    marginBottom: 12,
+  },
+  editFieldLabel: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
-    marginBottom: 4,
+    marginBottom: 5,
   },
   formInput: {
-    backgroundColor: '#FAF6EB',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 8,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.sm,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingVertical: Platform.OS === 'ios' ? 10 : 8,
     fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
-    marginBottom: 12,
+    color: COLORS.ink,
   },
   multilineInput: {
-    minHeight: 60,
+    minHeight: 70,
     textAlignVertical: 'top',
-  },
-  saveProfileBtn: {
-    backgroundColor: '#FDE047',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  saveProfileBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  socialLinksRow: {
-    flexDirection: 'column',
-    gap: 8,
-    marginBottom: 16,
-  },
-  socialPill: {
-    backgroundColor: '#F3F4F6',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  socialPillText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#000000',
-  },
-  avatarFallbackWrap: {
-    backgroundColor: '#FFE600',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarFallbackText: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#000000',
   },
   editAvatarWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: '#FAF6EB',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 12,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.lg,
     padding: 10,
-    marginBottom: 14,
   },
   editAvatarPreview: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: '#000000',
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
   },
   editAvatarControls: {
     flex: 1,
@@ -1387,29 +1901,112 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   presetBtn: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
     paddingHorizontal: 8,
     paddingVertical: 4,
+  },
+  presetBtnActive: {
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
   },
   presetBtnText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
-  presetClearBtn: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
-    borderRadius: 6,
+  presetBtnTextActive: {
+    color: COLORS.ink,
+  },
+  avatarLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  voxelTagPill: {
+    backgroundColor: COLORS.cyan,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  voxelTagText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  voxelActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+  },
+  randomVoxelBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.lime,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingVertical: 6,
     paddingHorizontal: 8,
-    paddingVertical: 4,
   },
-  presetClearBtnText: {
+  randomVoxelText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#EF4444',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
+  },
+  presetClearBtn: {
+    backgroundColor: COLORS.creamDark,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  presetClearText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  editSocialDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 12,
+    paddingTop: 4,
+  },
+  editSocialDividerText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+  },
+  saveProfileBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 13,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  saveProfileBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
 });

@@ -53,9 +53,9 @@ export const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME
   ? process.env.BREVO_SENDER_NAME.trim()
   : "DevDate";
 
-// Legacy Email & Google OAuth2 Credentials (maintained for backwards compatibility)
-export const EMAIL_USER = process.env.EMAIL_USER ? process.env.EMAIL_USER.trim() : BREVO_SENDER_EMAIL;
-export const EMAIL_PASS = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : undefined;
+// Email & SMTP Credentials (Gmail App Password or Custom SMTP)
+export const EMAIL_USER = process.env.EMAIL_USER ? process.env.EMAIL_USER.trim() : (process.env.BREVO_SENDER_EMAIL ? process.env.BREVO_SENDER_EMAIL.trim() : "");
+export const EMAIL_PASS = process.env.EMAIL_PASS ? process.env.EMAIL_PASS.trim() : "";
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGLE_CLIENT_ID.trim() : "";
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ? process.env.GOOGLE_CLIENT_SECRET.trim() : "";
 export const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN ? process.env.GOOGLE_REFRESH_TOKEN.trim() : "";

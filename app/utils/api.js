@@ -5,6 +5,7 @@ import {
   getAuthTokens,
   clearAuthTokens,
 } from './authStorage.js';
+import { getDiceBearAvatar, resolveProfileAvatar } from './avatar.js';
 
 export function getApiBaseUrl() {
   // If running in a web browser (React Native Web)
@@ -491,8 +492,7 @@ export function normalizeMatch(rawMatch, currentUserId) {
     developerName: partner.name || 'Collaborator',
     developerRole: partner.role || partner.preferredRole || 'Developer',
     developerAvatar:
-      partner.avatar ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      resolveProfileAvatar(partner.avatar, partner.name || 'Collaborator', 'voxel-bot'),
     projectId: (rawMatch.project?._id || rawMatch.project?.id || rawMatch.project || '').toString(),
     projectName: rawMatch.projectName || rawMatch.project?.title || 'Project',
     projectDescription: rawMatch.projectDescription || rawMatch.project?.description || '',
@@ -526,8 +526,7 @@ export function normalizeInvitation(rawInv) {
     developerName: dev.name || 'Developer',
     developerRole: dev.role || dev.preferredRole || 'Developer',
     developerAvatar:
-      dev.avatar ||
-      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=200&q=80',
+      resolveProfileAvatar(dev.avatar, dev.name || 'Developer', 'voxel-bot'),
     projectId: (proj._id || proj.id || '').toString(),
     projectName: proj.title || 'Project',
     projectDescription: proj.description || '',
@@ -656,8 +655,7 @@ export function normalizeConversation(rawConv, currentUserId) {
     developerName: partner.name || 'Collaborator',
     developerRole: partner.role || partner.preferredRole || 'Developer',
     developerAvatar:
-      partner.avatar ||
-      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+      resolveProfileAvatar(partner.avatar, partner.name || 'Collaborator', 'voxel-bot'),
     status: 'Online',
     lastMessage: lastMsgText,
     time: timeStr,
@@ -754,19 +752,19 @@ export function normalizeNotification(rawNotif, currentUserId) {
   const projectId = project ? (project._id || project.id || project).toString() : null;
   const invitationId = invitation ? (invitation._id || invitation.id || invitation).toString() : null;
 
-  let title = 'Notification 🔔';
+  let title = 'Notification';
   if (type === 'INVITATION_RECEIVED') {
-    title = 'New Collaboration Invite! ✉️';
+    title = 'New Collaboration Invite!';
   } else if (type === 'INVITATION_ACCEPTED') {
-    title = 'Invitation Accepted! 🎉';
+    title = 'Invitation Accepted!';
   } else if (type === 'INVITATION_REJECTED') {
-    title = 'Invitation Declined ✖';
+    title = 'Invitation Declined';
   } else if (type === 'INVITATION_WITHDRAWN') {
     title = 'Invitation Withdrawn';
   } else if (type === 'MATCH_CREATED' || type === 'MATCH') {
-    title = "It's a Match! 🚀";
+    title = "It's a Match!";
   } else if (type === 'MESSAGE' || type === 'NEW_MESSAGE') {
-    title = `New Message from ${actor.name || 'Collaborator'} 💬`;
+    title = `New Message from ${actor.name || 'Collaborator'}`;
   } else if (rawNotif.title) {
     title = rawNotif.title;
   }
@@ -1204,7 +1202,7 @@ export function normalizeProject(rawProject, canonicalSkills = []) {
   const rawImage = typeof rawProject.image === 'string' ? rawProject.image.trim() : null;
   const isImageHttp = rawImage && (rawImage.startsWith('http://') || rawImage.startsWith('https://') || rawImage.startsWith('data:image/'));
   const image = isImageHttp ? rawImage : (rawImage || null);
-  const icon = rawProject.icon || (isImageHttp ? '🚀' : (rawImage || '🚀'));
+  const icon = rawProject.icon || (isImageHttp ? '</>' : (rawImage || '</>'));
 
   return {
     id,
@@ -1288,7 +1286,7 @@ export function toBackendProjectPayload(formData, canonicalSkills = []) {
   let image = formData.image !== undefined ? formData.image : (formData.icon || null);
   if (typeof image === 'string' && (image.startsWith('http://') || image.startsWith('https://') || image.startsWith('data:image/'))) {
     image = image.trim();
-  } else if (typeof image === 'string' && image.length > 5 && !image.includes('🚀') && !image.includes('⚡')) {
+  } else if (typeof image === 'string' && image.length > 5) {
     image = image.trim();
   } else {
     image = null;
@@ -1683,9 +1681,7 @@ export function normalizeDeveloper(rawDev, activeProject = null) {
   const name = rawDev.name || 'Developer';
   const role = rawDev.role || rawDev.preferredRole || 'Full Stack Developer';
   const preferredRole = rawDev.preferredRole || rawDev.role || 'Full Stack Developer';
-  const avatar =
-    rawDev.avatar ||
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80';
+  const avatar = resolveProfileAvatar(rawDev.avatar, name, 'voxel-bot');
 
   const skills = Array.isArray(rawDev.skills) ? rawDev.skills : [];
   const interests = Array.isArray(rawDev.interests) ? rawDev.interests : [];

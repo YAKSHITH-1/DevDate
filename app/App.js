@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, StatusBar, Animated, Platform, ImageBackground, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, StatusBar, Animated, Platform, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './context/AppContext';
+import { COLORS, SHELL, BRUTAL_SHADOWS, BORDERS } from './styles/theme';
+import { DoodleCode, DoodleStar, DoodleSparkle } from './components/DoodleElements';
 
 import LandingScreen from './screens/LandingScreen';
 import HomeScreen from './screens/HomeScreen';
@@ -10,6 +12,7 @@ import MatchesScreen from './screens/MatchesScreen';
 import ChatsScreen from './screens/ChatsScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import BottomNav from './components/BottomNav';
+import ComicHalftoneBackground from './components/ComicHalftoneBackground';
 
 function MainNavigator() {
   const {
@@ -146,38 +149,44 @@ function MainNavigator() {
   if (authLoading) {
     return (
       <SafeAreaProvider>
-        <StatusBar barStyle="light-content" backgroundColor="#091830" />
+        <StatusBar barStyle="dark-content" backgroundColor={SHELL.loadingBg} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#38bdf8" />
+          {/* Doodle accents around loader */}
+          <View style={styles.loadingDoodleTopLeft}>
+            <DoodleCode symbol="</>" color="rgba(24, 24, 27, 0.08)" bgColor="transparent" />
+          </View>
+          <View style={styles.loadingDoodleBottomRight}>
+            <DoodleStar size={14} color="rgba(255, 222, 0, 0.20)" />
+          </View>
+
+          {/* Central loading badge */}
+          <View style={styles.loadingBadge}>
+            <DoodleSparkle size={20} color={COLORS.yellow} />
+            <Text style={styles.loadingText}>LOADING</Text>
+          </View>
+          <ActivityIndicator size="small" color={SHELL.loadingAccent} style={{ marginTop: 12 }} />
         </View>
       </SafeAreaProvider>
     );
   }
 
   const isLanding = activeTab === 'landing';
-  const ContainerComponent = isLanding ? View : ImageBackground;
-  const containerProps = isLanding
-    ? { style: styles.container }
-    : {
-        source: require('./assets/comic_screen_bg.png'),
-        style: styles.container,
-        resizeMode: 'cover',
-      };
 
   return (
     <SafeAreaProvider>
       <StatusBar
-        barStyle={isLanding ? 'light-content' : 'dark-content'}
-        backgroundColor={isLanding ? '#091830' : '#FAF6EB'}
+        barStyle="dark-content"
+        backgroundColor="#FAF6EB"
       />
       <SafeAreaView
         style={[
           styles.safeArea,
-          { backgroundColor: isLanding ? '#091830' : '#FAF6EB' },
+          { backgroundColor: '#FAF6EB' },
         ]}
-        edges={isLanding ? [] : ['top', 'left', 'right']}
+        edges={['top', 'left', 'right']}
       >
-        <ContainerComponent {...containerProps}>
+        <View style={styles.container}>
+          <ComicHalftoneBackground />
           {/* Main Screen Body */}
           <Animated.View
             style={[
@@ -204,7 +213,7 @@ function MainNavigator() {
               matchesCount={invitations.length}
             />
           )}
-        </ContainerComponent>
+        </View>
       </SafeAreaView>
     </SafeAreaProvider>
   );
@@ -232,8 +241,40 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#091830',
+    backgroundColor: SHELL.loadingBg,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingBadge: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    ...BRUTAL_SHADOWS.sm,
+    gap: 8,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    color: COLORS.ink,
+    textTransform: 'uppercase',
+  },
+  loadingDoodleTopLeft: {
+    position: 'absolute',
+    top: '25%',
+    left: 24,
+  },
+  loadingDoodleBottomRight: {
+    position: 'absolute',
+    bottom: '25%',
+    right: 28,
   },
 });

@@ -9,11 +9,30 @@ import {
   Modal,
   RefreshControl,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
+import ProjectCard from '../components/ProjectCard';
 import CreateProjectForm from '../components/CreateProjectForm';
+import {
+  DoodleStar,
+  DoodleSparkle,
+  DoodleCode,
+  DoodleArrow,
+  DoodleUnderline,
+  DoodleBadge,
+  DoodleSeparator,
+} from '../components/DoodleElements';
 import { useApp } from '../context/AppContext';
 import { getSkillLabels, ALL_SKILLS } from '../data/skillsDatabase';
+
+const SKILL_COLORS = [
+  { bg: COLORS.pillBlue, border: COLORS.pillBlueBorder },
+  { bg: COLORS.pillYellow, border: COLORS.pillYellowBorder },
+  { bg: COLORS.pillGreen, border: COLORS.pillGreenBorder },
+  { bg: COLORS.purplePastel, border: COLORS.purple },
+  { bg: COLORS.pillCoral, border: COLORS.pillCoralBorder },
+  { bg: COLORS.orangePastel, border: COLORS.orange },
+];
 
 export default function ProjectsScreen({
   onBackToDiscover,
@@ -98,7 +117,7 @@ export default function ProjectsScreen({
       const p = projects.find((pr) => pr.id === closeTargetId);
       const res = await closeProject(closeTargetId);
       if (res && res.success) {
-        showToast(`CLOSED "${res.project?.title || p?.title}" 🔒`);
+        showToast(`CLOSED "${res.project?.title || p?.title}"`);
         setCloseConfirmVisible(false);
         setCloseTargetId(null);
       } else {
@@ -113,14 +132,14 @@ export default function ProjectsScreen({
 
   const handleFindMembers = (project) => {
     setActiveProjectId(project.id);
-    showToast(`DISCOVERING FOR: ${project.title} 🎯`);
+    showToast(`DISCOVERING FOR: ${project.title}`);
     if (onSelectForDiscovery) onSelectForDiscovery();
   };
 
   const handleCreateSubmit = async (formData) => {
     const result = await createProject(formData);
     if (result && result.success && result.project) {
-      showToast(`CREATED "${result.project.title}" 🚀`);
+      showToast(`CREATED "${result.project.title}"`);
       return { success: true };
     } else {
       const errMsg = result?.error || 'Failed to create project';
@@ -133,7 +152,7 @@ export default function ProjectsScreen({
     if (!editingProject) return { success: false, error: 'No project selected for editing' };
     const result = await updateProject(editingProject.id, formData);
     if (result && result.success && result.project) {
-      showToast('PROJECT UPDATED! ✔');
+      showToast('PROJECT UPDATED!');
       setEditingProject(null);
       setEditModalVisible(false);
       return { success: true, project: result.project };
@@ -153,21 +172,21 @@ export default function ProjectsScreen({
     });
   };
 
-  // ─── STATUS STYLING (Chunk 11E) ─────────────────────────
+  // ─── STATUS STYLING ──────────────────────────────────────
   const getStatusStyle = (status, membersCount = 0, maxMembers = 0) => {
     if (status === 'CLOSED') {
-      return { bg: '#D1D5DB', color: '#374151', label: 'PROJECT CLOSED' };
+      return { bg: '#E5E7EB', color: '#374151', label: 'PROJECT CLOSED' };
     }
     if (maxMembers > 0 && membersCount >= maxMembers) {
       return { bg: '#FED7AA', color: '#9A3412', label: 'TEAM FULL' };
     }
     if (status === 'OPEN' || status === 'Recruiting') {
-      return { bg: '#86EFAC', color: '#166534', label: 'RECRUITING' };
+      return { bg: '#DCFCE7', color: '#166534', label: 'RECRUITING' };
     }
     if (status === 'Active MVP') {
-      return { bg: '#93C5FD', color: '#1E40AF', label: 'ACTIVE MVP' };
+      return { bg: '#E0F2FE', color: '#1E40AF', label: 'ACTIVE MVP' };
     }
-    return { bg: '#86EFAC', color: '#166534', label: status?.toUpperCase() || 'RECRUITING' };
+    return { bg: '#DCFCE7', color: '#166534', label: status?.toUpperCase() || 'RECRUITING' };
   };
 
   // Category color for skill chips
@@ -175,15 +194,15 @@ export default function ProjectsScreen({
     const skill = ALL_SKILLS.find((s) => s.id === skillId || s.label === skillId || s.name === skillId);
     if (!skill) return '#E5E7EB';
     const colors = {
-      frontend: '#BFDBFE',
-      backend: '#FDE68A',
-      fullstack: '#C4B5FD',
+      frontend: COLORS.pillBlue,
+      backend: COLORS.pillYellow,
+      fullstack: COLORS.purplePastel,
       ai_ml: '#E9D5FF',
-      mobile: '#BBF7D0',
-      database: '#FED7AA',
+      mobile: COLORS.pillGreen,
+      database: COLORS.orangePastel,
       devops: '#A5F3FC',
       design: '#FBCFE8',
-      blockchain: '#FCA5A5',
+      blockchain: COLORS.pillCoral,
       languages: '#E5E7EB',
     };
     return colors[skill.categoryId] || '#E5E7EB';
@@ -199,19 +218,22 @@ export default function ProjectsScreen({
         <TouchableOpacity
           activeOpacity={0.75}
           onPress={onBackToDiscover}
-          style={styles.headerIconBtn}
+          style={styles.headerBackBtn}
         >
-          <Text style={styles.headerIconText}>←</Text>
+          <Text style={styles.headerBackArrow}>←</Text>
         </TouchableOpacity>
 
-        <Text style={styles.listTitle}>MY PROJECTS</Text>
+        <View style={styles.listTitleWrap}>
+          <Text style={styles.listTitle}>MY PROJECTS</Text>
+          <DoodleStar size={14} color={COLORS.yellow} style={styles.titleStar} />
+        </View>
 
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={() => setCreateModalVisible(true)}
           style={[styles.newProjectBtn, BRUTAL_SHADOWS.xs]}
         >
-          <Text style={styles.newProjectBtnText}>➕ NEW</Text>
+          <Text style={styles.newProjectBtnText}>+ NEW</Text>
         </TouchableOpacity>
       </View>
 
@@ -231,181 +253,47 @@ export default function ProjectsScreen({
           <RefreshControl
             refreshing={Boolean(projectsLoading)}
             onRefresh={loadProjects}
-            tintColor="#FFE600"
-            colors={['#FFE600', '#00E5FF']}
+            tintColor={COLORS.yellow}
+            colors={[COLORS.yellow, COLORS.blue]}
           />
         }
       >
         {projectsLoading && projects.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>⏳</Text>
-            <Text style={styles.emptyTitle}>LOADING PROJECTS...</Text>
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleSparkle size={30} color={COLORS.yellow} style={{ marginBottom: 12 }} />
+            <Text style={styles.emptyTitle}>FETCHING PROJECTS...</Text>
             <Text style={styles.emptySubtitle}>
-              Fetching your projects from DevDate...
+              Connecting to project database...
             </Text>
           </View>
         ) : projects.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>📁</Text>
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
+            <DoodleCode symbol="</>" bgColor={COLORS.yellowHighlight} color={COLORS.ink} style={{ marginBottom: 12 }} />
             <Text style={styles.emptyTitle}>NO PROJECTS YET</Text>
+            <DoodleUnderline width={130} color={COLORS.yellow} height={3} style={{ marginBottom: 10 }} />
             <Text style={styles.emptySubtitle}>
               Create your first project to start finding team members!
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setCreateModalVisible(true)}
-              style={[styles.emptyCreateBtn, BRUTAL_SHADOWS.sm]}
+              style={[styles.emptyCreateBtn, BRUTAL_SHADOWS.button]}
             >
-              <Text style={styles.emptyCreateBtnText}>CREATE PROJECT 🚀</Text>
+              <Text style={styles.emptyCreateBtnText}>+ CREATE PROJECT</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          projects.map((project) => {
-            const currentMembers = project.membersCount || (Array.isArray(project.members) ? project.members.length : 1);
-            const maxMembers = project.maxMembers || project.teamSize?.max || 4;
-            const statusInfo = getStatusStyle(project.status, currentMembers, maxMembers);
-            const displaySkills = getDisplaySkills(project.techStack);
-            const isActive = project.id === activeProjectId;
-            const isClosed = project.status === 'CLOSED';
-            const shownSkills = displaySkills.slice(0, 5);
-            const extraCount = displaySkills.length - 5;
-
-            return (
-              <View
-                key={project.id}
-                style={[styles.projectCard, BRUTAL_SHADOWS.sm]}
-              >
-                {/* Card Header: Icon + Title + Status */}
-                <View style={styles.cardHeader}>
-                  <View style={styles.cardTitleRow}>
-                    {project.image && (project.image.startsWith('http') || project.image.startsWith('data:image/')) ? (
-                      <Image
-                        source={{ uri: project.image }}
-                        style={styles.cardImageThumb}
-                        onError={() => {}}
-                      />
-                    ) : (
-                      <Text style={styles.cardIcon}>{project.icon || '🚀'}</Text>
-                    )}
-                    <View style={styles.cardTitleGroup}>
-                      <Text style={styles.cardTitle} numberOfLines={1}>
-                        {project.title}
-                      </Text>
-                      <Text style={styles.cardCategory}>{project.category}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.statusBadge, { backgroundColor: statusInfo.bg }]}>
-                    <Text style={[styles.statusBadgeText, { color: statusInfo.color }]}>
-                      {statusInfo.label}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Active Discovery Indicator */}
-                {isActive && !isClosed && (
-                  <View style={styles.activeIndicator}>
-                    <Text style={styles.activeIndicatorText}>🎯 ACTIVE FOR DISCOVERY</Text>
-                  </View>
-                )}
-
-                {/* Description */}
-                <Text style={styles.cardDescription} numberOfLines={2}>
-                  {project.description}
-                </Text>
-
-                {/* Skills Chips */}
-                <View style={styles.cardSkillsRow}>
-                  {shownSkills.map((skill, idx) => (
-                    <View
-                      key={idx}
-                      style={[
-                        styles.skillChip,
-                        { backgroundColor: getSkillColor(project.techStack[idx]) },
-                      ]}
-                    >
-                      <Text style={styles.skillChipText}>{skill}</Text>
-                    </View>
-                  ))}
-                  {extraCount > 0 && (
-                    <View style={styles.skillChipMore}>
-                      <Text style={styles.skillChipMoreText}>+{extraCount}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Team Size Bar */}
-                <View style={styles.teamSizeRow}>
-                  <Text style={styles.teamSizeText}>
-                    👥 {project.membersCount || project.members?.length || 1}/{project.maxMembers || 4} Members
-                  </Text>
-                  <View style={styles.teamSizeBarBg}>
-                    <View
-                      style={[
-                        styles.teamSizeBarFill,
-                        {
-                          width: `${Math.min(100, ((project.membersCount || project.members?.length || 1) / (project.maxMembers || 4)) * 100)}%`,
-                        },
-                      ]}
-                    />
-                  </View>
-                </View>
-
-                {/* Roles Wanted */}
-                {project.wantedRoles && project.wantedRoles.length > 0 && (
-                  <View style={styles.rolesPreview}>
-                    <Text style={styles.rolesPreviewLabel}>LOOKING FOR:</Text>
-                    <Text style={styles.rolesPreviewText} numberOfLines={1}>
-                      {project.wantedRoles.slice(0, 3).join(' • ')}
-                      {project.wantedRoles.length > 3 ? ` +${project.wantedRoles.length - 3}` : ''}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Action Buttons */}
-                <View style={styles.cardActions}>
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => handleViewProject(project)}
-                    style={[styles.actionBtn, styles.actionBtnView, BRUTAL_SHADOWS.xs]}
-                  >
-                    <Text style={styles.actionBtnText}>👁️ VIEW</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    onPress={() => handleEditProject(project)}
-                    style={[styles.actionBtn, styles.actionBtnEdit, BRUTAL_SHADOWS.xs]}
-                  >
-                    <Text style={styles.actionBtnText}>✏️ EDIT</Text>
-                  </TouchableOpacity>
-
-                  {!isClosed ? (
-                    <>
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => handleCloseProject(project.id)}
-                        style={[styles.actionBtn, styles.actionBtnClose, BRUTAL_SHADOWS.xs]}
-                      >
-                        <Text style={styles.actionBtnCloseText}>🔒 CLOSE</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => handleFindMembers(project)}
-                        style={[styles.actionBtn, styles.actionBtnFind, BRUTAL_SHADOWS.xs]}
-                      >
-                        <Text style={styles.actionBtnFindText}>🎯 FIND</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <View style={[styles.actionBtn, styles.actionBtnDisabled]}>
-                      <Text style={styles.actionBtnDisabledText}>CLOSED</Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            );
-          })
+          projects.map((project) => (
+            <ProjectCard
+              key={project.id}
+              project={project}
+              isActiveForDiscovery={project.id === activeProjectId}
+              onView={handleViewProject}
+              onEdit={handleEditProject}
+              onClose={handleCloseProject}
+              onFindMembers={handleFindMembers}
+            />
+          ))
         )}
       </ScrollView>
     </View>
@@ -418,22 +306,28 @@ export default function ProjectsScreen({
     const isSelectedForDiscovery = proj?.id === activeProjectId;
     const isClosed = proj?.status === 'CLOSED';
     const displaySkills = getDisplaySkills(proj?.techStack);
+    const currentMembers =
+      proj?.membersCount ||
+      (Array.isArray(proj?.members) ? proj.members.length : 1);
+    const maxMembers = proj?.maxMembers || proj?.teamSize?.max || 4;
+    const statusInfo = getStatusStyle(proj?.status, currentMembers, maxMembers);
 
     return (
       <View style={styles.container}>
         {/* Header */}
-        <View style={styles.headerBar}>
+        <View style={styles.detailHeaderBar}>
           <TouchableOpacity
             activeOpacity={0.75}
             onPress={() => setViewMode('list')}
-            style={styles.headerIconBtn}
+            style={styles.detailHeaderIconBtn}
           >
-            <Text style={styles.headerIconText}>←</Text>
+            <Text style={styles.headerBackArrow}>←</Text>
           </TouchableOpacity>
 
           <View style={[styles.headerProjectBadge, BRUTAL_SHADOWS.xs]}>
+            <DoodleCode symbol="</>" bgColor={COLORS.yellowHighlight} color={COLORS.ink} style={styles.badgeCodeTag} />
             <Text style={styles.headerProjectBadgeText} numberOfLines={1}>
-              {proj?.icon || '⚡'} {proj?.title || 'Project'}
+              {proj?.title || 'Project'}
             </Text>
           </View>
 
@@ -442,9 +336,9 @@ export default function ProjectsScreen({
               activeOpacity={0.75}
               onPress={() => {
                 setIsBookmarked(!isBookmarked);
-                showToast(isBookmarked ? 'REMOVED BOOKMARK' : `BOOKMARKED ${proj?.title} ★`);
+                showToast(isBookmarked ? 'REMOVED BOOKMARK' : `BOOKMARKED ${proj?.title}`);
               }}
-              style={styles.headerIconBtn}
+              style={styles.detailHeaderIconBtn}
             >
               <Image
                 source={require('../assets/bookmark.png')}
@@ -459,9 +353,9 @@ export default function ProjectsScreen({
             <TouchableOpacity
               activeOpacity={0.75}
               onPress={() => handleEditProject(proj)}
-              style={styles.headerIconBtn}
+              style={styles.detailHeaderIconBtn}
             >
-              <Text style={styles.headerIconText}>✏️</Text>
+              <Text style={styles.editShortcutText}>EDIT</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -487,13 +381,13 @@ export default function ProjectsScreen({
                   loadProjects();
                 }
               }}
-              tintColor="#FFE600"
-              colors={['#FFE600', '#00E5FF']}
+              tintColor={COLORS.yellow}
+              colors={[COLORS.yellow, COLORS.blue]}
             />
           }
         >
           {/* Banner */}
-          <View style={styles.bannerContainer}>
+          <View style={[styles.bannerCard, BRUTAL_SHADOWS.card]}>
             {proj?.title === 'StudySync' ? (
               <Image
                 source={require('../assets/studysync_banner_clean.png')}
@@ -509,31 +403,27 @@ export default function ProjectsScreen({
               />
             ) : (
               <View style={styles.customBannerWrap}>
-                <Text style={styles.customBannerIcon}>{proj?.icon || '🚀'}</Text>
+                <DoodleCode symbol={proj?.icon || '</>'} bgColor={COLORS.yellowHighlight} color={COLORS.ink} style={styles.bannerCodeBadge} />
                 <Text style={styles.customBannerTitle}>{proj?.title}</Text>
-                <Text style={styles.customBannerCategory}>{proj?.category || 'Dev Project'}</Text>
+                <Text style={styles.customBannerCategory}>{proj?.category || 'Dev Venture'}</Text>
               </View>
             )}
 
             {/* Status overlay badge */}
             <View style={styles.bannerStatusOverlay}>
-              {(() => {
-                const currentMembers = proj?.membersCount || (Array.isArray(proj?.members) ? proj.members.length : 1);
-                const maxMembers = proj?.maxMembers || proj?.teamSize?.max || 4;
-                const si = getStatusStyle(proj?.status, currentMembers, maxMembers);
-                return (
-                  <View style={[styles.bannerStatusBadge, { backgroundColor: si.bg }]}>
-                    <Text style={[styles.bannerStatusText, { color: si.color }]}>{si.label}</Text>
-                  </View>
-                );
-              })()}
+              <View style={[styles.statusBadgeOverlay, { backgroundColor: statusInfo.bg }, BRUTAL_SHADOWS.xs]}>
+                <Text style={[styles.statusBadgeOverlayText, { color: statusInfo.color }]}>
+                  {statusInfo.label}
+                </Text>
+              </View>
             </View>
           </View>
 
-          {/* Active Discovery Badge */}
+          {/* Active Discovery Badge / CTA */}
           {!isClosed && isSelectedForDiscovery && (
-            <View style={styles.activeDiscoveryNotice}>
-              <Text style={styles.activeDiscoveryNoticeText}>🎯 CURRENTLY ACTIVE FOR DEVELOPER DISCOVERY</Text>
+            <View style={[styles.activeDiscoveryNotice, BRUTAL_SHADOWS.xs]}>
+              <DoodleStar size={14} color={COLORS.ink} style={{ marginRight: 6 }} />
+              <Text style={styles.activeDiscoveryNoticeText}>CURRENTLY ACTIVE FOR DEVELOPER DISCOVERY</Text>
             </View>
           )}
           {!isClosed && !isSelectedForDiscovery && (
@@ -541,82 +431,116 @@ export default function ProjectsScreen({
               activeOpacity={0.8}
               onPress={() => {
                 setActiveProjectId(proj.id);
-                showToast(`ACTIVATED ${proj.title} FOR DISCOVERY 🎯`);
+                showToast(`ACTIVATED ${proj.title} FOR DISCOVERY`);
                 if (onSelectForDiscovery) onSelectForDiscovery();
               }}
-              style={[styles.activateDiscoveryBtn, BRUTAL_SHADOWS.xs]}
+              style={[styles.activateDiscoveryBtn, BRUTAL_SHADOWS.button]}
             >
-              <Text style={styles.activateDiscoveryBtnText}>🎯 SELECT FOR DISCOVERY DECK →</Text>
+              <Text style={styles.activateDiscoveryBtnText}>SELECT FOR DISCOVERY DECK →</Text>
             </TouchableOpacity>
           )}
 
-          {/* Skills Tags */}
-          <View style={styles.tagsRow}>
-            {displaySkills.map((skill, i) => (
-              <View key={i} style={[styles.blueTag, { backgroundColor: getSkillColor(proj?.techStack[i]) }]}>
-                <Text style={styles.blueTagText}>{skill}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Meta Info */}
+          {/* Meta Stats Row */}
           <View style={styles.projectStatsRow}>
-            <View style={styles.metaStatPill}>
-              <Text style={styles.metaStatPillText}>📁 {proj?.category || 'Dev Venture'}</Text>
+            <View style={[styles.metaStatPill, BRUTAL_SHADOWS.xs]}>
+              <Text style={styles.metaStatPillLabel}>CATEGORY</Text>
+              <Text style={styles.metaStatPillValue}>{proj?.category || 'Dev Venture'}</Text>
             </View>
-            <View style={styles.metaStatPill}>
-              <Text style={styles.metaStatPillText}>⏱️ {proj?.duration || 'Ongoing'}</Text>
+            <View style={[styles.metaStatPill, BRUTAL_SHADOWS.xs]}>
+              <Text style={styles.metaStatPillLabel}>DURATION</Text>
+              <Text style={styles.metaStatPillValue}>{proj?.duration || 'Ongoing'}</Text>
             </View>
-            <View style={styles.metaStatPill}>
-              <Text style={styles.metaStatPillText}>
-                👥 {proj?.membersCount || (proj?.members ? proj.members.length : 2)}/{proj?.maxMembers || 4} Members
+            <View style={[styles.metaStatPill, BRUTAL_SHADOWS.xs]}>
+              <Text style={styles.metaStatPillLabel}>TEAM SIZE</Text>
+              <Text style={styles.metaStatPillValue}>
+                {currentMembers}/{maxMembers} Devs
               </Text>
             </View>
           </View>
 
+          {/* Skills Section */}
+          <View style={styles.detailSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>REQUIRED TECH STACK</Text>
+              <DoodleStar size={12} color={COLORS.yellow} />
+            </View>
+            <View style={styles.tagsRow}>
+              {displaySkills.map((skill, i) => {
+                const colorTheme = SKILL_COLORS[i % SKILL_COLORS.length];
+                return (
+                  <View key={i} style={[styles.skillTag, { backgroundColor: colorTheme.bg }]}>
+                    <Text style={styles.skillTagText}>{skill}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
           {/* Description */}
-          <Text style={styles.descriptionText}>
-            {proj?.description || 'Real-time study rooms for developers to code together, share goals, and stay accountable.'}
-          </Text>
+          <View style={styles.detailSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>PROJECT PITCH</Text>
+              <DoodleUnderline width={60} color={COLORS.yellowHighlight} height={2} />
+            </View>
+            <Text style={styles.descriptionText}>
+              {proj?.description || 'Real-time study rooms for developers to code together, share goals, and stay accountable.'}
+            </Text>
+          </View>
 
           {/* Looking For Roles */}
-          <Text style={styles.sectionHeader}>LOOKING FOR</Text>
-          <View style={styles.lookingForGrid}>
-            {proj?.wantedRoles && proj.wantedRoles.length > 0 ? (
-              proj.wantedRoles.map((role, i) => (
-                <View key={i} style={styles.roleTag}>
-                  <Text style={styles.roleTagText}>{role}</Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.emptyFieldText}>No roles specified</Text>
-            )}
+          <View style={styles.detailSection}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionHeader}>ROLES WANTED</Text>
+              <DoodleArrow direction="right" size={14} color={COLORS.inkMuted} />
+            </View>
+            <View style={styles.rolesGrid}>
+              {proj?.wantedRoles && proj.wantedRoles.length > 0 ? (
+                proj.wantedRoles.map((role, i) => (
+                  <View key={i} style={[styles.roleTagCard, BRUTAL_SHADOWS.xs]}>
+                    <View style={styles.roleTagDot} />
+                    <Text style={styles.roleTagCardText}>{role}</Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.emptyFieldText}>No roles specified</Text>
+              )}
+            </View>
           </View>
 
           {/* Interests */}
           {proj?.interests && proj.interests.length > 0 && (
-            <>
-              <Text style={styles.sectionHeader}>INTERESTS</Text>
-              <View style={styles.lookingForGrid}>
+            <View style={styles.detailSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeader}>PROJECT INTERESTS</Text>
+              </View>
+              <View style={styles.interestsRow}>
                 {proj.interests.map((interest, i) => (
                   <View key={i} style={styles.interestTag}>
                     <Text style={styles.interestTagText}>{interest}</Text>
                   </View>
                 ))}
               </View>
-            </>
+            </View>
           )}
 
           {/* Current Squad */}
           {proj?.members && proj.members.length > 0 && (
-            <View style={styles.squadSection}>
-              <Text style={styles.sectionHeader}>CURRENT SQUAD ({proj.members.length})</Text>
+            <View style={styles.detailSection}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionHeader}>CURRENT SQUAD ({proj.members.length})</Text>
+              </View>
               <View style={styles.squadRow}>
                 {proj.members.map((member, i) => (
-                  <View key={member.id || i} style={styles.squadMemberPill}>
-                    {member.avatar ? (
-                      <Image source={{ uri: member.avatar }} style={styles.squadAvatar} />
-                    ) : null}
+                  <View key={member.id || i} style={[styles.squadMemberPill, BRUTAL_SHADOWS.xs]}>
+                    <View style={styles.squadAvatarWrap}>
+                      {member.avatar ? (
+                        <Image source={{ uri: member.avatar }} style={styles.squadAvatar} />
+                      ) : (
+                        <Text style={styles.squadAvatarInitial}>
+                          {(member.name || 'D').charAt(0).toUpperCase()}
+                        </Text>
+                      )}
+                    </View>
                     <Text style={styles.squadMemberName}>{member.name}</Text>
                   </View>
                 ))}
@@ -631,7 +555,7 @@ export default function ProjectsScreen({
               onPress={() => handleEditProject(proj)}
               style={[styles.detailActionBtn, styles.detailActionEdit, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.detailActionBtnText}>✏️ EDIT PROJECT</Text>
+              <Text style={styles.detailActionBtnText}>EDIT PROJECT</Text>
             </TouchableOpacity>
 
             {!isClosed ? (
@@ -640,11 +564,11 @@ export default function ProjectsScreen({
                 onPress={() => handleCloseProject(proj.id)}
                 style={[styles.detailActionBtn, styles.detailActionClose, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.detailActionCloseText}>🔒 CLOSE PROJECT</Text>
+                <Text style={styles.detailActionCloseText}>CLOSE PROJECT</Text>
               </TouchableOpacity>
             ) : (
               <View style={[styles.detailActionBtn, styles.detailActionClosed]}>
-                <Text style={styles.detailActionClosedText}>🔒 PROJECT CLOSED</Text>
+                <Text style={styles.detailActionClosedText}>PROJECT CLOSED</Text>
               </View>
             )}
           </View>
@@ -656,13 +580,9 @@ export default function ProjectsScreen({
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setInterestedModalVisible(true)}
-              style={styles.interestedImageBtn}
+              style={[styles.interestedBtn, BRUTAL_SHADOWS.button]}
             >
-              <Image
-                source={require('../assets/im_interested_btn.png')}
-                style={[styles.interestedBtnImage, { backgroundColor: 'transparent' }]}
-                resizeMode="contain"
-              />
+              <Text style={styles.interestedBtnText}>I'M INTERESTED IN THIS PROJECT</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -705,8 +625,8 @@ export default function ProjectsScreen({
         onRequestClose={() => setCloseConfirmVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.confirmCard, BRUTAL_SHADOWS.md]}>
-            <ComicBadge text="CLOSE PROJECT? 🔒" color="#FCA5A5" textColor="#000" size="md" />
+          <View style={[styles.confirmCard, BRUTAL_SHADOWS.modal]}>
+            <ComicBadge text="CLOSE PROJECT?" color={COLORS.pillCoral} textColor="#000" size="md" />
             <Text style={styles.confirmTitle}>Are you sure?</Text>
             <Text style={styles.confirmSubtitle}>
               Closing this project will stop new member recruitment. The project will remain saved and you can still view and edit its details.
@@ -727,7 +647,7 @@ export default function ProjectsScreen({
                 disabled={isClosing}
                 style={[styles.confirmCloseBtn, BRUTAL_SHADOWS.xs, isClosing && { opacity: 0.6 }]}
               >
-                <Text style={styles.confirmCloseText}>{isClosing ? 'CLOSING... ⏳' : 'CLOSE IT'}</Text>
+                <Text style={styles.confirmCloseText}>{isClosing ? 'CLOSING...' : 'CLOSE IT'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -742,8 +662,8 @@ export default function ProjectsScreen({
         onRequestClose={() => setInterestedModalVisible(false)}
       >
         <View style={styles.modalBackdrop}>
-          <View style={[styles.confirmCard, BRUTAL_SHADOWS.md]}>
-            <ComicBadge text="APPLICATION FILED! 🚀" color="#FCD34D" textColor="#000" rotate="-3deg" size="md" />
+          <View style={[styles.confirmCard, BRUTAL_SHADOWS.modal]}>
+            <ComicBadge text="APPLICATION FILED!" color={COLORS.yellow} textColor="#000" rotate="-3deg" size="md" />
             <Text style={styles.confirmTitle}>{proj?.title} Squad</Text>
             <Text style={styles.confirmSubtitle}>
               You signaled interest to join {proj?.title}! The squad leads have been notified and you will receive a direct invitation response in Matches.
@@ -751,9 +671,9 @@ export default function ProjectsScreen({
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={() => setInterestedModalVisible(false)}
-              style={[styles.confirmCloseBtn, { backgroundColor: '#FFCC00' }, BRUTAL_SHADOWS.xs]}
+              style={[styles.confirmAwesomeBtn, BRUTAL_SHADOWS.button]}
             >
-              <Text style={styles.confirmCloseText}>AWESOME!</Text>
+              <Text style={styles.confirmAwesomeText}>AWESOME!</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -775,41 +695,56 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  headerBackBtn: {
+    width: 34,
+    height: 34,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: 17,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerBackArrow: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  listTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    position: 'relative',
   },
   listTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: 1,
+    color: COLORS.ink,
+    letterSpacing: 0.8,
+  },
+  titleStar: {
+    position: 'absolute',
+    top: -6,
+    right: -14,
   },
   newProjectBtn: {
-    backgroundColor: '#4ADE80',
-    borderWidth: 2.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
     paddingHorizontal: 14,
     paddingVertical: 6,
   },
   newProjectBtnText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000',
-  },
-  headerIconBtn: {
-    padding: 4,
-  },
-  headerIconText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#000',
-  },
-  headerBookmarkImg: {
-    width: 22,
-    height: 22,
-  },
-  headerBookmarkInactive: {
-    opacity: 0.45,
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
 
   // ─── TOAST ───────────────────────────────────────────────
@@ -818,17 +753,20 @@ const styles = StyleSheet.create({
     top: 55,
     alignSelf: 'center',
     zIndex: 999,
-    backgroundColor: '#FCD34D',
+    backgroundColor: COLORS.yellow,
     borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
     paddingHorizontal: 16,
     paddingVertical: 6,
   },
   toastText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000',
+    color: COLORS.ink,
   },
 
   // ─── SCROLL ──────────────────────────────────────────────
@@ -838,561 +776,489 @@ const styles = StyleSheet.create({
   listScrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 24,
+    paddingTop: 8,
   },
   detailScrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 110,
+    paddingTop: 8,
   },
 
   // ─── EMPTY STATE ─────────────────────────────────────────
-  emptyState: {
+  emptyCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 26,
+    padding: 28,
     alignItems: 'center',
-    paddingTop: 60,
-    paddingHorizontal: 30,
-  },
-  emptyIcon: {
-    fontSize: 56,
-    marginBottom: 16,
+    marginTop: 36,
+    marginBottom: 36,
   },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#000',
-    marginBottom: 8,
+    color: COLORS.ink,
+    marginBottom: 6,
+    letterSpacing: 0.3,
   },
   emptySubtitle: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#666',
+    fontWeight: '700',
+    color: COLORS.textMuted,
     textAlign: 'center',
+    marginBottom: 16,
     lineHeight: 18,
-    marginBottom: 24,
   },
   emptyCreateBtn: {
-    height: 48,
-    paddingHorizontal: 28,
-    backgroundColor: '#FFCC00',
+    backgroundColor: COLORS.yellow,
     borderWidth: 2.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
   },
   emptyCreateBtnText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#000',
-  },
-
-  // ═══ PROJECT CARD (List Mode) ════════════════════════════
-  projectCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 3,
-    borderColor: '#000',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 16,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  cardTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 10,
-  },
-  cardIcon: {
-    fontSize: 30,
-  },
-  cardTitleGroup: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#000',
-  },
-  cardCategory: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#666',
-    marginTop: 1,
-  },
-  statusBadge: {
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  statusBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
-  activeIndicator: {
-    backgroundColor: '#FEF9C3',
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: 8,
-    paddingVertical: 4,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  activeIndicatorText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#854D0E',
-    letterSpacing: 0.5,
-  },
-  cardDescription: {
-    fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 17,
-    color: '#333',
-    marginBottom: 10,
-  },
 
-  // Skills Chips
-  cardSkillsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 5,
-    marginBottom: 10,
-  },
-  skillChip: {
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  skillChipText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#000',
-  },
-  skillChipMore: {
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: '#F3F4F6',
-  },
-  skillChipMoreText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#666',
-  },
-
-  // Team Size
-  teamSizeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 8,
-  },
-  teamSizeText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000',
-    minWidth: 100,
-  },
-  teamSizeBarBg: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: '#000',
-    overflow: 'hidden',
-  },
-  teamSizeBarFill: {
-    height: '100%',
-    backgroundColor: '#4ADE80',
-    borderRadius: 3,
-  },
-
-  // Roles Preview
-  rolesPreview: {
-    marginBottom: 10,
-  },
-  rolesPreviewLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#666',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  rolesPreviewText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#000',
-  },
-
-  // Action Buttons
-  cardActions: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 4,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 36,
-    borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionBtnView: {
-    backgroundColor: '#E0F2FE',
-  },
-  actionBtnEdit: {
-    backgroundColor: '#FEF9C3',
-  },
-  actionBtnClose: {
-    backgroundColor: '#FEE2E2',
-  },
-  actionBtnFind: {
-    backgroundColor: '#4ADE80',
-  },
-  actionBtnText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000',
-  },
-  actionBtnCloseText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#B91C1C',
-  },
-  actionBtnFindText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000',
-  },
-  actionBtnDisabled: {
-    backgroundColor: '#E5E7EB',
-    borderColor: '#9CA3AF',
-  },
-  actionBtnDisabledText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#6B7280',
-  },
-
-  // ═══ DETAIL VIEW ═════════════════════════════════════════
-  headerBar: {
+  // ─── DETAIL VIEW HEADER ──────────────────────────────────
+  detailHeaderBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 8,
+    paddingBottom: 6,
+  },
+  detailHeaderIconBtn: {
+    width: 34,
+    height: 34,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: 17,
+    backgroundColor: COLORS.white,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerProjectBadge: {
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     maxWidth: 180,
+    gap: 6,
+  },
+  badgeCodeTag: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
   },
   headerProjectBadgeText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000',
+    color: COLORS.ink,
   },
   headerRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 8,
+  },
+  headerBookmarkImg: {
+    width: 18,
+    height: 18,
+  },
+  headerBookmarkInactive: {
+    opacity: 0.45,
+  },
+  editShortcutText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
 
-  // Banner
-  bannerContainer: {
+  // ─── BANNER CARD ─────────────────────────────────────────
+  bannerCard: {
     width: '100%',
-    height: 340,
-    borderRadius: 18,
+    height: 190,
     borderWidth: 2.5,
-    borderColor: '#000',
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 24,
     overflow: 'hidden',
-    backgroundColor: '#FAF6EB',
+    backgroundColor: COLORS.creamDark,
     marginBottom: 14,
+    position: 'relative',
   },
   bannerImage: {
     width: '100%',
     height: '100%',
   },
   customBannerWrap: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#E0F2FE',
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
   },
-  customBannerIcon: {
-    fontSize: 60,
-    marginBottom: 10,
+  bannerCodeBadge: {
+    marginBottom: 8,
   },
   customBannerTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: '900',
-    color: '#000',
-    textAlign: 'center',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
   customBannerCategory: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#2563EB',
-    marginTop: 6,
+    color: COLORS.textMuted,
+    marginTop: 4,
   },
   bannerStatusOverlay: {
     position: 'absolute',
     top: 12,
     right: 12,
   },
-  bannerStatusBadge: {
-    borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
+  statusBadgeOverlay: {
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  bannerStatusText: {
+  statusBadgeOverlayText: {
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.5,
   },
 
-  // Detail — Discovery
+  // ─── ACTIVE DISCOVERY NOTICE ─────────────────────────────
   activeDiscoveryNotice: {
-    backgroundColor: '#FEF9C3',
-    borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: 12,
-    paddingVertical: 6,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: 14,
   },
   activeDiscoveryNoticeText: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '900',
-    color: '#854D0E',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
   activateDiscoveryBtn: {
-    backgroundColor: '#FFCC00',
-    borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: 12,
-    paddingVertical: 8,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    paddingVertical: 10,
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   activateDiscoveryBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
-    color: '#000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
 
-  // Detail — Tags
+  // ─── META STATS ROW ──────────────────────────────────────
+  projectStatsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+  },
+  metaStatPill: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 14,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+  },
+  metaStatPillLabel: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  metaStatPillValue: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+
+  // ─── DETAIL SECTIONS ─────────────────────────────────────
+  detailSection: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    padding: 14,
+    marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionHeader: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
   tagsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
-    marginBottom: 14,
   },
-  blueTag: {
+  skillTag: {
     borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 12,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 11,
+    paddingHorizontal: 9,
     paddingVertical: 4,
   },
-  blueTagText: {
+  skillTagText: {
     fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  descriptionText: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#000',
+    color: COLORS.textSecondary,
+    lineHeight: 20,
   },
 
-  // Detail — Meta Stats
-  projectStatsRow: {
+  // ─── ROLES GRID ──────────────────────────────────────────
+  rolesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
   },
-  metaStatPill: {
-    backgroundColor: '#FAF6EB',
+  roleTagCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.creamLight,
     borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
-  metaStatPillText: {
+  roleTagDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.coral,
+    marginRight: 6,
+  },
+  roleTagCardText: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#000',
-  },
-
-  // Detail — Description
-  descriptionText: {
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
-    color: '#000',
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    fontSize: 13,
     fontWeight: '900',
-    color: '#000',
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  lookingForGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  roleTag: {
-    backgroundColor: '#E0F2FE',
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  roleTagText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#000',
-  },
-  interestTag: {
-    backgroundColor: '#E9D5FF',
-    borderWidth: 1.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-  },
-  interestTagText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#000',
+    color: COLORS.ink,
   },
   emptyFieldText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#999',
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
 
-  // Detail — Squad
-  squadSection: {
-    marginTop: 8,
-    marginBottom: 16,
+  // ─── INTERESTS ───────────────────────────────────────────
+  interestsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
   },
+  interestTag: {
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  interestTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+
+  // ─── SQUAD ROW ───────────────────────────────────────────
   squadRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
   },
   squadMemberPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 10,
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 14,
+    paddingHorizontal: 8,
     paddingVertical: 4,
+    gap: 6,
   },
-  squadAvatar: {
+  squadAvatarWrap: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#000',
+    borderColor: COLORS.ink,
+    backgroundColor: COLORS.yellowHighlight,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  squadAvatar: {
+    width: '100%',
+    height: '100%',
+  },
+  squadAvatarInitial: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
   squadMemberName: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#000',
+    fontWeight: '900',
+    color: COLORS.ink,
   },
 
-  // Detail — Action Row
+  // ─── DETAIL ACTIONS ROW ──────────────────────────────────
   detailActionRow: {
     flexDirection: 'row',
     gap: 10,
-    marginTop: 8,
-    marginBottom: 20,
+    marginTop: 6,
   },
   detailActionBtn: {
     flex: 1,
-    height: 44,
-    borderWidth: 2.5,
-    borderColor: '#000',
-    borderRadius: 14,
-    justifyContent: 'center',
+    height: 42,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   detailActionEdit: {
-    backgroundColor: '#FEF9C3',
-  },
-  detailActionClose: {
-    backgroundColor: '#FEE2E2',
-  },
-  detailActionClosed: {
-    backgroundColor: '#E5E7EB',
-    borderColor: '#9CA3AF',
+    backgroundColor: COLORS.white,
   },
   detailActionBtnText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  detailActionClose: {
+    backgroundColor: COLORS.pillCoral,
   },
   detailActionCloseText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#B91C1C',
+    color: COLORS.coral,
+    letterSpacing: 0.5,
+  },
+  detailActionClosed: {
+    backgroundColor: COLORS.creamDark,
+    borderColor: COLORS.borderMuted,
   },
   detailActionClosedText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#6B7280',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
   },
 
-  // Floating CTA
+  // ─── FLOATING CTA ────────────────────────────────────────
   bottomCtaContainer: {
     position: 'absolute',
-    bottom: 12,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 99,
+    bottom: 20,
+    left: 16,
+    right: 16,
   },
-  interestedImageBtn: {
-    width: '100%',
+  interestedBtn: {
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 14,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 20,
+    height: 48,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  interestedBtnImage: {
-    width: 320,
-    height: 70,
+  interestedBtnText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
 
-  // ─── MODALS ──────────────────────────────────────────────
+  // ─── MODAL STYLES ────────────────────────────────────────
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.72)',
@@ -1402,68 +1268,91 @@ const styles = StyleSheet.create({
   },
   confirmCard: {
     width: '100%',
-    maxWidth: 380,
-    backgroundColor: '#FAF6EB',
-    borderRadius: 24,
-    borderWidth: 3.5,
-    borderColor: '#000',
-    padding: 24,
+    maxWidth: 360,
+    backgroundColor: COLORS.cream,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 18,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 26,
+    borderWidth: 3,
+    borderColor: COLORS.ink,
+    padding: 22,
     alignItems: 'center',
   },
   confirmTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '900',
-    color: '#000',
-    marginTop: 14,
-    marginBottom: 8,
+    color: COLORS.ink,
+    marginTop: 10,
+    marginBottom: 6,
   },
   confirmSubtitle: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#444',
+    fontWeight: '700',
+    color: COLORS.textSecondary,
     textAlign: 'center',
+    marginBottom: 18,
     lineHeight: 18,
-    marginBottom: 20,
   },
   confirmBtnRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
+    width: '100%',
   },
   confirmCancelBtn: {
-    height: 42,
-    paddingHorizontal: 22,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    justifyContent: 'center',
+    flex: 1,
+    height: 40,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   confirmCancelText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000',
+    color: COLORS.ink,
   },
   confirmCloseBtn: {
-    height: 42,
-    paddingHorizontal: 22,
-    backgroundColor: '#FCA5A5',
-    borderWidth: 2.5,
-    borderColor: '#000',
-    borderRadius: BORDER_RADIUS.pill,
-    justifyContent: 'center',
+    flex: 1,
+    height: 40,
+    backgroundColor: COLORS.pillCoral,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   confirmCloseText: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000',
+    color: COLORS.coral,
   },
-  cardImageThumb: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#000000',
+  confirmAwesomeBtn: {
+    width: '100%',
+    height: 42,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  confirmAwesomeText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
 });

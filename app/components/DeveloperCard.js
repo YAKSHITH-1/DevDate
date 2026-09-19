@@ -1,8 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, Dimensions, TouchableOpacity } from 'react-native';
-import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
+import { DoodleStar, DoodleSparkle, DoodleUnderline, DoodleCode, DoodleArrow } from './DoodleElements';
 
 const { width } = Dimensions.get('window');
+
+// Rotating accent colors for skill chips — consistent system, not random
+const SKILL_COLORS = [
+  { bg: COLORS.pillBlue, border: COLORS.pillBlueBorder },
+  { bg: COLORS.pillYellow, border: COLORS.pillYellowBorder },
+  { bg: COLORS.pillGreen, border: COLORS.pillGreenBorder },
+  { bg: COLORS.purplePastel, border: COLORS.purple },
+  { bg: COLORS.pillCoral, border: COLORS.pillCoralBorder },
+  { bg: COLORS.orangePastel, border: COLORS.orange },
+];
 
 export default function DeveloperCard({ developer, onPress }) {
   if (!developer) return null;
@@ -18,12 +29,13 @@ export default function DeveloperCard({ developer, onPress }) {
 
   return (
     <CardWrapper {...wrapperProps} style={[styles.cardContainer, BRUTAL_SHADOWS.card]}>
-      {/* 1. TOP COMIC ILLUSTRATION */}
+      {/* 1. TOP IMAGE / AVATAR AREA */}
       <View style={styles.imageContainer}>
         {/* Match Percentage Sticker */}
         {developer.matchScore ? (
           <View style={styles.cardMatchBadge}>
-            <Text style={styles.cardMatchBadgeText}>⚡ {developer.matchScore}% MATCH</Text>
+            <DoodleSparkle size={10} color={COLORS.ink} style={{ marginRight: 4 }} />
+            <Text style={styles.cardMatchBadgeText}>{developer.matchScore}% MATCH</Text>
           </View>
         ) : null}
 
@@ -49,9 +61,16 @@ export default function DeveloperCard({ developer, onPress }) {
               />
             ) : (
               <View style={[styles.cardImage, styles.cardFallbackImage]}>
-                <Text style={styles.cardFallbackInitial}>
-                  {developer.name?.charAt(0)?.toUpperCase() || '👤'}
-                </Text>
+                {/* Doodle circle frame behind initial */}
+                <View style={styles.fallbackCircle}>
+                  <Text style={styles.cardFallbackInitial}>
+                    {developer.name?.charAt(0)?.toUpperCase() || 'D'}
+                  </Text>
+                </View>
+                {/* Corner doodle accent */}
+                <View style={styles.fallbackDoodleAccent}>
+                  <DoodleCode symbol="</>" color="rgba(24,24,27,0.12)" bgColor="transparent" />
+                </View>
               </View>
             )}
             {developer.sticker && (
@@ -60,13 +79,19 @@ export default function DeveloperCard({ developer, onPress }) {
               </View>
             )}
             <View style={styles.deckCounter}>
+              <DoodleStar size={8} color={COLORS.white} style={{ marginRight: 4 }} />
               <Text style={styles.deckCounterText}>TOP MATCH</Text>
             </View>
           </View>
         )}
+
+        {/* Decorative doodle sparkle on image corner */}
+        <View style={styles.imageDoodleAccent}>
+          <DoodleStar size={12} color={COLORS.yellow} />
+        </View>
       </View>
 
-      {/* 2. CARD CONTENT DETAILS (EXACT MATCH TO PHONE 2) */}
+      {/* 2. CARD BODY */}
       <View style={styles.cardBody}>
         {/* Name with Green Online Indicator Dot */}
         <View style={styles.nameRow}>
@@ -74,19 +99,40 @@ export default function DeveloperCard({ developer, onPress }) {
           <View style={styles.onlineDot} />
         </View>
 
-        {/* Developer Role */}
-        <Text style={styles.devRole}>{developer.role}</Text>
+        {/* Hand-drawn underline under name */}
+        <DoodleUnderline width={80} height={3} color={COLORS.yellow} style={{ marginBottom: 4 }} />
 
-        {/* Location with Pin */}
-        <Text style={styles.locationText}>📍 {developer.location}</Text>
+        {/* Developer Role with code tag prefix */}
+        <View style={styles.roleRow}>
+          <DoodleCode symbol="</>" color={COLORS.textMuted} bgColor="transparent" style={styles.roleCodeTag} />
+          <Text style={styles.devRole}>{developer.role}</Text>
+        </View>
 
-        {/* Tech Stack Pills (Light Blue with Crisp Border) */}
+        {/* Location */}
+        <View style={styles.locationRow}>
+          <DoodleArrow direction="right" size={12} color={COLORS.textLight} style={{ marginRight: 4 }} />
+          <Text style={styles.locationText}>{developer.location}</Text>
+        </View>
+
+        {/* Tech Stack Pills — Varied Pop Art accent colors */}
         <View style={styles.tagsRow}>
-          {developer.skills?.map((skill) => (
-            <View key={skill} style={styles.tagPill}>
-              <Text style={styles.tagPillText}>{skill}</Text>
-            </View>
-          ))}
+          {developer.skills?.map((skill, index) => {
+            const colorSet = SKILL_COLORS[index % SKILL_COLORS.length];
+            return (
+              <View
+                key={skill}
+                style={[
+                  styles.tagPill,
+                  {
+                    backgroundColor: colorSet.bg,
+                    borderColor: COLORS.borderBlack,
+                  },
+                ]}
+              >
+                <Text style={styles.tagPillText}>{skill}</Text>
+              </View>
+            );
+          })}
         </View>
 
         {/* Bio Text */}
@@ -100,10 +146,13 @@ export default function DeveloperCard({ developer, onPress }) {
 
 const styles = StyleSheet.create({
   cardContainer: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 20,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thick,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 16,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 24,
     overflow: 'hidden',
     width: '100%',
   },
@@ -111,9 +160,9 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 310,
     position: 'relative',
-    backgroundColor: '#FAF6EB',
-    borderBottomWidth: 2.5,
-    borderBottomColor: '#000000',
+    backgroundColor: COLORS.creamBg,
+    borderBottomWidth: BORDERS.thick,
+    borderBottomColor: COLORS.borderBlack,
   },
   cardImage: {
     width: '100%',
@@ -128,37 +177,55 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 14,
     left: 14,
-    backgroundColor: '#FDE047',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 4,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 6,
+    borderTopRightRadius: 3,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
     transform: [{ rotate: '-4deg' }],
+    ...BRUTAL_SHADOWS.xs,
   },
   customStickyText: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   deckCounter: {
     position: 'absolute',
     top: 14,
     right: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.ink,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 12,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   deckCounterText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
-    color: '#FFFFFF',
+    color: COLORS.white,
+    letterSpacing: 0.4,
+  },
+  imageDoodleAccent: {
+    position: 'absolute',
+    bottom: 8,
+    right: 10,
+    opacity: 0.6,
   },
   cardBody: {
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
   },
   nameRow: {
     flexDirection: 'row',
@@ -169,26 +236,42 @@ const styles = StyleSheet.create({
   devName: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.2,
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
   onlineDot: {
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: '#22C55E',
+    backgroundColor: COLORS.greenOnline,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderBlack,
+  },
+  roleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  roleCodeTag: {
+    marginRight: 6,
+    borderWidth: 1,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
   },
   devRole: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 4,
+    color: COLORS.textSecondary,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   locationText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#374151',
-    marginBottom: 12,
+    color: COLORS.textMuted,
   },
   tagsRow: {
     flexDirection: 'row',
@@ -197,55 +280,71 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tagPill: {
-    backgroundColor: '#E0F2FE',
     borderWidth: 1.5,
-    borderColor: '#000000',
     borderRadius: BORDER_RADIUS.pill,
-    paddingHorizontal: 11,
+    paddingHorizontal: 10,
     paddingVertical: 4,
   },
   tagPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#000000',
+    color: COLORS.ink,
   },
   bioText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.textSecondary,
     lineHeight: 18,
   },
   cardMatchBadge: {
     position: 'absolute',
     top: 12,
     right: 12,
-    backgroundColor: '#FDE047',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 7,
+    borderBottomRightRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    shadowColor: '#000000',
-    shadowOffset: { width: 2, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 0,
-    elevation: 4,
+    ...BRUTAL_SHADOWS.xs,
     zIndex: 10,
   },
   cardMatchBadgeText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
   cardFallbackImage: {
-    backgroundColor: '#FFE600',
+    backgroundColor: COLORS.creamBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
+  fallbackCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.thick,
+    borderColor: COLORS.borderBlack,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...BRUTAL_SHADOWS.sm,
+  },
   cardFallbackInitial: {
-    fontSize: 64,
+    fontSize: 48,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+  },
+  fallbackDoodleAccent: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    opacity: 0.3,
   },
 });

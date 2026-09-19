@@ -577,7 +577,7 @@ export function AppProvider({ children }) {
 
         addNotification({
           type: 'PROJECT',
-          title: 'Project Created! 🚀',
+          title: 'Project Created!',
           message: `"${normalized.title}" is now active for developer discovery.`,
         });
 
@@ -683,7 +683,7 @@ export function AppProvider({ children }) {
 
         addNotification({
           type: 'PROJECT',
-          title: 'Project Closed 🔒',
+          title: 'Project Closed',
           message: `"${normalized.title}" has been closed and is no longer recruiting.`,
         });
 
@@ -842,7 +842,7 @@ export function AppProvider({ children }) {
     // Add notification
     addNotification({
       type: 'INVITATION',
-      title: isSuper ? '★ Super Invite Sent! ★' : 'Invite Sent! ♥',
+      title: isSuper ? 'Super Invite Sent!' : 'Invite Sent!',
       message: `Invited ${dev.name} to join ${newInvitation.projectName}.`,
     });
   };
@@ -1045,7 +1045,7 @@ export function AppProvider({ children }) {
       // Add Notification
       addNotification({
         type: 'MATCH',
-        title: "It's a Match! 🎉",
+        title: "It's a Match!",
         message: `You and ${newMatch.developerName} are now connected on ${newMatch.projectName}!`,
       });
 
@@ -1489,7 +1489,7 @@ export function AppProvider({ children }) {
     const newN = {
       id: `notif-${Date.now()}`,
       type: type || 'NOTIFICATION',
-      title: title || 'Notification 🔔',
+      title: title || 'Notification',
       message: message || '',
       time: 'Just now',
       read: false,

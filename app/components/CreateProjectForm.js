@@ -7,12 +7,10 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  KeyboardAvoidingView,
   Platform,
-  ImageBackground,
   Image,
 } from 'react-native';
-import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
+import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from './ComicBadge';
 import {
   SKILL_CATEGORIES,
@@ -26,13 +24,27 @@ import {
   PROJECT_ICONS,
   getSkillPresentation,
 } from '../data/skillsDatabase';
+import {
+  DoodleStar,
+  DoodleSparkle,
+  DoodleCode,
+  DoodleArrow,
+  DoodleUnderline,
+  DoodleCheck,
+  DoodleCross,
+} from './DoodleElements';
 import { useApp } from '../context/AppContext';
 import { resolveSkillToId } from '../utils/api';
 
-/**
- * CreateProjectForm — High-Definition 3-Step Comic Wizard
- * Matches Step 1 (Scope), Step 2 (Stack & Architecture), and Step 3 (Co-Founder Matching)
- */
+const SKILL_THEMES = [
+  { bg: COLORS.pillBlue, border: COLORS.pillBlueBorder },
+  { bg: COLORS.pillYellow, border: COLORS.pillYellowBorder },
+  { bg: COLORS.pillGreen, border: COLORS.pillGreenBorder },
+  { bg: COLORS.purplePastel, border: COLORS.purple },
+  { bg: COLORS.pillCoral, border: COLORS.pillCoralBorder },
+  { bg: COLORS.orangePastel, border: COLORS.orange },
+];
+
 export default function CreateProjectForm({
   visible,
   onClose,
@@ -79,7 +91,7 @@ export default function CreateProjectForm({
       ? initialData.image
       : ''
   );
-  const [projectIcon, setProjectIcon] = useState(initialData?.icon || '🚀');
+  const [projectIcon, setProjectIcon] = useState(initialData?.icon || '</>');
   const [showIconPicker, setShowIconPicker] = useState(false);
 
   const { canonicalSkills = [] } = useApp ? useApp() : {};
@@ -123,7 +135,7 @@ export default function CreateProjectForm({
         setSelectedSkills([...new Set(resolved)]);
         setSelectedRoles(initialData.wantedRoles || initialData.requiredRoles || ['FULL STACK']);
         setSelectedInterests(initialData.interests || ['Web Platform']);
-        setProjectIcon(initialData.icon || (initialData.image && !initialData.image.startsWith('http') ? initialData.image : '🚀'));
+        setProjectIcon(initialData.icon || (initialData.image && !initialData.image.startsWith('http') ? initialData.image : '</>'));
         setProjectImage(initialData.image && (initialData.image.startsWith('http') || initialData.image.startsWith('data:image/')) ? initialData.image : '');
       } else {
         setTitle('DevDate');
@@ -136,7 +148,7 @@ export default function CreateProjectForm({
         setSelectedSkills([...new Set(resolved)]);
         setSelectedRoles(['FULL STACK', 'BACKEND DEV']);
         setSelectedInterests(['AI & Neural Nets', 'Web Platform', 'Developer Tools']);
-        setProjectIcon('🚀');
+        setProjectIcon('</>');
         setProjectImage('');
       }
       setSkillSearch('');
@@ -159,7 +171,7 @@ export default function CreateProjectForm({
           name: cs.name,
           categories: cs.categories || [],
           aliases: cs.aliases || [],
-          badge: pres?.badge || { text: cs.name.slice(0, 2).toUpperCase(), bg: '#3B82F6', color: '#FFF' },
+          badge: pres?.badge || { text: cs.name.slice(0, 2).toUpperCase(), bg: '#38BDF8', color: '#FFF' },
           subtitle: cs.categories?.[0]?.toUpperCase() || 'TECH',
         };
       });
@@ -179,7 +191,7 @@ export default function CreateProjectForm({
       );
     }
     if (activeCategoryTab === 'all') {
-      return allAvailableSkills.slice(0, 20);
+      return allAvailableSkills.slice(0, 24);
     }
     return allAvailableSkills
       .filter((s) =>
@@ -187,7 +199,7 @@ export default function CreateProjectForm({
           ? s.categories.some((c) => c.toLowerCase().includes(activeCategoryTab.toLowerCase()))
           : s.categoryId === activeCategoryTab
       )
-      .slice(0, 20);
+      .slice(0, 24);
   }, [skillSearch, activeCategoryTab, allAvailableSkills]);
 
   const toggleSkill = (skillId) => {
@@ -232,7 +244,7 @@ export default function CreateProjectForm({
   const [submitError, setSubmitError] = useState(null);
 
   const handleSubmit = async () => {
-    if (isSubmitting) return; // Prevent double submission
+    if (isSubmitting) return;
     setIsSubmitting(true);
     setSubmitError(null);
 
@@ -271,30 +283,28 @@ export default function CreateProjectForm({
     }
   };
 
-  // ─── Category Tabs for Step 2 ───────────────────────────────
   const categoryTabOptions = [
-    { id: 'all', label: 'All Technologies' },
-    { id: 'fullstack', label: 'Full Stack Development' },
+    { id: 'all', label: 'All Tech' },
+    { id: 'fullstack', label: 'Full Stack' },
     { id: 'frontend', label: 'Frontend' },
     { id: 'backend', label: 'Backend' },
     { id: 'mobile', label: 'Mobile' },
     { id: 'ai_ml', label: 'AI / ML' },
     { id: 'database', label: 'Database' },
-    { id: 'devops', label: 'DevOps / Cloud' },
+    { id: 'devops', label: 'DevOps' },
     { id: 'languages', label: 'Languages' },
     { id: 'blockchain', label: 'Blockchain' },
-    { id: 'design', label: 'UI / UX Design' },
+    { id: 'design', label: 'UI / UX' },
   ];
 
   // ─── TOP WIZARD HEADER ──────────────────────────────────────
   const renderTopHeader = () => {
-    let stepTitle = isEdit ? 'STEP 1: EDIT PROJECT SCOPE' : 'STEP 1: PROJECT SCOPE';
-    if (step === 2) stepTitle = isEdit ? 'STEP 2: EDIT TECH STACK' : 'STEP 2: STACK & ARCHITECTURE';
-    if (step === 3) stepTitle = isEdit ? 'STEP 3: EDIT TEAM REQUIREMENTS' : 'STEP 3: CO FOUNDER MATCHING';
+    let stepTitle = isEdit ? 'EDIT PROJECT SCOPE' : 'PROJECT SCOPE';
+    if (step === 2) stepTitle = isEdit ? 'EDIT TECH STACK' : 'STACK & ARCHITECTURE';
+    if (step === 3) stepTitle = isEdit ? 'EDIT TEAM' : 'CO-FOUNDER MATCHING';
 
     return (
       <View style={styles.topHeader}>
-        {/* Left: Back Button */}
         <TouchableOpacity
           activeOpacity={0.8}
           onPress={handleBack}
@@ -303,22 +313,19 @@ export default function CreateProjectForm({
           <Text style={styles.headerBackArrow}>←</Text>
         </TouchableOpacity>
 
-        {/* Center: Wizard Title & Subtitle */}
         <View style={styles.headerCenter}>
           <View style={styles.headerSubtitleRow}>
-            <Text style={styles.headerSubtitleDevDate}>DEVDATE :: WIZARD</Text>
-            <Text style={styles.headerSubtitleSlash}> / </Text>
-            <Text style={styles.headerSubtitleDrafting}>{isEdit ? '★ EDITING' : '★ DRAFTING'}</Text>
+            <Text style={styles.headerSubtitleDevDate}>DEVDATE WIZARD</Text>
+            <Text style={styles.headerSubtitleSlash}> // </Text>
+            <Text style={styles.headerSubtitleDrafting}>{isEdit ? 'EDITING' : 'DRAFTING'}</Text>
           </View>
           <Text style={styles.headerMainTitle} numberOfLines={1}>
-            {stepTitle}
+            STEP {step}: {stepTitle}
           </Text>
         </View>
 
-        {/* Right: Avatar Badge */}
-        <View style={[styles.headerAvatarBadge, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.headerAvatarIcon}>👤</Text>
-          <View style={styles.headerAvatarOnlineDot} />
+        <View style={[styles.headerModeBadge, BRUTAL_SHADOWS.xs]}>
+          <Text style={styles.headerModeBadgeText}>{isEdit ? 'EDIT' : 'NEW'}</Text>
         </View>
       </View>
     );
@@ -332,123 +339,73 @@ export default function CreateProjectForm({
         <View
           style={[
             styles.trackerCircle,
-            step === 1 && styles.trackerCircleStep1Active,
+            step === 1 && styles.trackerCircleActive,
             step > 1 && styles.trackerCircleDone,
           ]}
         >
           <Text
             style={[
               styles.trackerCircleText,
-              (step === 1 || step > 1) && styles.trackerCircleTextDone,
+              (step === 1 || step > 1) && styles.trackerCircleTextActive,
             ]}
           >
-            {step > 1 ? '✓' : '1'}
+            {step > 1 ? 'OK' : '1'}
           </Text>
         </View>
-        <View
-          style={[
-            styles.trackerLabelPill,
-            step === 1 && styles.trackerLabelPillStep1Active,
-            step > 1 && styles.trackerLabelPillDone,
-          ]}
-        >
-          <Text
-            style={[
-              styles.trackerLabelText,
-              step === 1 && styles.trackerLabelTextStep1Active,
-              step > 1 && styles.trackerLabelTextDone,
-            ]}
-          >
-            {step > 1 ? '1 DETAILS' : 'DETAILS'}
-          </Text>
-        </View>
+        <Text style={[styles.trackerLabel, step === 1 && styles.trackerLabelActive]}>
+          1. SCOPE
+        </Text>
       </View>
 
       {/* CONNECTOR 1-2 */}
-      <View
-        style={[
-          styles.trackerLine,
-          step >= 2 && styles.trackerLineDone,
-        ]}
-      />
+      <View style={[styles.trackerLine, step >= 2 && styles.trackerLineDone]} />
 
       {/* STEP 2 */}
       <View style={styles.trackerNode}>
         <View
           style={[
             styles.trackerCircle,
-            step === 2 && styles.trackerCircleStep2Active,
+            step === 2 && styles.trackerCircleActive,
             step > 2 && styles.trackerCircleDone,
           ]}
         >
           <Text
             style={[
               styles.trackerCircleText,
-              (step === 2 || step > 2) && styles.trackerCircleTextDone,
+              (step === 2 || step > 2) && styles.trackerCircleTextActive,
             ]}
           >
-            {step > 2 ? '✓' : '2'}
+            {step > 2 ? 'OK' : '2'}
           </Text>
         </View>
-        <View
-          style={[
-            styles.trackerLabelPill,
-            step === 2 && styles.trackerLabelPillStep2Active,
-            step > 2 && styles.trackerLabelPillDone,
-          ]}
-        >
-          <Text
-            style={[
-              styles.trackerLabelText,
-              step === 2 && styles.trackerLabelTextStep2Active,
-              step > 2 && styles.trackerLabelTextDone,
-            ]}
-          >
-            {step === 2 ? '2 SKILLS' : 'SKILLS'}
-          </Text>
-        </View>
+        <Text style={[styles.trackerLabel, step === 2 && styles.trackerLabelActive]}>
+          2. STACK
+        </Text>
       </View>
 
       {/* CONNECTOR 2-3 */}
-      <View
-        style={[
-          styles.trackerLine,
-          step === 3 && styles.trackerLineDone,
-        ]}
-      />
+      <View style={[styles.trackerLine, step === 3 && styles.trackerLineDone]} />
 
       {/* STEP 3 */}
       <View style={styles.trackerNode}>
         <View
           style={[
             styles.trackerCircle,
-            step === 3 && styles.trackerCircleStep3Active,
+            step === 3 && styles.trackerCircleActive,
           ]}
         >
           <Text
             style={[
               styles.trackerCircleText,
-              step === 3 && styles.trackerCircleTextStep3Active,
+              step === 3 && styles.trackerCircleTextActive,
             ]}
           >
             3
           </Text>
         </View>
-        <View
-          style={[
-            styles.trackerLabelPill,
-            step === 3 && styles.trackerLabelPillStep3Active,
-          ]}
-        >
-          <Text
-            style={[
-              styles.trackerLabelText,
-              step === 3 && styles.trackerLabelTextStep3Active,
-            ]}
-          >
-            {step === 3 ? '3 TEAM' : 'TEAM'}
-          </Text>
-        </View>
+        <Text style={[styles.trackerLabel, step === 3 && styles.trackerLabelActive]}>
+          3. TEAM
+        </Text>
       </View>
     </View>
   );
@@ -456,31 +413,32 @@ export default function CreateProjectForm({
   // ─── STEP 1: PROJECT SCOPE ──────────────────────────────────
   const renderStep1 = () => (
     <View style={styles.stepBody}>
-      {/* Top Tag & Comic Title */}
-      <View style={styles.scopeHeaderCard}>
-        <View style={[styles.stepSpecPill, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.stepSpecPillDot}>●</Text>
-          <Text style={styles.stepSpecPillText}>STEP 1 OF 3 • PROJECT SPEC</Text>
+      {/* Scope Header Card */}
+      <View style={[styles.stepIntroCard, BRUTAL_SHADOWS.card]}>
+        <View style={styles.stepIntroRow}>
+          <DoodleCode symbol="</>" bgColor={COLORS.yellow} color={COLORS.ink} style={styles.stepIntroBadge} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stepIntroTitle}>
+              {isEdit ? 'EDIT PROJECT SCOPE' : 'DEFINE YOUR PROJECT'}
+            </Text>
+            <Text style={styles.stepIntroSubtitle}>
+              Tell developers what you're building and set team expectations.
+            </Text>
+          </View>
         </View>
-
-        <Text style={styles.comicHeading}>{isEdit ? 'EDIT YOUR PROJECT' : 'CREATE YOUR PROJECT'}</Text>
-        <Text style={styles.comicSubheading}>TELL DEVELOPERS WHAT YOU'RE BUILDING.</Text>
       </View>
 
       {/* Field 1: Project Name */}
       <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.fieldCardHeader}>
-          <Text style={styles.fieldLabel}>PROJECT NAME <Text style={styles.redAsterisk}>*</Text></Text>
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>STRING</Text>
-          </View>
+        <View style={styles.fieldHeaderRow}>
+          <Text style={styles.fieldLabel}>PROJECT NAME *</Text>
         </View>
-        <View style={styles.inputPromptWrap}>
+        <View style={styles.inputWrapper}>
           <Text style={styles.promptPrefix}>&gt;_</Text>
           <TextInput
-            style={styles.terminalInput}
+            style={styles.textInput}
             placeholder="e.g. DevDate, StudySync"
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={COLORS.textMuted}
             value={title}
             onChangeText={setTitle}
           />
@@ -489,16 +447,14 @@ export default function CreateProjectForm({
 
       {/* Field 2: Project Description */}
       <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.fieldCardHeader}>
-          <Text style={styles.fieldLabel}>PROJECT DESCRIPTION <Text style={styles.redAsterisk}>*</Text></Text>
-          <View style={[styles.counterBadge, BRUTAL_SHADOWS.xs]}>
-            <Text style={styles.counterBadgeText}>{description.length} / 500</Text>
-          </View>
+        <View style={styles.fieldHeaderRow}>
+          <Text style={styles.fieldLabel}>PROJECT DESCRIPTION *</Text>
+          <Text style={styles.charCount}>{description.length} / 500</Text>
         </View>
         <TextInput
-          style={styles.textAreaInput}
-          placeholder="Describe your project, what you're building, and what problem it solves..."
-          placeholderTextColor="#94A3B8"
+          style={styles.textArea}
+          placeholder="Describe your project, core architecture, and what problem it solves..."
+          placeholderTextColor={COLORS.textMuted}
           value={description}
           onChangeText={(text) => {
             if (text.length <= 500) setDescription(text);
@@ -510,11 +466,8 @@ export default function CreateProjectForm({
 
       {/* Field 3: Category */}
       <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.fieldCardHeader}>
+        <View style={styles.fieldHeaderRow}>
           <Text style={styles.fieldLabel}>CATEGORY</Text>
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>ENUM</Text>
-          </View>
         </View>
         <TouchableOpacity
           activeOpacity={0.8}
@@ -556,11 +509,8 @@ export default function CreateProjectForm({
 
       {/* Field 4: Estimated Duration */}
       <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.fieldCardHeader}>
+        <View style={styles.fieldHeaderRow}>
           <Text style={styles.fieldLabel}>ESTIMATED DURATION</Text>
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeBadgeText}>TIMELINE</Text>
-          </View>
         </View>
         <TouchableOpacity
           activeOpacity={0.8}
@@ -568,7 +518,7 @@ export default function CreateProjectForm({
           style={styles.dropdownTrigger}
         >
           <Text style={styles.dropdownValueText}>{duration}</Text>
-          <Text style={styles.dropdownClockIcon}>🕒</Text>
+          <Text style={styles.dropdownChevron}>▾</Text>
         </TouchableOpacity>
 
         {showDurationPicker && (
@@ -602,72 +552,67 @@ export default function CreateProjectForm({
 
       {/* Field 5: Team Size */}
       <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.fieldCardHeader}>
-          <Text style={styles.fieldLabel}>TEAM SIZE</Text>
-          <View style={[styles.rangeBadge, BRUTAL_SHADOWS.xs]}>
-            <Text style={styles.rangeBadgeText}>RANGE (2-10)</Text>
-          </View>
+        <View style={styles.fieldHeaderRow}>
+          <Text style={styles.fieldLabel}>TEAM SIZE RANGE</Text>
+          <Text style={styles.fieldHint}>2-10 developers</Text>
         </View>
 
-        <View style={styles.stepperRow}>
-          {/* Min Devs */}
+        <View style={styles.steppersContainer}>
           <View style={styles.stepperCol}>
-            <Text style={styles.stepperSubLabel}>MIN DEVS</Text>
+            <Text style={styles.stepperLabel}>MIN MEMBERS</Text>
             <View style={styles.stepperBox}>
-              <Text style={styles.stepperNumber}>{minDevs}</Text>
-              <View style={styles.stepperArrows}>
+              <Text style={styles.stepperValue}>{minDevs}</Text>
+              <View style={styles.stepperButtons}>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
                     if (minDevs < maxDevs) setMinDevs(minDevs + 1);
                   }}
-                  style={styles.stepperArrowBtn}
+                  style={styles.stepperBtn}
                 >
-                  <Text style={styles.stepperArrowText}>▲</Text>
+                  <Text style={styles.stepperArrow}>▲</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
                     if (minDevs > 1) setMinDevs(minDevs - 1);
                   }}
-                  style={styles.stepperArrowBtn}
+                  style={styles.stepperBtn}
                 >
-                  <Text style={styles.stepperArrowText}>▼</Text>
+                  <Text style={styles.stepperArrow}>▼</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
 
-          {/* Max Devs */}
           <View style={styles.stepperCol}>
-            <Text style={styles.stepperSubLabel}>MAX DEVS</Text>
+            <Text style={styles.stepperLabel}>MAX MEMBERS</Text>
             <View style={styles.stepperBox}>
-              <Text style={styles.stepperNumber}>{maxDevs}</Text>
-              <View style={styles.stepperArrows}>
+              <Text style={styles.stepperValue}>{maxDevs}</Text>
+              <View style={styles.stepperButtons}>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
                     if (maxDevs < 10) setMaxDevs(maxDevs + 1);
                   }}
-                  style={styles.stepperArrowBtn}
+                  style={styles.stepperBtn}
                 >
-                  <Text style={styles.stepperArrowText}>▲</Text>
+                  <Text style={styles.stepperArrow}>▲</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => {
                     if (maxDevs > minDevs) setMaxDevs(maxDevs - 1);
                   }}
-                  style={styles.stepperArrowBtn}
+                  style={styles.stepperBtn}
                 >
-                  <Text style={styles.stepperArrowText}>▼</Text>
+                  <Text style={styles.stepperArrow}>▼</Text>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </View>
-
-        <Text style={styles.stepperNotice}>ⓘ Maximum cannot be smaller than minimum.</Text>
+        <Text style={styles.noteText}>NOTE: Maximum capacity cannot be smaller than minimum.</Text>
       </View>
 
       {/* Step 1 Bottom Button */}
@@ -676,12 +621,12 @@ export default function CreateProjectForm({
         onPress={handleNext}
         disabled={!canGoNext()}
         style={[
-          styles.continueFullBtn,
-          !canGoNext() && styles.continueBtnDisabled,
-          BRUTAL_SHADOWS.sm,
+          styles.nextStepBtn,
+          !canGoNext() && styles.nextStepBtnDisabled,
+          BRUTAL_SHADOWS.button,
         ]}
       >
-        <Text style={styles.continueBtnText}>CONTINUE ➔</Text>
+        <Text style={styles.nextStepBtnText}>NEXT: TECH STACK →</Text>
       </TouchableOpacity>
     </View>
   );
@@ -689,101 +634,45 @@ export default function CreateProjectForm({
   // ─── STEP 2: STACK & ARCHITECTURE ───────────────────────────
   const renderStep2 = () => (
     <View style={styles.stepBody}>
-      {/* Top Banner Row */}
-      <View style={styles.step2BannerRow}>
-        <View style={styles.step2DarkBanner}>
-          <Text style={styles.step2DarkBannerText}>STEP 2 OF 3 • REQUIRED TECH STACK</Text>
+      {/* Header Card */}
+      <View style={[styles.stepIntroCard, BRUTAL_SHADOWS.card]}>
+        <View style={styles.stepIntroRow}>
+          <DoodleStar size={20} color={COLORS.yellow} style={styles.stepIntroBadge} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stepIntroTitle}>REQUIRED TECH STACK</Text>
+            <Text style={styles.stepIntroSubtitle}>
+              Select the skills needed. Candidates are recommended based on stack compatibility.
+            </Text>
+          </View>
         </View>
-        <View style={styles.step2SkillsCountPill}>
-          <Text style={styles.step2SkillsCountText}>{selectedSkills.length}/15 SKILLS</Text>
+        <View style={[styles.selectedCountBadge, BRUTAL_SHADOWS.xs]}>
+          <Text style={styles.selectedCountText}>{selectedSkills.length} SKILLS SELECTED</Text>
         </View>
-      </View>
-
-      {/* Comic Card with BOOM sticker */}
-      <View style={[styles.step2ComicCard, BRUTAL_SHADOWS.xs]}>
-        <View style={[styles.boomSticker, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.boomStickerText}>BOOM! ★</Text>
-        </View>
-        <Text style={styles.comicHeadingSkills}>WHAT SKILLS DOES YOUR PROJECT REQUIRE?</Text>
-        <Text style={styles.comicSubheadingSkills}>
-          Select the tech stack needed for collaboration. Matches are synthesized based on core proficiencies.
-        </Text>
       </View>
 
       {/* Search Bar */}
-      <View style={[styles.searchBarContainer, BRUTAL_SHADOWS.xs]}>
-        <Text style={styles.searchPrefix}>&gt;_</Text>
+      <View style={[styles.searchBar, BRUTAL_SHADOWS.xs]}>
+        <Text style={styles.promptPrefix}>&gt;_</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search skills, aliases (e.g., 'js', 'kube')"
-          placeholderTextColor="#94A3B8"
+          placeholder="Search technologies, frameworks, aliases..."
+          placeholderTextColor={COLORS.textMuted}
           value={skillSearch}
           onChangeText={setSkillSearch}
         />
-        <View style={styles.searchIconBtn}>
-          <Text style={styles.searchIconBtnText}>🔍</Text>
-        </View>
+        {skillSearch.length > 0 && (
+          <TouchableOpacity onPress={() => setSkillSearch('')} style={styles.clearSearchBtn}>
+            <Text style={styles.clearSearchText}>CLEAR</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filter Category Dropdown Trigger */}
-      <View style={styles.filterRow}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setShowSkillCategoryDropdown(!showSkillCategoryDropdown)}
-          style={[styles.filterDropdownTrigger, BRUTAL_SHADOWS.xs]}
-        >
-          <Text style={styles.filterDropdownText} numberOfLines={1}>
-            {activeCategoryTab === 'all'
-              ? 'FULL STACK DEVELOPMENT (10 available)'
-              : categoryTabOptions.find((t) => t.id === activeCategoryTab)?.label || 'FILTER CATEGORY'}
-          </Text>
-          <Text style={styles.dropdownChevron}>▾</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => setShowSkillCategoryDropdown(!showSkillCategoryDropdown)}
-          style={[styles.filterActionBtn, BRUTAL_SHADOWS.xs]}
-        >
-          <Text style={styles.filterActionBtnText}>🎛 FILTER</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Category Dropdown Menu */}
-      {showSkillCategoryDropdown && (
-        <View style={[styles.dropdownMenu, { marginBottom: 12 }]}>
-          {categoryTabOptions.map((opt) => (
-            <TouchableOpacity
-              key={opt.id}
-              activeOpacity={0.8}
-              onPress={() => {
-                setActiveCategoryTab(opt.id);
-                setShowSkillCategoryDropdown(false);
-              }}
-              style={[
-                styles.dropdownItem,
-                activeCategoryTab === opt.id && styles.dropdownItemActive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.dropdownItemText,
-                  activeCategoryTab === opt.id && styles.dropdownItemTextActive,
-                ]}
-              >
-                {opt.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
-
-      {/* Horizontal Category Filter Pills */}
+      {/* Category Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.categoryPillsScroll}
-        contentContainerStyle={styles.categoryPillsContent}
+        style={styles.categoryTabsScroll}
+        contentContainerStyle={styles.categoryTabsContent}
       >
         {categoryTabOptions.map((tab) => {
           const isActive = activeCategoryTab === tab.id;
@@ -793,15 +682,15 @@ export default function CreateProjectForm({
               activeOpacity={0.8}
               onPress={() => setActiveCategoryTab(tab.id)}
               style={[
-                styles.categoryFilterPill,
-                isActive && styles.categoryFilterPillActive,
+                styles.categoryTabPill,
+                isActive && styles.categoryTabPillActive,
+                BRUTAL_SHADOWS.xs,
               ]}
             >
-              {isActive && <Text style={styles.activePillBullet}>● </Text>}
               <Text
                 style={[
-                  styles.categoryFilterPillText,
-                  isActive && styles.categoryFilterPillTextActive,
+                  styles.categoryTabPillText,
+                  isActive && styles.categoryTabPillTextActive,
                 ]}
               >
                 {tab.label}
@@ -811,12 +700,13 @@ export default function CreateProjectForm({
         })}
       </ScrollView>
 
-      {/* 2-Column High-Definition Skills Grid */}
+      {/* 2-Column Skills Grid */}
       <View style={styles.skillsGrid}>
-        {filteredSkills.map((skill) => {
-          const isSelected = selectedSkills.includes(skill.id);
-          const badgeBg = skill.badge?.bg || '#3B82F6';
-          const badgeTextColor = skill.badge?.color || '#FFFFFF';
+        {filteredSkills.map((skill, index) => {
+          const isSelected = selectedSkills.includes(String(skill.id));
+          const theme = SKILL_THEMES[index % SKILL_THEMES.length];
+          const badgeBg = skill.badge?.bg || theme.bg;
+          const badgeTextColor = skill.badge?.color || COLORS.ink;
           const badgeGlyph = skill.badge?.text || skill.label.slice(0, 2).toUpperCase();
 
           return (
@@ -825,108 +715,75 @@ export default function CreateProjectForm({
               activeOpacity={0.8}
               onPress={() => toggleSkill(skill.id)}
               style={[
-                styles.skillCard,
-                isSelected && styles.skillCardSelected,
+                styles.skillSelectCard,
+                isSelected && styles.skillSelectCardActive,
                 BRUTAL_SHADOWS.xs,
               ]}
             >
-              {/* Card Top Row: HD Tech Badge + Selection Indicator */}
-              <View style={styles.skillCardTopRow}>
-                {/* Tech Badge */}
-                <View
-                  style={[
-                    styles.techLogoBadge,
-                    { backgroundColor: badgeBg },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.techLogoBadgeText,
-                      { color: badgeTextColor },
-                    ]}
-                    numberOfLines={1}
-                  >
+              <View style={styles.skillSelectTop}>
+                <View style={[styles.techGlyphBadge, { backgroundColor: badgeBg }]}>
+                  <Text style={[styles.techGlyphText, { color: badgeTextColor }]}>
                     {badgeGlyph}
                   </Text>
                 </View>
-
-                {/* Check or Plus Indicator */}
                 <View
                   style={[
-                    styles.skillIndicatorCircle,
-                    isSelected && styles.skillIndicatorCircleSelected,
+                    styles.checkCircle,
+                    isSelected && styles.checkCircleActive,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.skillIndicatorText,
-                      isSelected && styles.skillIndicatorTextSelected,
-                    ]}
-                  >
-                    {isSelected ? '✓' : '+'}
-                  </Text>
+                  <Text style={styles.checkCircleText}>{isSelected ? 'OK' : '+'}</Text>
                 </View>
               </View>
 
-              {/* Skill Name */}
-              <Text style={styles.skillCardName} numberOfLines={1}>
+              <Text style={styles.skillSelectName} numberOfLines={1}>
                 {skill.label}
               </Text>
-
-              {/* Subtitle / Spec */}
-              <Text style={styles.skillCardSubtitle} numberOfLines={1}>
-                {skill.subtitle || 'LANGUAGE • CORE'}
+              <Text style={styles.skillSelectSubtitle} numberOfLines={1}>
+                {skill.subtitle || 'TECH'}
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* Selected Skills Bottom Drawer Bar */}
-      <View style={[styles.selectedSkillsDrawer, BRUTAL_SHADOWS.sm]}>
-        <View style={styles.drawerHeaderRow}>
-          <Text style={styles.drawerTitle}>☑ SELECTED SKILLS</Text>
-          <View style={styles.drawerCountPill}>
-            <Text style={styles.drawerCountText}>{selectedSkills.length} selected</Text>
+      {/* Selected Skills Drawer Bar */}
+      {selectedSkills.length > 0 && (
+        <View style={[styles.selectedDrawer, BRUTAL_SHADOWS.card]}>
+          <View style={styles.drawerHeader}>
+            <Text style={styles.drawerHeaderTitle}>ACTIVE SELECTION</Text>
+            <Text style={styles.drawerHeaderCount}>{selectedSkills.length} selected</Text>
+          </View>
+          <View style={styles.drawerChipsRow}>
+            {selectedSkills.map((sId) => {
+              const sk =
+                allAvailableSkills.find((s) => s.id === sId) ||
+                ALL_SKILLS.find((s) => s.id === sId);
+              const label = sk ? (sk.label || sk.name) : sId;
+              return (
+                <TouchableOpacity
+                  key={sId}
+                  activeOpacity={0.8}
+                  onPress={() => toggleSkill(sId)}
+                  style={styles.selectedDrawerChip}
+                >
+                  <Text style={styles.selectedDrawerChipText}>{label}</Text>
+                  <Text style={styles.selectedDrawerChipRemove}>X</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
-
-        <View style={styles.drawerChipsWrap}>
-          {selectedSkills.map((sId) => {
-            const sk =
-              allAvailableSkills.find((s) => s.id === sId) ||
-              ALL_SKILLS.find((s) => s.id === sId);
-            const label = sk ? (sk.label || sk.name) : sId;
-            return (
-              <TouchableOpacity
-                key={sId}
-                activeOpacity={0.8}
-                onPress={() => toggleSkill(sId)}
-                style={styles.drawerChip}
-              >
-                <Text style={styles.drawerChipText}>{label}</Text>
-                <Text style={styles.drawerChipRemove}>✕</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={styles.drawerFooterRow}>
-          <Text style={styles.drawerFooterSync}>Auto-synced to project draft</Text>
-          <View style={styles.drawerDraftBadge}>
-            <Text style={styles.drawerDraftBadgeText}>DRAFT #PRJ-002</Text>
-          </View>
-        </View>
-      </View>
+      )}
 
       {/* Step 2 Bottom Navigation */}
       <View style={styles.stepNavRow}>
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handleBack}
-          style={[styles.backNavBtn, BRUTAL_SHADOWS.xs]}
+          style={[styles.backStepBtn, BRUTAL_SHADOWS.xs]}
         >
-          <Text style={styles.backNavBtnText}>← BACK</Text>
+          <Text style={styles.backStepBtnText}>← BACK</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -934,12 +791,12 @@ export default function CreateProjectForm({
           onPress={handleNext}
           disabled={!canGoNext()}
           style={[
-            styles.continueNavBtn,
-            !canGoNext() && styles.continueBtnDisabled,
-            BRUTAL_SHADOWS.sm,
+            styles.continueStepBtn,
+            !canGoNext() && styles.nextStepBtnDisabled,
+            BRUTAL_SHADOWS.button,
           ]}
         >
-          <Text style={styles.continueNavBtnText}>CONTINUE ➔</Text>
+          <Text style={styles.continueStepBtnText}>NEXT: TEAM →</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -948,28 +805,23 @@ export default function CreateProjectForm({
   // ─── STEP 3: CO FOUNDER MATCHING ────────────────────────────
   const renderStep3 = () => (
     <View style={styles.stepBody}>
-      {/* POW Sticker & Header Card */}
-      <View style={[styles.step3HeaderCard, BRUTAL_SHADOWS.xs]}>
-        <View style={[styles.powSticker, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.powStickerText}>POW! ★</Text>
+      {/* Header Card */}
+      <View style={[styles.stepIntroCard, BRUTAL_SHADOWS.card]}>
+        <View style={styles.stepIntroRow}>
+          <DoodleSparkle size={22} color={COLORS.yellow} style={styles.stepIntroBadge} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.stepIntroTitle}>TEAM & CO-FOUNDERS</Text>
+            <Text style={styles.stepIntroSubtitle}>
+              Specify wanted roles and technical interests for candidate matching.
+            </Text>
+          </View>
         </View>
-
-        <View style={[styles.step3SpecPill, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.step3SpecPillText}>● STEP 3 OF 3 • TEAM & LAUNCH</Text>
-        </View>
-
-        <Text style={styles.comicHeadingTeam}>BUILD YOUR TEAM</Text>
-        <Text style={styles.comicSubheadingTeam}>
-          Tell us who you're looking for and finalize pairing attributes.
-        </Text>
       </View>
 
       {/* Section: Required Roles */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>👥 REQUIRED ROLES</Text>
-        <View style={[styles.rolesCountPill, BRUTAL_SHADOWS.xs]}>
-          <Text style={styles.rolesCountPillText}>{selectedRoles.length} / 6 selected</Text>
-        </View>
+      <View style={styles.sectionTitleRow}>
+        <Text style={styles.sectionHeaderTitle}>REQUIRED ROLES</Text>
+        <Text style={styles.sectionSubCount}>{selectedRoles.length} selected</Text>
       </View>
 
       {/* 2-Column Roles Grid */}
@@ -983,15 +835,15 @@ export default function CreateProjectForm({
               activeOpacity={0.8}
               onPress={() => toggleRole(rc.title)}
               style={[
-                styles.roleCard,
-                isSelected && styles.roleCardSelected,
+                styles.roleSelectCard,
+                isSelected && styles.roleSelectCardActive,
                 BRUTAL_SHADOWS.xs,
               ]}
             >
               <Text
                 style={[
-                  styles.roleCardTitle,
-                  isSelected && styles.roleCardTitleSelected,
+                  styles.roleSelectTitle,
+                  isSelected && styles.roleSelectTitleActive,
                 ]}
                 numberOfLines={1}
               >
@@ -999,29 +851,21 @@ export default function CreateProjectForm({
               </Text>
               <Text
                 style={[
-                  styles.roleCardSubtitle,
-                  isSelected && styles.roleCardSubtitleSelected,
+                  styles.roleSelectSubtitle,
+                  isSelected && styles.roleSelectSubtitleActive,
                 ]}
                 numberOfLines={1}
               >
                 {rc.subtitle}
               </Text>
 
-              {/* Status Circle Bottom Right */}
               <View
                 style={[
-                  styles.roleIndicatorCircle,
-                  isSelected && styles.roleIndicatorCircleSelected,
+                  styles.roleCheckIndicator,
+                  isSelected && styles.roleCheckIndicatorActive,
                 ]}
               >
-                <Text
-                  style={[
-                    styles.roleIndicatorText,
-                    isSelected && styles.roleIndicatorTextSelected,
-                  ]}
-                >
-                  {isSelected ? '✓' : '+'}
-                </Text>
+                <Text style={styles.roleCheckIndicatorText}>{isSelected ? 'OK' : '+'}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -1029,14 +873,14 @@ export default function CreateProjectForm({
       </View>
 
       {/* Section: What Is Your Project About? */}
-      <View style={styles.interestsCard}>
-        <Text style={styles.interestsTitle}>💥 WHAT IS YOUR PROJECT ABOUT?</Text>
-        <Text style={styles.interestsSubtitle}>Select core technical themes and domain verticals :</Text>
+      <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
+        <Text style={styles.fieldLabel}>PROJECT THEMES & DOMAINS</Text>
+        <Text style={styles.fieldHint}>Select topics of interest:</Text>
 
-        <View style={styles.interestsPillsWrap}>
+        <View style={styles.interestsWrap}>
           {PROJECT_INTERESTS.map((interest) => {
             const isSelected = selectedInterests.includes(interest);
-            const activeColor = INTEREST_COLORS[interest] || '#4ADE80';
+            const activeColor = INTEREST_COLORS[interest] || COLORS.yellow;
 
             return (
               <TouchableOpacity
@@ -1044,16 +888,16 @@ export default function CreateProjectForm({
                 activeOpacity={0.8}
                 onPress={() => toggleInterest(interest)}
                 style={[
-                  styles.interestPill,
+                  styles.interestChip,
                   isSelected && { backgroundColor: activeColor },
                   BRUTAL_SHADOWS.xs,
                 ]}
               >
-                {isSelected && <Text style={styles.interestCheckmark}>✓ </Text>}
+                {isSelected && <Text style={styles.interestCheckBullet}>● </Text>}
                 <Text
                   style={[
-                    styles.interestPillText,
-                    isSelected && styles.interestPillTextSelected,
+                    styles.interestChipText,
+                    isSelected && styles.interestChipTextActive,
                   ]}
                 >
                   {interest}
@@ -1064,46 +908,46 @@ export default function CreateProjectForm({
         </View>
       </View>
 
-      {/* Section: Project Cover Image */}
-      <View style={[styles.coverCard, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.coverCardHeader}>
-          <Text style={styles.coverHeaderTitle}>🖼 PROJECT COVER IMAGE & ICON</Text>
-          <Text style={styles.coverHeaderOptional}>(Optional)</Text>
+      {/* Section: Project Cover Image & Icon */}
+      <View style={[styles.fieldCard, BRUTAL_SHADOWS.xs]}>
+        <View style={styles.fieldHeaderRow}>
+          <Text style={styles.fieldLabel}>PROJECT IMAGE & ICON (OPTIONAL)</Text>
         </View>
 
-        <View style={styles.coverUploadBox}>
+        <View style={styles.coverRow}>
           {projectImage.trim() ? (
-            <Image
-              source={{ uri: projectImage.trim() }}
-              style={styles.coverImagePreview}
-              onError={() => {}}
-            />
+            <View style={[styles.coverPreviewFrame, BRUTAL_SHADOWS.xs]}>
+              <Image
+                source={{ uri: projectImage.trim() }}
+                style={styles.coverImagePreview}
+                onError={() => {}}
+              />
+            </View>
           ) : (
-            <View style={styles.coverBlueprintIconBox}>
-              <Text style={styles.coverBlueprintEmoji}>{projectIcon}</Text>
-              <Text style={styles.coverBlueprintCaption}>ARCH/ICON</Text>
+            <View style={[styles.coverFallbackFrame, BRUTAL_SHADOWS.xs]}>
+              <Text style={styles.coverFallbackIcon}>{projectIcon}</Text>
+              <Text style={styles.coverFallbackCaption}>ICON</Text>
             </View>
           )}
 
-          <View style={styles.coverUploadTextCol}>
-            <Text style={styles.coverUploadTitle}>COVER IMAGE (URL) OR EMOJI ICON</Text>
+          <View style={styles.coverInputsCol}>
             <TextInput
               value={projectImage}
               onChangeText={setProjectImage}
               placeholder="https://... image URL (optional)"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={COLORS.textMuted}
               autoCapitalize="none"
-              style={[styles.formInput, { fontSize: 11, paddingVertical: 5, paddingHorizontal: 8, marginBottom: 6 }]}
+              style={styles.coverUrlInput}
             />
 
-            <View style={styles.coverBtnRow}>
+            <View style={styles.coverActionsRow}>
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => setShowIconPicker(!showIconPicker)}
-                style={[styles.addImageBtn, BRUTAL_SHADOWS.xs]}
+                style={[styles.chooseIconBtn, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.addImageBtnText}>
-                  {showIconPicker ? '▲ HIDE ICONS' : '⚡ SELECT EMOJI ICON'}
+                <Text style={styles.chooseIconBtnText}>
+                  {showIconPicker ? 'HIDE ICONS' : 'SELECT ICON'}
                 </Text>
               </TouchableOpacity>
 
@@ -1111,9 +955,9 @@ export default function CreateProjectForm({
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => setProjectImage('')}
-                  style={styles.skipBtn}
+                  style={styles.clearImageBtn}
                 >
-                  <Text style={styles.skipBtnText}>✕ CLEAR URL</Text>
+                  <Text style={styles.clearImageBtnText}>CLEAR URL</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -1122,7 +966,7 @@ export default function CreateProjectForm({
 
         {/* Icon picker dropdown if toggled */}
         {showIconPicker && (
-          <View style={styles.iconPickerGrid}>
+          <View style={styles.iconPickerRow}>
             {PROJECT_ICONS.map((icon) => (
               <TouchableOpacity
                 key={icon}
@@ -1132,35 +976,33 @@ export default function CreateProjectForm({
                   setShowIconPicker(false);
                 }}
                 style={[
-                  styles.iconPickerOption,
-                  projectIcon === icon && styles.iconPickerOptionSelected,
+                  styles.iconPickerChip,
+                  projectIcon === icon && styles.iconPickerChipActive,
                 ]}
               >
-                <Text style={styles.iconPickerOptionText}>{icon}</Text>
+                <Text style={styles.iconPickerChipText}>{icon}</Text>
               </TouchableOpacity>
             ))}
           </View>
         )}
       </View>
 
-      {/* Verification / Deployment Banner */}
-      <View style={[styles.deploymentBanner, BRUTAL_SHADOWS.xs]}>
-        <View style={styles.deploymentBannerTop}>
-          <Text style={styles.deploymentDot}>●</Text>
-          <Text style={styles.deploymentTitle}>READY TO DEPLOY MATCH INSTANCE</Text>
+      {/* Verification Summary Banner */}
+      <View style={[styles.verificationBanner, BRUTAL_SHADOWS.xs]}>
+        <View style={styles.verificationTop}>
+          <DoodleCheck size={14} color={COLORS.ink} style={{ marginRight: 6 }} />
+          <Text style={styles.verificationTitle}>PROJECT SPEC VERIFIED</Text>
         </View>
-        <Text style={styles.deploymentSubtitle}>
-          5 fields verified • {selectedSkills.length} core stack • {selectedRoles.length} roles open
+        <Text style={styles.verificationSubtitle}>
+          {title} • {selectedSkills.length} skills • {selectedRoles.length} roles open
         </Text>
-        <View style={styles.verifiedTag}>
-          <Text style={styles.verifiedTagText}>✓ VERIFIED</Text>
-        </View>
       </View>
 
       {/* Error Message if Creation Rejected */}
       {submitError && (
-        <View style={{ backgroundColor: '#FEE2E2', borderWidth: 2, borderColor: '#EF4444', borderRadius: 8, padding: 10, marginVertical: 10 }}>
-          <Text style={{ color: '#B91C1C', fontWeight: 'bold', fontSize: 13 }}>⚠️ {submitError}</Text>
+        <View style={[styles.errorBanner, BRUTAL_SHADOWS.xs]}>
+          <DoodleCross size={14} color={COLORS.coral} style={{ marginRight: 6 }} />
+          <Text style={styles.errorBannerText}>{submitError}</Text>
         </View>
       )}
 
@@ -1169,9 +1011,9 @@ export default function CreateProjectForm({
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handleBack}
-          style={[styles.backNavBtn, BRUTAL_SHADOWS.xs]}
+          style={[styles.backStepBtn, BRUTAL_SHADOWS.xs]}
         >
-          <Text style={styles.backNavBtnText}>← BACK</Text>
+          <Text style={styles.backStepBtnText}>← BACK</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -1179,17 +1021,17 @@ export default function CreateProjectForm({
           onPress={handleSubmit}
           disabled={isSubmitting}
           style={[
-            styles.createProjectBtn,
+            styles.submitProjectBtn,
             isSubmitting && { opacity: 0.6 },
-            BRUTAL_SHADOWS.sm,
+            BRUTAL_SHADOWS.button,
           ]}
         >
-          <Text style={styles.createProjectBtnText}>
+          <Text style={styles.submitProjectBtnText}>
             {isSubmitting
-              ? (isEdit ? 'SAVING... ⏳' : 'CREATING... ⏳')
+              ? (isEdit ? 'SAVING...' : 'CREATING...')
               : isEdit
-                ? 'SAVE CHANGES ✔'
-                : 'CREATE PROJECT 🚀'}
+                ? 'SAVE CHANGES'
+                : 'CREATE PROJECT'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -1205,68 +1047,53 @@ export default function CreateProjectForm({
       onRequestClose={onClose}
     >
       <View style={styles.screenContainer}>
-        {/* Yellow Top Header */}
         {renderTopHeader()}
-
-        {/* 3-Step Tracker */}
         {renderStepTracker()}
 
-        {/* Scrollable Wizard Body with Halftone Background */}
-        <ImageBackground
-          source={require('../assets/comic_screen_bg.png')}
-          style={styles.bodyBackground}
-          resizeMode="cover"
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-          >
-            {step === 1 && renderStep1()}
-            {step === 2 && renderStep2()}
-            {step === 3 && renderStep3()}
-          </ScrollView>
-        </ImageBackground>
+          {step === 1 && renderStep1()}
+          {step === 2 && renderStep2()}
+          {step === 3 && renderStep3()}
+        </ScrollView>
       </View>
     </Modal>
   );
 }
 
-// ─── HIGH-DEFINITION STYLES ──────────────────────────────────
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
-    backgroundColor: '#FAF6EB',
+    backgroundColor: COLORS.creamBg,
     width: '100%',
-    maxWidth: 440,
+    maxWidth: 480,
     alignSelf: 'center',
     borderLeftWidth: Platform.OS === 'web' ? 2.5 : 0,
     borderRightWidth: Platform.OS === 'web' ? 2.5 : 0,
-    borderColor: '#000000',
-  },
-  bodyBackground: {
-    flex: 1,
-    backgroundColor: '#FAF6EB',
+    borderColor: COLORS.ink,
   },
   scrollArea: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 36,
+    paddingBottom: 40,
   },
   stepBody: {
     width: '100%',
   },
 
-  // ─── TOP WIZARD HEADER ──────────────────────────────────────
+  // ─── TOP HEADER ─────────────────────────────────────────────
   topHeader: {
-    backgroundColor: '#FFE600',
-    borderBottomWidth: 3,
-    borderColor: '#000000',
-    paddingHorizontal: 12,
+    backgroundColor: COLORS.yellow,
+    borderBottomWidth: 2.5,
+    borderColor: COLORS.ink,
+    paddingHorizontal: 14,
     paddingTop: Platform.OS === 'ios' ? 14 : 10,
     paddingBottom: 10,
     flexDirection: 'row',
@@ -1274,11 +1101,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerBackBtn: {
-    width: 38,
-    height: 38,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
+    width: 36,
+    height: 36,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1286,7 +1113,7 @@ const styles = StyleSheet.create({
   headerBackArrow: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
   headerCenter: {
     flex: 1,
@@ -1299,207 +1126,166 @@ const styles = StyleSheet.create({
   headerSubtitleDevDate: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
   headerSubtitleSlash: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#666666',
+    color: COLORS.inkMuted,
   },
   headerSubtitleDrafting: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#EF4444',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
   headerMainTitle: {
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginTop: 1,
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
-  headerAvatarBadge: {
-    width: 38,
-    height: 38,
-    backgroundColor: '#38BDF8',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
+  headerModeBadge: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  headerAvatarIcon: {
-    fontSize: 18,
-  },
-  headerAvatarOnlineDot: {
-    position: 'absolute',
-    bottom: -1,
-    right: -1,
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#22C55E',
-    borderWidth: 1.5,
-    borderColor: '#000000',
+  headerModeBadgeText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
 
   // ─── STEP PROGRESS TRACKER ──────────────────────────────────
   trackerContainer: {
-    backgroundColor: '#FAF6EB',
-    borderBottomWidth: 2.5,
-    borderColor: '#000000',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 18,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 2,
+    borderColor: COLORS.ink,
+    paddingHorizontal: 20,
     paddingVertical: 10,
   },
   trackerNode: {
     alignItems: 'center',
   },
   trackerCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    backgroundColor: COLORS.creamDark,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
-  trackerCircleStep1Active: {
-    backgroundColor: '#00E5FF',
-  },
-  trackerCircleStep2Active: {
-    backgroundColor: '#00E5FF',
-  },
-  trackerCircleStep3Active: {
-    backgroundColor: '#FFE600',
+  trackerCircleActive: {
+    backgroundColor: COLORS.yellow,
+    ...BRUTAL_SHADOWS.xs,
   },
   trackerCircleDone: {
-    backgroundColor: '#22C55E',
+    backgroundColor: COLORS.lime,
   },
   trackerCircleText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '900',
-    color: '#64748B',
+    color: COLORS.inkMuted,
   },
-  trackerCircleTextDone: {
-    color: '#000000',
+  trackerCircleTextActive: {
+    color: COLORS.ink,
   },
-  trackerCircleTextStep3Active: {
-    color: '#000000',
-  },
-  trackerLabelPill: {
-    marginTop: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  trackerLabelPillStep1Active: {
-    backgroundColor: '#FFE600',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-  },
-  trackerLabelPillStep2Active: {
-    backgroundColor: '#00E5FF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-  },
-  trackerLabelPillStep3Active: {
-    backgroundColor: '#FFE600',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-  },
-  trackerLabelPillDone: {
-    backgroundColor: '#000000',
-  },
-  trackerLabelText: {
+  trackerLabel: {
     fontSize: 9,
-    fontWeight: '900',
-    color: '#64748B',
+    fontWeight: '800',
+    color: COLORS.textMuted,
     letterSpacing: 0.5,
   },
-  trackerLabelTextStep1Active: {
-    color: '#000000',
-  },
-  trackerLabelTextStep2Active: {
-    color: '#000000',
-  },
-  trackerLabelTextStep3Active: {
-    color: '#000000',
-  },
-  trackerLabelTextDone: {
-    color: '#FFFFFF',
+  trackerLabelActive: {
+    color: COLORS.ink,
+    fontWeight: '900',
   },
   trackerLine: {
     flex: 1,
-    height: 3,
-    backgroundColor: '#000000',
-    marginHorizontal: 4,
-    marginBottom: 16,
+    height: 2,
+    backgroundColor: COLORS.borderMuted,
+    marginHorizontal: 8,
+    marginBottom: 14,
   },
   trackerLineDone: {
-    backgroundColor: '#00E5FF',
+    backgroundColor: COLORS.ink,
   },
 
-  // ─── STEP 1 STYLES ──────────────────────────────────────────
-  scopeHeaderCard: {
-    marginBottom: 12,
+  // ─── STEP INTRO CARD ────────────────────────────────────────
+  stepIntroCard: {
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    padding: 14,
+    marginBottom: 14,
   },
-  stepSpecPill: {
-    alignSelf: 'flex-start',
+  stepIntroRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F43F5E',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginBottom: 8,
+    gap: 10,
   },
-  stepSpecPillDot: {
-    fontSize: 9,
-    color: '#FFE600',
-    marginRight: 5,
+  stepIntroBadge: {
+    marginRight: 2,
   },
-  stepSpecPillText: {
-    fontSize: 10,
+  stepIntroTitle: {
+    fontSize: 14,
     fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
-  comicHeading: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#000000',
-    fontStyle: 'italic',
-    letterSpacing: -0.5,
-    lineHeight: 30,
-  },
-  comicSubheading: {
+  stepIntroSubtitle: {
     fontSize: 11,
-    fontWeight: '800',
-    color: '#374151',
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    color: COLORS.textMuted,
     marginTop: 2,
+    lineHeight: 15,
+  },
+  selectedCountBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.yellow,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 8,
+  },
+  selectedCountText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
 
-  // Field Cards
+  // ─── FIELD CARDS ────────────────────────────────────────────
   fieldCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
-    padding: 12,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 16,
+    padding: 14,
     marginBottom: 12,
   },
-  fieldCardHeader: {
+  fieldHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1508,984 +1294,676 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
-  redAsterisk: {
-    color: '#EF4444',
+  fieldHint: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.textMuted,
   },
-  typeBadge: {
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  typeBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#334155',
-  },
-  counterBadge: {
-    backgroundColor: '#FDE047',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  counterBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  rangeBadge: {
-    backgroundColor: '#67E8F9',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  rangeBadgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#000000',
+  charCount: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.textMuted,
   },
 
-  // Inputs
-  inputPromptWrap: {
+  // ─── INPUTS ─────────────────────────────────────────────────
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
     borderRadius: 10,
     paddingHorizontal: 10,
-    height: 44,
+    height: 42,
   },
   promptPrefix: {
-    fontSize: 14,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
     fontWeight: '900',
-    color: '#EC4899',
+    color: COLORS.ink,
     marginRight: 6,
   },
-  terminalInput: {
+  textInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
-    padding: 0,
+    color: COLORS.ink,
   },
-  textAreaInput: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
+  textArea: {
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
     borderRadius: 10,
     padding: 10,
-    minHeight: 74,
-    textAlignVertical: 'top',
     fontSize: 12,
-    fontWeight: '600',
-    color: '#000000',
-    lineHeight: 18,
+    fontWeight: '700',
+    color: COLORS.ink,
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
 
-  // Dropdown Pickers
+  // ─── DROPDOWNS ──────────────────────────────────────────────
   dropdownTrigger: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
     borderRadius: 10,
     paddingHorizontal: 12,
-    height: 44,
+    paddingVertical: 10,
   },
   dropdownValueText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#000000',
+    color: COLORS.ink,
   },
   dropdownChevron: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
-  },
-  dropdownClockIcon: {
-    fontSize: 15,
+    color: COLORS.ink,
   },
   dropdownMenu: {
-    marginTop: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: COLORS.ink,
     borderRadius: 10,
+    marginTop: 6,
     overflow: 'hidden',
   },
   dropdownItem: {
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: COLORS.borderLight,
   },
   dropdownItemActive: {
-    backgroundColor: '#FEF08A',
+    backgroundColor: COLORS.yellowHighlight,
   },
   dropdownItemText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#1E293B',
+    color: COLORS.ink,
   },
   dropdownItemTextActive: {
     fontWeight: '900',
-    color: '#000000',
   },
 
-  // Stepper
-  stepperRow: {
+  // ─── STEPPERS ───────────────────────────────────────────────
+  steppersContainer: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 2,
   },
   stepperCol: {
     flex: 1,
   },
-  stepperSubLabel: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#64748B',
+  stepperLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.textMuted,
     marginBottom: 4,
-    letterSpacing: 0.5,
   },
   stepperBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
     borderRadius: 10,
     paddingHorizontal: 12,
     height: 42,
   },
-  stepperNumber: {
-    fontSize: 16,
+  stepperValue: {
+    fontSize: 14,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
-  stepperArrows: {
-    flexDirection: 'column',
-    justifyContent: 'center',
+  stepperButtons: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  stepperBtn: {
+    width: 24,
+    height: 24,
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 6,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  stepperArrowBtn: {
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-  },
-  stepperArrowText: {
-    fontSize: 9,
+  stepperArrow: {
+    fontSize: 8,
     fontWeight: '900',
-    color: '#64748B',
+    color: COLORS.ink,
   },
-  stepperNotice: {
+  noteText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#475569',
+    color: COLORS.textMuted,
     marginTop: 8,
   },
 
-  // Continue Full Button
-  continueFullBtn: {
-    height: 50,
-    backgroundColor: '#00E5FF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
+  // ─── BUTTONS ────────────────────────────────────────────────
+  nextStepBtn: {
+    height: 46,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 14,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 6,
-    marginBottom: 16,
+    marginTop: 8,
   },
-  continueBtnDisabled: {
-    backgroundColor: '#CBD5E1',
-    opacity: 0.7,
+  nextStepBtnDisabled: {
+    opacity: 0.5,
   },
-  continueBtnText: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-
-  // ─── STEP 2 STYLES ──────────────────────────────────────────
-  step2BannerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  step2DarkBanner: {
-    backgroundColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  step2DarkBannerText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#00E5FF',
-    letterSpacing: 0.5,
-  },
-  step2SkillsCountPill: {
-    backgroundColor: '#EC4899',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderWidth: 1.5,
-    borderColor: '#000000',
-  },
-  step2SkillsCountText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  step2ComicCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    position: 'relative',
-  },
-  boomSticker: {
-    position: 'absolute',
-    top: -10,
-    right: 14,
-    backgroundColor: '#FFE600',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    transform: [{ rotate: '4deg' }],
-  },
-  boomStickerText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  comicHeadingSkills: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  comicSubheadingSkills: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-    lineHeight: 16,
-  },
-
-  // Search
-  searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 12,
-    paddingLeft: 10,
-    paddingRight: 4,
-    height: 44,
-    marginBottom: 10,
-  },
-  searchPrefix: {
+  nextStepBtnText: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#EC4899',
-    marginRight: 6,
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  stepNavRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  backStepBtn: {
+    flex: 1,
+    height: 44,
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  backStepBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  continueStepBtn: {
+    flex: 1.5,
+    height: 44,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueStepBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+  submitProjectBtn: {
+    flex: 1.5,
+    height: 44,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 2.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitProjectBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
+  },
+
+  // ─── STEP 2 SKILLS SELECTION ────────────────────────────────
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    height: 42,
+    marginBottom: 10,
   },
   searchInput: {
     flex: 1,
     fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
-    padding: 0,
+    color: COLORS.ink,
   },
-  searchIconBtn: {
-    width: 32,
-    height: 32,
-    backgroundColor: '#FFE600',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+  clearSearchBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
   },
-  searchIconBtnText: {
-    fontSize: 13,
-  },
-
-  // Filter Row
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 10,
-  },
-  filterDropdownTrigger: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    height: 38,
-  },
-  filterDropdownText: {
-    fontSize: 11,
+  clearSearchText: {
+    fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.inkMuted,
   },
-  filterActionBtn: {
-    backgroundColor: '#FFE600',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterActionBtnText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-  },
-
-  // Horizontal Pills
-  categoryPillsScroll: {
+  categoryTabsScroll: {
     marginBottom: 12,
   },
-  categoryPillsContent: {
+  categoryTabsContent: {
     gap: 8,
   },
-  categoryFilterPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 20,
+  categoryTabPill: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 5,
   },
-  categoryFilterPillActive: {
-    backgroundColor: '#00E5FF',
+  categoryTabPillActive: {
+    backgroundColor: COLORS.yellow,
   },
-  activePillBullet: {
-    fontSize: 9,
-    color: '#000000',
+  categoryTabPillText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.ink,
   },
-  categoryFilterPillText: {
-    fontSize: 11,
+  categoryTabPillTextActive: {
     fontWeight: '900',
-    color: '#000000',
   },
-  categoryFilterPillTextActive: {
-    color: '#000000',
-  },
-
-  // Skills Grid
   skillsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 14,
-  },
-  skillCard: {
-    width: '48.5%',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 14,
-    padding: 10,
-    marginBottom: 4,
-  },
-  skillCardSelected: {
-    backgroundColor: '#CFFAFE',
-  },
-  skillCardTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  techLogoBadge: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#000000',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  techLogoBadgeText: {
-    fontSize: 12,
-    fontWeight: '900',
-    textAlign: 'center',
-  },
-  skillIndicatorCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skillIndicatorCircleSelected: {
-    backgroundColor: '#00E5FF',
-  },
-  skillIndicatorText: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  skillIndicatorTextSelected: {
-    color: '#000000',
-  },
-  skillCardName: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 2,
-  },
-  skillCardSubtitle: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: '#64748B',
-    letterSpacing: 0.5,
-  },
-
-  // Selected Skills Bottom Drawer
-  selectedSkillsDrawer: {
-    backgroundColor: '#0F172A',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 14,
-  },
-  drawerHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  drawerTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-  drawerCountPill: {
-    backgroundColor: '#00E5FF',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  drawerCountText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  drawerChipsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 10,
-  },
-  drawerChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  drawerChipText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#000000',
-    marginRight: 6,
-  },
-  drawerChipRemove: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#EF4444',
-  },
-  drawerFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderColor: '#334155',
-  },
-  drawerFooterSync: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#00E5FF',
-  },
-  drawerDraftBadge: {
-    backgroundColor: '#FFE600',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderWidth: 1,
-    borderColor: '#000000',
-  },
-  drawerDraftBadgeText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: '#000000',
-  },
-
-  // Step Nav Row
-  stepNavRow: {
-    flexDirection: 'row',
     gap: 10,
     marginBottom: 14,
   },
-  backNavBtn: {
-    flex: 1,
-    height: 48,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backNavBtnText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  continueNavBtn: {
-    flex: 2,
-    height: 48,
-    backgroundColor: '#00E5FF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueNavBtnText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-
-  // ─── STEP 3 STYLES ──────────────────────────────────────────
-  step3HeaderCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 14,
-    position: 'relative',
-  },
-  powSticker: {
-    position: 'absolute',
-    top: -12,
-    left: 10,
-    backgroundColor: '#EC4899',
+  skillSelectCard: {
+    width: '48%',
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    transform: [{ rotate: '-6deg' }],
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 14,
+    padding: 10,
   },
-  powStickerText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#FFFFFF',
+  skillSelectCardActive: {
+    backgroundColor: COLORS.yellowHighlight,
   },
-  step3SpecPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#FDE047',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 20,
-    paddingHorizontal: 9,
-    paddingVertical: 2,
+  skillSelectTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
   },
-  step3SpecPillText: {
-    fontSize: 9.5,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  comicHeadingTeam: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: -0.5,
-    marginBottom: 2,
-  },
-  comicSubheadingTeam: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-    lineHeight: 16,
-  },
-
-  // Required Roles Section
-  sectionHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
-  },
-  rolesCountPill: {
-    backgroundColor: '#FFE600',
-    borderWidth: 1.5,
-    borderColor: '#000000',
-    borderRadius: 6,
-    paddingHorizontal: 7,
+  techGlyphBadge: {
+    paddingHorizontal: 6,
     paddingVertical: 2,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 4,
   },
-  rolesCountPillText: {
+  techGlyphText: {
     fontSize: 9,
     fontWeight: '900',
-    color: '#000000',
   },
-
-  // Roles Grid
-  rolesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: 8,
-    marginBottom: 14,
-  },
-  roleCard: {
-    width: '48.5%',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 14,
-    padding: 10,
-    minHeight: 68,
-    position: 'relative',
-  },
-  roleCardSelected: {
-    backgroundColor: '#00E5FF',
-  },
-  roleCardTitle: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 2,
-  },
-  roleCardTitleSelected: {
-    color: '#000000',
-  },
-  roleCardSubtitle: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#64748B',
-    paddingRight: 24,
-  },
-  roleCardSubtitleSelected: {
-    color: '#091830',
-  },
-  roleIndicatorCircle: {
-    position: 'absolute',
-    bottom: 8,
-    right: 8,
+  checkCircle: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#FFFFFF',
+    borderColor: COLORS.ink,
+    backgroundColor: COLORS.creamLight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  roleIndicatorCircleSelected: {
-    backgroundColor: '#4ADE80',
+  checkCircleActive: {
+    backgroundColor: COLORS.yellow,
   },
-  roleIndicatorText: {
-    fontSize: 11,
+  checkCircleText: {
+    fontSize: 9,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
   },
-  roleIndicatorTextSelected: {
-    color: '#000000',
-  },
-
-  // Project Interests Section
-  interestsCard: {
-    marginBottom: 14,
-  },
-  interestsTitle: {
+  skillSelectName: {
     fontSize: 12,
     fontWeight: '900',
-    color: '#000000',
-    marginBottom: 2,
+    color: COLORS.ink,
   },
-  interestsSubtitle: {
-    fontSize: 10.5,
+  skillSelectSubtitle: {
+    fontSize: 9,
     fontWeight: '700',
-    color: '#64748B',
-    marginBottom: 8,
+    color: COLORS.textMuted,
+    marginTop: 2,
   },
-  interestsPillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  interestPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+  selectedDrawer: {
+    backgroundColor: COLORS.white,
     borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-  },
-  interestCheckmark: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  interestPillText: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  interestPillTextSelected: {
-    color: '#000000',
-  },
-
-  // Cover Image Card
-  coverCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 16,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 16,
     padding: 12,
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  coverCardHeader: {
+  drawerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  coverHeaderTitle: {
+  drawerHeaderTitle: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.textMuted,
+    letterSpacing: 0.5,
+  },
+  drawerHeaderCount: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  drawerChipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  selectedDrawerChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.yellowHighlight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 6,
+  },
+  selectedDrawerChipText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  selectedDrawerChipRemove: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.coral,
+  },
+
+  // ─── STEP 3 ROLES & DOMAINS ─────────────────────────────────
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  sectionHeaderTitle: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
-  coverHeaderOptional: {
+  sectionSubCount: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#64748B',
+    fontWeight: '800',
+    color: COLORS.textMuted,
   },
-  coverUploadBox: {
+  rolesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+  roleSelectCard: {
+    width: '48%',
+    backgroundColor: COLORS.white,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 14,
+    padding: 10,
+    position: 'relative',
+  },
+  roleSelectCardActive: {
+    backgroundColor: COLORS.yellowHighlight,
+  },
+  roleSelectTitle: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  roleSelectTitleActive: {
+    color: COLORS.ink,
+  },
+  roleSelectSubtitle: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  roleSelectSubtitleActive: {
+    color: COLORS.inkMuted,
+  },
+  roleCheckIndicator: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    backgroundColor: COLORS.creamLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roleCheckIndicatorActive: {
+    backgroundColor: COLORS.yellow,
+  },
+  roleCheckIndicatorText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+
+  interestsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 6,
+  },
+  interestChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  interestCheckBullet: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  interestChipText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: COLORS.ink,
+  },
+  interestChipTextActive: {
+    fontWeight: '900',
+  },
+
+  coverRow: {
     flexDirection: 'row',
     gap: 10,
     alignItems: 'center',
   },
-  coverBlueprintIconBox: {
-    width: 64,
-    height: 64,
-    backgroundColor: '#0F172A',
+  coverPreviewFrame: {
+    width: 60,
+    height: 60,
     borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 12,
+    borderColor: COLORS.ink,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: COLORS.creamDark,
+  },
+  coverImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  coverFallbackFrame: {
+    width: 60,
+    height: 60,
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderRadius: 10,
+    backgroundColor: COLORS.yellowHighlight,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  coverBlueprintEmoji: {
-    fontSize: 26,
-  },
-  coverBlueprintCaption: {
-    fontSize: 7.5,
+  coverFallbackIcon: {
+    fontSize: 16,
     fontWeight: '900',
-    color: '#00E5FF',
+    color: COLORS.ink,
+  },
+  coverFallbackCaption: {
+    fontSize: 8,
+    fontWeight: '800',
+    color: COLORS.inkMuted,
     marginTop: 2,
   },
-  coverImagePreview: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#000000',
-  },
-  coverUploadTextCol: {
+  coverInputsCol: {
     flex: 1,
   },
-  coverUploadTitle: {
+  coverUrlInput: {
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     fontSize: 11,
-    fontWeight: '900',
-    color: '#000000',
-    marginBottom: 2,
-  },
-  coverUploadSubtext: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#475569',
-    lineHeight: 14,
+    fontWeight: '700',
+    color: COLORS.ink,
     marginBottom: 6,
   },
-  boldHighlight: {
-    fontWeight: '900',
-    color: '#000000',
-  },
-  coverBtnRow: {
+  coverActionsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
   },
-  addImageBtn: {
-    backgroundColor: '#00E5FF',
-    borderWidth: 2,
-    borderColor: '#000000',
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  addImageBtnText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  skipBtn: {
+  chooseIconBtn: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  skipBtnText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748B',
+  chooseIconBtnText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
-  iconPickerGrid: {
+  clearImageBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  clearImageBtnText: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: COLORS.coral,
+  },
+  iconPickerRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
     marginTop: 10,
-    paddingTop: 10,
+    paddingTop: 8,
     borderTopWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: COLORS.borderLight,
   },
-  iconPickerOption: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
+  iconPickerChip: {
+    backgroundColor: COLORS.white,
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderColor: COLORS.ink,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
-  iconPickerOptionSelected: {
-    borderColor: '#000000',
-    backgroundColor: '#FEF08A',
+  iconPickerChipActive: {
+    backgroundColor: COLORS.yellow,
   },
-  iconPickerOptionText: {
-    fontSize: 18,
+  iconPickerChipText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
   },
 
-  // Deployment Banner
-  deploymentBanner: {
-    backgroundColor: '#4ADE80',
-    borderWidth: 2.5,
-    borderColor: '#000000',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
+  verificationBanner: {
+    backgroundColor: COLORS.creamLight,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 12,
+    padding: 10,
+    marginBottom: 10,
   },
-  deploymentBannerTop: {
+  verificationTop: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 2,
   },
-  deploymentDot: {
-    fontSize: 9,
-    color: '#166534',
-    marginRight: 5,
-  },
-  deploymentTitle: {
-    fontSize: 11,
+  verificationTitle: {
+    fontSize: 10,
     fontWeight: '900',
-    color: '#000000',
+    color: COLORS.ink,
     letterSpacing: 0.5,
   },
-  deploymentSubtitle: {
-    fontSize: 9.5,
+  verificationSubtitle: {
+    fontSize: 10,
     fontWeight: '700',
-    color: '#14532D',
-    marginBottom: 6,
-  },
-  verifiedTag: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#000000',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  verifiedTagText: {
-    fontSize: 8.5,
-    fontWeight: '900',
-    color: '#4ADE80',
-    letterSpacing: 0.5,
+    color: COLORS.textMuted,
   },
 
-  // Create Project Final Button
-  createProjectBtn: {
-    flex: 2,
-    height: 48,
-    backgroundColor: '#00E5FF',
-    borderWidth: 3,
-    borderColor: '#000000',
-    borderRadius: BORDER_RADIUS.pill,
+  errorBanner: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: COLORS.pillCoral,
+    borderWidth: 1.5,
+    borderColor: COLORS.coral,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
   },
-  createProjectBtnText: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#000000',
-    letterSpacing: 0.5,
+  errorBannerText: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.coral,
   },
 });

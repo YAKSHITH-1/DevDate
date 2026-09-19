@@ -6,9 +6,9 @@ export const SKILL_CATEGORIES = [
   {
     id: 'frontend',
     name: 'Frontend',
-    icon: '🎨',
+    icon: 'UI',
     skills: [
-      { id: 'react', label: 'React', badge: { text: '⚛', bg: '#00D8FF', color: '#000' }, subtitle: 'FRONTEND • UI LIB' },
+      { id: 'react', label: 'React', badge: { text: 'RE', bg: '#00D8FF', color: '#000' }, subtitle: 'FRONTEND • UI LIB' },
       { id: 'vue', label: 'Vue.js', badge: { text: 'V', bg: '#42B883', color: '#FFF' }, subtitle: 'FRONTEND • FRAMEWORK' },
       { id: 'angular', label: 'Angular', badge: { text: 'NG', bg: '#DD0031', color: '#FFF' }, subtitle: 'FRONTEND • MVC' },
       { id: 'nextjs', label: 'Next.js', badge: { text: 'N', bg: '#000000', color: '#FFF' }, subtitle: 'FRAMEWORK • SSR' },
@@ -19,13 +19,13 @@ export const SKILL_CATEGORIES = [
       { id: 'sass', label: 'Sass/SCSS', badge: { text: 'Sass', bg: '#CC6699', color: '#FFF' }, subtitle: 'CSS • PREPROCESSOR' },
       { id: 'redux', label: 'Redux', badge: { text: 'RD', bg: '#764ABC', color: '#FFF' }, subtitle: 'STATE • MANAGEMENT' },
       { id: 'webpack', label: 'Webpack', badge: { text: 'WP', bg: '#8DD6F9', color: '#000' }, subtitle: 'TOOL • BUNDLER' },
-      { id: 'vite', label: 'Vite', badge: { text: '⚡', bg: '#646CFF', color: '#FFF' }, subtitle: 'TOOL • BUNDLER' },
+      { id: 'vite', label: 'Vite', badge: { text: 'VT', bg: '#646CFF', color: '#FFF' }, subtitle: 'TOOL • BUNDLER' },
     ],
   },
   {
     id: 'backend',
     name: 'Backend',
-    icon: '⚙️',
+    icon: 'API',
     skills: [
       { id: 'nodejs', label: 'Node.js', badge: { text: 'Node', bg: '#5FA04E', color: '#FFF' }, subtitle: 'BACKEND • RUNTIME' },
       { id: 'express', label: 'Express.js', badge: { text: 'EX', bg: '#E2E8F0', color: '#000' }, subtitle: 'BACKEND • API' },
@@ -36,7 +36,7 @@ export const SKILL_CATEGORIES = [
       { id: 'rails', label: 'Ruby on Rails', badge: { text: 'RoR', bg: '#CC0000', color: '#FFF' }, subtitle: 'BACKEND • MVC' },
       { id: 'go_fiber', label: 'Go Fiber', badge: { text: 'GF', bg: '#00ADD8', color: '#FFF' }, subtitle: 'BACKEND • HIGH-PERF' },
       { id: 'nestjs', label: 'NestJS', badge: { text: 'NJ', bg: '#E0234E', color: '#FFF' }, subtitle: 'BACKEND • TYPESCRIPT' },
-      { id: 'graphql', label: 'GraphQL', badge: { text: '◈', bg: '#E10098', color: '#FFF' }, subtitle: 'API • QUERY SPEC' },
+      { id: 'graphql', label: 'GraphQL', badge: { text: 'GQL', bg: '#E10098', color: '#FFF' }, subtitle: 'API • QUERY SPEC' },
       { id: 'rest_api', label: 'REST API', badge: { text: 'REST', bg: '#3B82F6', color: '#FFF' }, subtitle: 'API • ARCHITECTURE' },
       { id: 'grpc', label: 'gRPC', badge: { text: 'gRPC', bg: '#244c5a', color: '#FFF' }, subtitle: 'API • PROTOBUF' },
     ],
@@ -44,7 +44,7 @@ export const SKILL_CATEGORIES = [
   {
     id: 'fullstack',
     name: 'Full Stack',
-    icon: '🔗',
+    icon: 'STACK',
     skills: [
       { id: 'javascript', label: 'JavaScript', badge: { text: 'JS', bg: '#F7DF1E', color: '#000' }, subtitle: 'LANGUAGE • CORE' },
       { id: 'typescript', label: 'TypeScript', badge: { text: 'TS', bg: '#3178C6', color: '#FFF' }, subtitle: 'LANGUAGE • STRICT' },
@@ -53,25 +53,25 @@ export const SKILL_CATEGORIES = [
       { id: 't3_stack', label: 'T3 Stack', badge: { text: 'T3', bg: '#1E293B', color: '#FFF' }, subtitle: 'STACK • NEXT/TRPC' },
       { id: 'remix', label: 'Remix', badge: { text: 'RX', bg: '#000000', color: '#FFF' }, subtitle: 'FRAMEWORK • WEB' },
       { id: 'nuxtjs', label: 'Nuxt.js', badge: { text: 'NX', bg: '#00DC82', color: '#000' }, subtitle: 'FRAMEWORK • VUE SSR' },
-      { id: 'astro', label: 'Astro', badge: { text: '🚀', bg: '#FF5D01', color: '#FFF' }, subtitle: 'FRAMEWORK • CONTENT' },
+      { id: 'astro', label: 'Astro', badge: { text: 'AST', bg: '#FF5D01', color: '#FFF' }, subtitle: 'FRAMEWORK • CONTENT' },
       { id: 'blitz', label: 'Blitz.js', badge: { text: 'BZ', bg: '#6700EB', color: '#FFF' }, subtitle: 'FRAMEWORK • FULLSTACK' },
-      { id: 'redwood', label: 'RedwoodJS', badge: { text: '🌲', bg: '#BF4722', color: '#FFF' }, subtitle: 'FRAMEWORK • FULLSTACK' },
+      { id: 'redwood', label: 'RedwoodJS', badge: { text: 'RDW', bg: '#BF4722', color: '#FFF' }, subtitle: 'FRAMEWORK • FULLSTACK' },
     ],
   },
   {
     id: 'ai_ml',
     name: 'AI / ML',
-    icon: '🤖',
+    icon: 'AI',
     skills: [
       { id: 'tensorflow', label: 'TensorFlow', badge: { text: 'TF', bg: '#FF6F00', color: '#FFF' }, subtitle: 'AI • DEEP LEARNING' },
       { id: 'pytorch', label: 'PyTorch', badge: { text: 'PT', bg: '#EE4C2C', color: '#FFF' }, subtitle: 'AI • RESEARCH/TENSORS' },
       { id: 'openai_api', label: 'OpenAI / LLMs', badge: { text: 'AI', bg: '#10A37F', color: '#FFF' }, subtitle: 'AI • GENERATIVE' },
-      { id: 'langchain', label: 'LangChain', badge: { text: '🦜', bg: '#22C55E', color: '#000' }, subtitle: 'AI • AGENT/CHAINS' },
-      { id: 'huggingface', label: 'Hugging Face', badge: { text: '🤗', bg: '#FFD21E', color: '#000' }, subtitle: 'AI • TRANSFORMERS' },
-      { id: 'computer_vision', label: 'Computer Vision', badge: { text: '👁', bg: '#8B5CF6', color: '#FFF' }, subtitle: 'AI • PERCEPTION' },
+      { id: 'langchain', label: 'LangChain', badge: { text: 'LC', bg: '#22C55E', color: '#000' }, subtitle: 'AI • AGENT/CHAINS' },
+      { id: 'huggingface', label: 'Hugging Face', badge: { text: 'HF', bg: '#FFD21E', color: '#000' }, subtitle: 'AI • TRANSFORMERS' },
+      { id: 'computer_vision', label: 'Computer Vision', badge: { text: 'CV', bg: '#8B5CF6', color: '#FFF' }, subtitle: 'AI • PERCEPTION' },
       { id: 'nlp', label: 'NLP', badge: { text: 'NLP', bg: '#06B6D4', color: '#FFF' }, subtitle: 'AI • LINGUISTICS' },
       { id: 'scikit_learn', label: 'scikit-learn', badge: { text: 'SK', bg: '#F59E0B', color: '#000' }, subtitle: 'AI • CLASSIC ML' },
-      { id: 'pandas', label: 'Pandas', badge: { text: '🐼', bg: '#150458', color: '#FFF' }, subtitle: 'DATA • ANALYSIS' },
+      { id: 'pandas', label: 'Pandas', badge: { text: 'PD', bg: '#150458', color: '#FFF' }, subtitle: 'DATA • ANALYSIS' },
       { id: 'rag', label: 'RAG Systems', badge: { text: 'RAG', bg: '#EC4899', color: '#FFF' }, subtitle: 'AI • RETRIEVAL' },
       { id: 'prompt_engineering', label: 'Prompt Engineering', badge: { text: 'PE', bg: '#A855F7', color: '#FFF' }, subtitle: 'AI • OPTIMIZATION' },
       { id: 'stable_diffusion', label: 'Diffusion Models', badge: { text: 'SD', bg: '#6366F1', color: '#FFF' }, subtitle: 'AI • IMAGE GEN' },
@@ -80,7 +80,7 @@ export const SKILL_CATEGORIES = [
   {
     id: 'mobile',
     name: 'Mobile',
-    icon: '📱',
+    icon: 'APP',
     skills: [
       { id: 'react_native', label: 'React Native', badge: { text: 'RN', bg: '#61DAFB', color: '#000' }, subtitle: 'MOBILE • CROSS-PLATFORM' },
       { id: 'flutter', label: 'Flutter', badge: { text: 'FL', bg: '#02569B', color: '#FFF' }, subtitle: 'MOBILE • DART UI' },
@@ -96,15 +96,15 @@ export const SKILL_CATEGORIES = [
   {
     id: 'database',
     name: 'Database',
-    icon: '🗄️',
+    icon: 'DB',
     skills: [
-      { id: 'mongodb', label: 'MongoDB', badge: { text: '🗄️', bg: '#13AA52', color: '#FFF' }, subtitle: 'DATABASE • NOSQL' },
-      { id: 'postgresql', label: 'PostgreSQL', badge: { text: '☰', bg: '#336791', color: '#FFF' }, subtitle: 'DATABASE • SQL' },
+      { id: 'mongodb', label: 'MongoDB', badge: { text: 'MDB', bg: '#13AA52', color: '#FFF' }, subtitle: 'DATABASE • NOSQL' },
+      { id: 'postgresql', label: 'PostgreSQL', badge: { text: 'PG', bg: '#336791', color: '#FFF' }, subtitle: 'DATABASE • SQL' },
       { id: 'mysql', label: 'MySQL', badge: { text: 'MY', bg: '#4479A1', color: '#FFF' }, subtitle: 'DATABASE • RELATIONAL' },
       { id: 'redis', label: 'Redis', badge: { text: 'RD', bg: '#DC382D', color: '#FFF' }, subtitle: 'DATABASE • IN-MEMORY' },
-      { id: 'firebase', label: 'Firebase', badge: { text: '🔥', bg: '#FFCA28', color: '#000' }, subtitle: 'DATABASE • REALTIME' },
-      { id: 'supabase', label: 'Supabase', badge: { text: '⚡', bg: '#3ECF8E', color: '#000' }, subtitle: 'DATABASE • POSTGRES/AUTH' },
-      { id: 'prisma', label: 'Prisma', badge: { text: '▲', bg: '#2D3748', color: '#FFF' }, subtitle: 'ORM • TYPE-SAFE' },
+      { id: 'firebase', label: 'Firebase', badge: { text: 'FB', bg: '#FFCA28', color: '#000' }, subtitle: 'DATABASE • REALTIME' },
+      { id: 'supabase', label: 'Supabase', badge: { text: 'SB', bg: '#3ECF8E', color: '#000' }, subtitle: 'DATABASE • POSTGRES/AUTH' },
+      { id: 'prisma', label: 'Prisma', badge: { text: 'PR', bg: '#2D3748', color: '#FFF' }, subtitle: 'ORM • TYPE-SAFE' },
       { id: 'dynamodb', label: 'DynamoDB', badge: { text: 'DDB', bg: '#4053D6', color: '#FFF' }, subtitle: 'DATABASE • KEY-VALUE' },
       { id: 'sqlite', label: 'SQLite', badge: { text: 'SQL', bg: '#003B57', color: '#FFF' }, subtitle: 'DATABASE • EMBEDDED' },
       { id: 'elasticsearch', label: 'Elasticsearch', badge: { text: 'ES', bg: '#005571', color: '#FFF' }, subtitle: 'SEARCH • ANALYTICS' },
@@ -113,9 +113,9 @@ export const SKILL_CATEGORIES = [
   {
     id: 'devops',
     name: 'DevOps / Cloud',
-    icon: '☁️',
+    icon: 'OPS',
     skills: [
-      { id: 'docker', label: 'Docker', badge: { text: '📦', bg: '#2496ED', color: '#FFF' }, subtitle: 'DEVOPS • CONTAINERS' },
+      { id: 'docker', label: 'Docker', badge: { text: 'DCK', bg: '#2496ED', color: '#FFF' }, subtitle: 'DEVOPS • CONTAINERS' },
       { id: 'kubernetes', label: 'Kubernetes', badge: { text: 'K8s', bg: '#326CE5', color: '#FFF' }, subtitle: 'DEVOPS • ORCHESTRATION' },
       { id: 'aws', label: 'AWS', badge: { text: 'AWS', bg: '#FF9900', color: '#000' }, subtitle: 'CLOUD • INFRASTRUCTURE' },
       { id: 'gcp', label: 'GCP', badge: { text: 'GCP', bg: '#4285F4', color: '#FFF' }, subtitle: 'CLOUD • PLATFORM' },
@@ -124,14 +124,14 @@ export const SKILL_CATEGORIES = [
       { id: 'terraform', label: 'Terraform', badge: { text: 'TF', bg: '#844FBA', color: '#FFF' }, subtitle: 'DEVOPS • IAC' },
       { id: 'github_actions', label: 'GitHub Actions', badge: { text: 'GA', bg: '#2088FF', color: '#FFF' }, subtitle: 'CI • AUTOMATION' },
       { id: 'nginx', label: 'Nginx', badge: { text: 'NGX', bg: '#009639', color: '#FFF' }, subtitle: 'SERVER • PROXY' },
-      { id: 'vercel', label: 'Vercel', badge: { text: '▲', bg: '#000000', color: '#FFF' }, subtitle: 'DEPLOY • EDGE' },
+      { id: 'vercel', label: 'Vercel', badge: { text: 'VCL', bg: '#000000', color: '#FFF' }, subtitle: 'DEPLOY • EDGE' },
       { id: 'netlify', label: 'Netlify', badge: { text: 'NL', bg: '#00C7B7', color: '#000' }, subtitle: 'DEPLOY • JAMSTACK' },
     ],
   },
   {
     id: 'design',
     name: 'Design',
-    icon: '🎯',
+    icon: 'UX',
     skills: [
       { id: 'figma', label: 'Figma', badge: { text: 'FG', bg: '#F24E1E', color: '#FFF' }, subtitle: 'DESIGN • COLLAB' },
       { id: 'ui_ux', label: 'UI/UX Design', badge: { text: 'UX', bg: '#FF7262', color: '#FFF' }, subtitle: 'DESIGN • PRODUCT' },
@@ -146,7 +146,7 @@ export const SKILL_CATEGORIES = [
   {
     id: 'blockchain',
     name: 'Blockchain',
-    icon: '⛓️',
+    icon: 'WEB3',
     skills: [
       { id: 'solidity', label: 'Solidity', badge: { text: 'SOL', bg: '#363636', color: '#FFF' }, subtitle: 'WEB3 • EVM' },
       { id: 'web3js', label: 'Web3.js', badge: { text: 'W3', bg: '#F16822', color: '#FFF' }, subtitle: 'WEB3 • CLIENT' },
@@ -161,7 +161,7 @@ export const SKILL_CATEGORIES = [
   {
     id: 'languages',
     name: 'Languages',
-    icon: '💻',
+    icon: 'CODE',
     skills: [
       { id: 'python', label: 'Python', badge: { text: 'PY', bg: '#3776AB', color: '#FFD43B' }, subtitle: 'LANGUAGE • GENERAL' },
       { id: 'go', label: 'Go', badge: { text: 'GO', bg: '#00ADD8', color: '#FFF' }, subtitle: 'LANGUAGE • COMPILED' },
@@ -318,9 +318,9 @@ export const INTEREST_COLORS = {
   'E-commerce': '#60A5FA',
 };
 
-// Project icon options
+// Project icon options (developer tokens, zero emojis)
 export const PROJECT_ICONS = [
-  '🚀', '⚡', '🔥', '💡', '🎯', '⚛️', '🤖', '🎨',
-  '📱', '🌐', '🔗', '🛠️', '📊', '🎮', '🧠', '💻',
-  '🏗️', '🔒', '📡', '🌟', '💎', '🎪', '🏆', '🦾',
+  '</>', '{}', '//', 'git', 'API', 'UI', 'DB', 'AI',
+  'CLI', 'Web', 'App', 'OS', 'ML', 'RAG', 'Dev', 'Ops',
+  'Bot', 'CSS', 'JS', 'Py', 'Go', 'Rust', 'Node', 'SQL',
 ];

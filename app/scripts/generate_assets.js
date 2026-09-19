@@ -65,11 +65,11 @@ function createPng(width, height, r, g, b, a = 255) {
 const dir = path.join(__dirname, '..', 'assets');
 if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-// Purple brand theme: rgb(106, 27, 154)
-const iconPng = createPng(512, 512, 106, 27, 154);
-const splashPng = createPng(1242, 2436, 106, 27, 154);
-const adaptiveIconPng = createPng(512, 512, 106, 27, 154);
-const faviconPng = createPng(48, 48, 106, 27, 154);
+// DevDate Playful Pop Art x Doodle Art brand: Cream bg (#FAF6EB), Ink accent (#18181B)
+const iconPng = createPng(512, 512, 250, 246, 235);
+const splashPng = createPng(1242, 2436, 250, 246, 235);
+const adaptiveIconPng = createPng(512, 512, 250, 246, 235);
+const faviconPng = createPng(48, 48, 250, 246, 235);
 
 fs.writeFileSync(path.join(dir, 'icon.png'), iconPng);
 fs.writeFileSync(path.join(dir, 'splash.png'), splashPng);

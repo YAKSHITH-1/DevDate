@@ -6,17 +6,23 @@ import {
   TouchableOpacity,
   Modal,
   Image,
-  Platform,
 } from 'react-native';
-import { POP_PALETTE, POP_SHADOWS, BORDER_RADIUS } from '../styles/theme';
+import { COLORS, BORDERS, BORDER_RADIUS, BRUTAL_SHADOWS, FONTS } from '../styles/theme';
+import ComicBadge from './ComicBadge';
+import { DoodleSparkle, DoodleCheck, DoodleStar, DoodleUnderline } from './DoodleElements';
+import { getDiceBearAvatar, resolveProfileAvatar } from '../utils/avatar';
 
+/**
+ * DevDate OTP Success Modal — Pop Art Celebratory Verification Modal
+ * Fully conforming to Pop Art x Doodle Art design system with ZERO Unicode emojis.
+ */
 export default function OtpSuccessModal({
   visible,
   onClose,
   onEnterDiscord,
   onViewProfile,
-  primaryButtonText = '💬 PROCEED TO LOGIN 🚀',
-  secondaryButtonText = '👥 SQUAD DETAILS & LOGIN',
+  primaryButtonText = 'PROCEED TO LOGIN',
+  secondaryButtonText = 'SQUAD DETAILS & LOGIN',
 }) {
   return (
     <Modal
@@ -26,66 +32,72 @@ export default function OtpSuccessModal({
       onRequestClose={onClose}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalCard, POP_SHADOWS.modal]}>
+        <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
           {/* ================= HEADER SECTION (YELLOW) ================= */}
           <View style={styles.modalHeader}>
             {/* Top Badge & Close Row */}
             <View style={styles.headerTopRow}>
-              <View style={[styles.boomBadge, POP_SHADOWS.xs]}>
-                <Text style={styles.boomBadgeText}>BOOM! ★ AUTHENTICATED!</Text>
-              </View>
+              <ComicBadge
+                text="BOOM! // AUTHENTICATED!"
+                color={COLORS.coral}
+                textColor={COLORS.white}
+                size="sm"
+                rotate="-2deg"
+              />
 
               <View style={styles.headerRightRow}>
-                <View style={styles.matchUnlockedPill}>
-                  <Text style={styles.matchUnlockedText}>MATCH UNLOCKED</Text>
+                <View style={[styles.matchUnlockedPill, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.matchUnlockedText}>RIG VERIFIED</Text>
                 </View>
 
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={onClose}
-                  style={styles.closeBtn}
+                  style={[styles.closeBtn, BRUTAL_SHADOWS.xs]}
                   accessibilityRole="button"
                   accessibilityLabel="Close modal"
                 >
-                  <Text style={styles.closeBtnText}>✕</Text>
+                  <Text style={styles.closeBtnText}>X</Text>
                 </TouchableOpacity>
               </View>
             </View>
 
-            {/* Rocket Icon in Green Circle */}
-            <View style={styles.rocketIconCircle}>
-              <Text style={styles.rocketIconText}>🚀</Text>
+            {/* Sparkle Icon Circle */}
+            <View style={[styles.sparkleIconCircle, BRUTAL_SHADOWS.xs]}>
+              <DoodleSparkle size={26} color={COLORS.ink} />
             </View>
 
             {/* Hero Title */}
             <Text style={styles.heroTitle}>YOU'RE IN THE SQUAD!</Text>
 
+            <DoodleUnderline width={140} color={COLORS.coral} height={3} style={{ marginBottom: 6 }} />
+
             {/* Subtitle Pill */}
             <View style={styles.subtitlePill}>
               <Text style={styles.subtitlePillText}>
-                Mission Code Accepted! Rig verified for DevDate 🚀
+                Mission Code Accepted! Identity verified for DevDate.
               </Text>
             </View>
           </View>
 
-          {/* ================= SQUAD MATCH SECTION (CYAN) ================= */}
+          {/* ================= SQUAD MATCH SECTION (CREAM / CYAN) ================= */}
           <View style={styles.squadSection}>
             {/* Tag Badges */}
             <View style={styles.tagBadgesRow}>
-              <View style={[styles.tagPill, { backgroundColor: POP_PALETTE.inkBlack }]}>
-                <Text style={[styles.tagText, { color: POP_PALETTE.pureWhite }]}>
+              <View style={[styles.tagPill, { backgroundColor: COLORS.ink }]}>
+                <Text style={[styles.tagText, { color: COLORS.white }]}>
                   DEVDATE #2026
                 </Text>
               </View>
 
-              <View style={[styles.tagPill, { backgroundColor: POP_PALETTE.pink }]}>
-                <Text style={[styles.tagText, { color: POP_PALETTE.pureWhite }]}>
+              <View style={[styles.tagPill, { backgroundColor: COLORS.coral }]}>
+                <Text style={[styles.tagText, { color: COLORS.white }]}>
                   BIO MATCH
                 </Text>
               </View>
 
-              <View style={[styles.tagPill, { backgroundColor: POP_PALETTE.lime }]}>
-                <Text style={[styles.tagText, { color: POP_PALETTE.inkBlack }]}>
+              <View style={[styles.tagPill, { backgroundColor: COLORS.lime }]}>
+                <Text style={[styles.tagText, { color: COLORS.ink }]}>
                   98% COMPATIBLE
                 </Text>
               </View>
@@ -94,11 +106,11 @@ export default function OtpSuccessModal({
             {/* Dual Co-Founder Connected Cards */}
             <View style={styles.coFoundersRow}>
               {/* Member 1: Rahul Patel */}
-              <View style={[styles.memberCard, { marginRight: 4 }]}>
+              <View style={[styles.memberCard, BRUTAL_SHADOWS.xs, { marginRight: 4 }]}>
                 <View style={styles.avatarContainer}>
                   <Image
                     source={{
-                      uri: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+                      uri: resolveProfileAvatar('', 'Rahul Patel', 'voxel-bot'),
                     }}
                     style={styles.memberAvatar}
                   />
@@ -109,15 +121,18 @@ export default function OtpSuccessModal({
                 <Text style={styles.memberName} numberOfLines={1}>
                   RAHUL PATEL
                 </Text>
-                <Text style={styles.memberRole}>AI Lead</Text>
+                <Text style={styles.memberRole}>Full Stack Lead</Text>
               </View>
 
               {/* Member 2: Alex Chen */}
-              <View style={[styles.memberCard, { marginLeft: 4 }]}>
+              <View style={[styles.memberCard, BRUTAL_SHADOWS.xs, { marginLeft: 4 }]}>
                 <View style={styles.avatarContainer}>
-                  <View style={[styles.memberAvatar, styles.avatarPinkPlaceholder]}>
-                    <Text style={styles.avatarPinkText}>100</Text>
-                  </View>
+                  <Image
+                    source={{
+                      uri: resolveProfileAvatar('', 'Alex Chen', 'voxel-bot'),
+                    }}
+                    style={styles.memberAvatar}
+                  />
                   <View style={styles.gradYearBadge}>
                     <Text style={styles.gradYearText}>CS '26</Text>
                   </View>
@@ -125,35 +140,36 @@ export default function OtpSuccessModal({
                 <Text style={styles.memberName} numberOfLines={1}>
                   ALEX CHEN
                 </Text>
-                <Text style={styles.memberRole}>Frontend Wizard</Text>
+                <Text style={styles.memberRole}>Backend Architect</Text>
               </View>
             </View>
 
             {/* Squad metadata footer */}
             <View style={styles.squadMetaRow}>
-              <Text style={styles.squadMetaLeft}>🩵 AGENTIC RAG SQUAD</Text>
+              <Text style={styles.squadMetaLeft}>// AGENTIC RAG SQUAD</Text>
               <Text style={styles.squadMetaRight}>CHANNEL #SQUAD-ALPHA</Text>
             </View>
           </View>
 
           {/* ================= ACTIONS SECTION ================= */}
           <View style={styles.actionsSection}>
-            {/* Primary Action Button: Proceed to Login */}
+            {/* Primary Action Button */}
             <TouchableOpacity
               activeOpacity={0.85}
-              onPress={onEnterDiscord}
-              style={[styles.primaryModalBtn, POP_SHADOWS.sm]}
+              onPress={onEnterDiscord || onClose}
+              style={[styles.primaryModalBtn, BRUTAL_SHADOWS.sm]}
               accessibilityRole="button"
               accessibilityLabel={primaryButtonText}
             >
+              <DoodleCheck size={14} color={COLORS.ink} />
               <Text style={styles.primaryModalBtnText}>{primaryButtonText}</Text>
             </TouchableOpacity>
 
-            {/* Secondary Action Button: Squad Details & Login */}
+            {/* Secondary Action Button */}
             <TouchableOpacity
               activeOpacity={0.8}
-              onPress={onViewProfile}
-              style={styles.secondaryModalBtn}
+              onPress={onViewProfile || onClose}
+              style={[styles.secondaryModalBtn, BRUTAL_SHADOWS.xs]}
               accessibilityRole="button"
               accessibilityLabel={secondaryButtonText}
             >
@@ -171,28 +187,28 @@ export default function OtpSuccessModal({
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(5, 12, 24, 0.75)',
+    backgroundColor: 'rgba(24, 24, 27, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 360,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 3.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 24,
+    maxWidth: 380,
+    backgroundColor: COLORS.creamBg,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xl,
     overflow: 'hidden',
   },
   modalHeader: {
-    backgroundColor: POP_PALETTE.yellow,
-    paddingHorizontal: 14,
-    paddingTop: 12,
+    backgroundColor: COLORS.yellow,
+    paddingHorizontal: 16,
+    paddingTop: 16,
     paddingBottom: 14,
     alignItems: 'center',
-    borderBottomWidth: 3.5,
-    borderBottomColor: POP_PALETTE.inkBlack,
+    borderBottomWidth: BORDERS.heavy,
+    borderBottomColor: COLORS.borderBlack,
   },
   headerTopRow: {
     width: '100%',
@@ -201,31 +217,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  boomBadge: {
-    backgroundColor: POP_PALETTE.pink,
-    borderWidth: 2.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    transform: [{ rotate: '-2deg' }],
-  },
-  boomBadgeText: {
-    fontSize: 10.5,
-    fontWeight: '900',
-    color: POP_PALETTE.pureWhite,
-    letterSpacing: 0.6,
-    fontStyle: 'italic',
-  },
   headerRightRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
   matchUnlockedPill: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.lime,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
     borderRadius: BORDER_RADIUS.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -233,103 +233,93 @@ const styles = StyleSheet.create({
   matchUnlockedText: {
     fontSize: 9.5,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
     letterSpacing: 0.4,
   },
   closeBtn: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
     fontSize: 12,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    lineHeight: 14,
+    color: COLORS.ink,
   },
-  rocketIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 2.8,
-    borderColor: POP_PALETTE.inkBlack,
+  sparkleIconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: COLORS.lime,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
-  },
-  rocketIconText: {
-    fontSize: 22,
+    marginBottom: 8,
   },
   heroTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '900',
-    fontStyle: 'italic',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.8,
+    color: COLORS.ink,
     textAlign: 'center',
-    marginBottom: 6,
-    textShadowColor: 'rgba(255, 255, 255, 0.8)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 0,
+    letterSpacing: 0.5,
+    marginBottom: 4,
   },
   subtitlePill: {
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: BORDER_RADIUS.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    maxWidth: '96%',
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
   },
   subtitlePillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.ink,
     textAlign: 'center',
   },
   squadSection: {
-    backgroundColor: POP_PALETTE.cyan,
-    padding: 12,
-    borderBottomWidth: 3.5,
-    borderBottomColor: POP_PALETTE.inkBlack,
+    backgroundColor: COLORS.cyan,
+    padding: 14,
+    borderBottomWidth: BORDERS.heavy,
+    borderBottomColor: COLORS.borderBlack,
   },
   tagBadgesRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 6,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   tagPill: {
-    borderWidth: 1.8,
-    borderColor: POP_PALETTE.inkBlack,
     borderRadius: BORDER_RADIUS.pill,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   tagText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '900',
     letterSpacing: 0.4,
   },
   coFoundersRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+    justifyContent: 'center',
+    marginBottom: 10,
   },
   memberCard: {
     flex: 1,
-    backgroundColor: POP_PALETTE.pureWhite,
-    borderWidth: 2.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    padding: 10,
     alignItems: 'center',
   },
   avatarContainer: {
@@ -337,102 +327,90 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   memberAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: POP_PALETTE.inkBlack,
-  },
-  avatarPinkPlaceholder: {
-    backgroundColor: '#EC4899',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarPinkText: {
-    color: POP_PALETTE.pureWhite,
-    fontWeight: '900',
-    fontSize: 16,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    backgroundColor: COLORS.creamDark,
   },
   gradYearBadge: {
     position: 'absolute',
-    bottom: -4,
-    alignSelf: 'center',
-    backgroundColor: POP_PALETTE.yellow,
-    borderWidth: 1.5,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: 8,
-    paddingHorizontal: 5,
+    bottom: -3,
+    right: -3,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingHorizontal: 4,
     paddingVertical: 1,
   },
   gradYearText: {
-    fontSize: 8.5,
+    fontSize: 8,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
+    color: COLORS.ink,
   },
   memberName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
-    marginBottom: 2,
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
   memberRole: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '700',
-    color: POP_PALETTE.grayMuted,
+    color: COLORS.textMuted,
+    marginTop: 1,
   },
   squadMetaRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 4,
-    paddingHorizontal: 4,
+    marginTop: 4,
   },
   squadMetaLeft: {
     fontSize: 9.5,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
+    color: COLORS.ink,
   },
   squadMetaRight: {
     fontSize: 9.5,
-    fontWeight: '800',
-    color: POP_PALETTE.inkBlack,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontWeight: '900',
+    color: COLORS.ink,
   },
   actionsSection: {
-    backgroundColor: POP_PALETTE.canvasCream,
+    backgroundColor: COLORS.creamBg,
     padding: 14,
-    gap: 10,
+    gap: 8,
   },
   primaryModalBtn: {
-    backgroundColor: POP_PALETTE.lime,
-    borderWidth: 3,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    height: 48,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.heavy,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 12,
   },
   primaryModalBtnText: {
-    fontSize: 13.5,
+    fontSize: 13,
     fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.6,
+    color: COLORS.ink,
+    letterSpacing: 0.5,
   },
   secondaryModalBtn: {
-    backgroundColor: POP_PALETTE.cyanLight,
-    borderWidth: 2.2,
-    borderColor: POP_PALETTE.inkBlack,
-    borderRadius: BORDER_RADIUS.pill,
-    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 10,
   },
   secondaryModalBtnText: {
-    fontSize: 11.5,
-    fontWeight: '900',
-    color: POP_PALETTE.inkBlack,
-    letterSpacing: 0.4,
+    fontSize: 11,
+    fontWeight: '800',
+    color: COLORS.textMuted,
   },
 });
