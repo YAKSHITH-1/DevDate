@@ -9,6 +9,7 @@ import {
   forgotPassword,
   resetPassword,
   getMe,
+  updateMe,
 } from "./auth.controller.js";
 import {
   registerValidation,
@@ -16,6 +17,7 @@ import {
   loginValidation,
   forgotPasswordValidation,
   resetPasswordValidation,
+  updateProfileValidation,
 } from "./auth.validation.js";
 import validate from "../../middleware/validate.js";
 import authenticate from "../../middleware/auth.js";
@@ -56,7 +58,9 @@ router.post(
   resetPassword
 );
 
-// Protected authenticated user profile endpoint
+// Protected authenticated user profile endpoints
 router.get("/me", authenticate, getMe);
+router.put("/me", authenticate, validate(updateProfileValidation), updateMe);
+router.patch("/me", authenticate, validate(updateProfileValidation), updateMe);
 
 export default router;

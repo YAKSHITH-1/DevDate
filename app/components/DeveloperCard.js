@@ -7,6 +7,8 @@ const { width } = Dimensions.get('window');
 export default function DeveloperCard({ developer, onPress }) {
   if (!developer) return null;
 
+  const [imgError, setImgError] = React.useState(false);
+
   // Use the exact comic artwork from screen-ref Phone 2 for Maya, and customized comic frames for others
   const isMaya = developer.name.startsWith('Maya');
   const isAlex = developer.name.startsWith('Alex');
@@ -39,7 +41,19 @@ export default function DeveloperCard({ developer, onPress }) {
           />
         ) : (
           <View style={styles.customImageWrap}>
-            <Image source={{ uri: developer.avatar }} style={styles.cardImage} />
+            {!imgError && developer.avatar ? (
+              <Image
+                source={{ uri: developer.avatar }}
+                style={styles.cardImage}
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <View style={[styles.cardImage, styles.cardFallbackImage]}>
+                <Text style={styles.cardFallbackInitial}>
+                  {developer.name?.charAt(0)?.toUpperCase() || '👤'}
+                </Text>
+              </View>
+            )}
             {developer.sticker && (
               <View style={styles.customStickyNote}>
                 <Text style={styles.customStickyText}>{developer.sticker}</Text>
@@ -223,5 +237,15 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000000',
     letterSpacing: 0.5,
+  },
+  cardFallbackImage: {
+    backgroundColor: '#FFE600',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cardFallbackInitial: {
+    fontSize: 64,
+    fontWeight: '900',
+    color: '#000000',
   },
 });

@@ -189,17 +189,47 @@ export const ALL_SKILLS = SKILL_CATEGORIES.flatMap((cat) =>
   }))
 );
 
-// Lookup a skill by its canonical ID
+// Lookup a skill by its ID or label
 export function getSkillById(id) {
-  return ALL_SKILLS.find((s) => s.id === id) || null;
+  if (!id) return null;
+  const str = String(id).toLowerCase().trim();
+  return ALL_SKILLS.find((s) => s.id.toLowerCase() === str || s.label.toLowerCase() === str) || null;
 }
 
-// Get skill labels from an array of skill IDs
-export function getSkillLabels(ids) {
+// Lookup presentation metadata (badge, color, category) for any skill name or ID
+export function getSkillPresentation(nameOrId) {
+  if (!nameOrId) return null;
+  const str = String(nameOrId).toLowerCase().trim();
+  const found = ALL_SKILLS.find(
+    (s) =>
+      s.id.toLowerCase() === str ||
+      s.label.toLowerCase() === str ||
+      s.label.toLowerCase().replace(/[\s\-_.]/g, '') === str.replace(/[\s\-_.]/g, '')
+  );
+  if (found) return found;
+  return {
+    id: nameOrId,
+    label: nameOrId,
+    badge: { text: String(nameOrId).slice(0, 2).toUpperCase(), bg: '#3B82F6', color: '#FFF' },
+    subtitle: 'SKILL',
+    categoryId: 'general',
+  };
+}
+
+// Get skill labels from an array of skill IDs or objects
+export function getSkillLabels(ids, canonicalSkills = []) {
   if (!ids || !Array.isArray(ids)) return [];
   return ids.map((id) => {
-    const skill = getSkillById(id);
-    return skill ? skill.label : id; // Fallback to raw string if not found
+    if (typeof id === 'object' && id !== null) {
+      return id.name || id.label || id.id || '';
+    }
+    const strId = String(id);
+    if (Array.isArray(canonicalSkills) && canonicalSkills.length > 0) {
+      const canonical = canonicalSkills.find((s) => (s._id || s.id || '').toString() === strId);
+      if (canonical) return canonical.name;
+    }
+    const skill = getSkillById(strId);
+    return skill ? skill.label : strId; // Fallback to raw string if not found
   });
 }
 

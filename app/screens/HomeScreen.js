@@ -8,6 +8,7 @@ import {
   Image,
   Modal,
   FlatList,
+  RefreshControl,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import DeveloperCard from '../components/DeveloperCard';
@@ -16,6 +17,7 @@ import SwipeControls from '../components/SwipeControls';
 import ComicBadge from '../components/ComicBadge';
 import { useApp } from '../context/AppContext';
 import { getSkillLabels } from '../data/skillsDatabase';
+import { recordSwipeApi, createInvitationApi } from '../utils/api';
 
 export default function HomeScreen({
   onNavigateToProjects,
@@ -26,8 +28,11 @@ export default function HomeScreen({
   const {
     activeProject,
     projects,
+    currentUser,
     setActiveProjectId,
     availableDevelopersForActiveProject,
+    discoveryLoading,
+    loadDiscoveryDevelopers,
     skipDeveloper,
     unskipDeveloper,
     uninviteDeveloper,
@@ -35,20 +40,70 @@ export default function HomeScreen({
     resetDiscoveryForProject,
     notifications,
     unreadNotificationsCount,
+    notificationsLoading,
+    loadNotifications,
+    markNotificationAsRead,
     markAllNotificationsRead,
     setSelectedDeveloperForProfile,
   } = useApp();
+
+  const handleNotificationPress = async (n) => {
+    if (!n) return;
+
+    // 1. Mark as read on backend & update local state
+    if (markNotificationAsRead && n.id) {
+      await markNotificationAsRead(n.id);
+    }
+
+    // 2. Close modal
+    setNotificationsVisible(false);
+
+    // 3. Perform relevant action / navigation
+    const type = (n.type || '').toUpperCase();
+    if (
+      type === 'INVITATION_RECEIVED' ||
+      type === 'INVITATION_ACCEPTED' ||
+      type === 'INVITATION_REJECTED' ||
+      type === 'INVITATION_WITHDRAWN' ||
+      type === 'INVITATION'
+    ) {
+      if (onNavigateToMatches) {
+        onNavigateToMatches();
+      }
+    } else if (
+      type === 'MESSAGE' ||
+      type === 'NEW_MESSAGE' ||
+      type === 'MATCH_CREATED' ||
+      type === 'MATCH'
+    ) {
+      if (n.matchId && onOpenChat) {
+        onOpenChat(n.matchId);
+      } else if (onNavigateToMatches) {
+        onNavigateToMatches();
+      }
+    } else if (n.projectId && onNavigateToProjects) {
+      onNavigateToProjects();
+    }
+  };
 
   const [history, setHistory] = useState([]);
   const [inviteModalData, setInviteModalData] = useState(null);
   const [feedbackToast, setFeedbackToast] = useState(null);
   const [activeSegment, setActiveSegment] = useState('DISCOVER');
+  const [isProcessingSwipe, setIsProcessingSwipe] = useState(false);
 
   // Modals
   const [projectPickerVisible, setProjectPickerVisible] = useState(false);
   const [notificationsVisible, setNotificationsVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('ALL');
+
+  // Recruitment Eligibility checks (Chunk 11E)
+  const isProjectClosed = activeProject?.status === 'CLOSED';
+  const projectMembersCount = activeProject?.membersCount || (Array.isArray(activeProject?.members) ? activeProject.members.length : 1);
+  const projectMaxCapacity = activeProject?.maxMembers || activeProject?.teamSize?.max || 4;
+  const isProjectFull = projectMembersCount >= projectMaxCapacity;
+  const canRecruit = !isProjectClosed && !isProjectFull;
 
   // Filter developers based on selected role filter
   const filteredDevs = availableDevelopersForActiveProject.filter((dev) => {
@@ -57,34 +112,130 @@ export default function HomeScreen({
   });
 
   // Top developer of the active project deck
-  const currentDev = filteredDevs[0];
+  const currentDev = canRecruit ? filteredDevs[0] : null;
 
   const showToast = (message, color = COLORS.btnGreen) => {
     setFeedbackToast({ message, color });
     setTimeout(() => setFeedbackToast(null), 1600);
   };
 
-  const handlePass = () => {
-    if (currentDev) {
+  const handlePass = async () => {
+    if (isProcessingSwipe) return;
+    if (!canRecruit) {
+      showToast(isProjectClosed ? 'PROJECT IS CLOSED' : 'TEAM IS FULL', COLORS.btnRed);
+      return;
+    }
+    if (!currentDev) return;
+
+    setIsProcessingSwipe(true);
+    try {
+      // If active project is a real MongoDB ObjectId, persist PASS to backend
+      const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
+      if (isRealProject) {
+        const token = currentUser?.token || null;
+        const uid = currentUser?._id || currentUser?.id;
+        const res = await recordSwipeApi(
+          activeProject.id,
+          currentDev._id || currentDev.id,
+          'PASS',
+          token,
+          uid
+        );
+        if (!res.success) {
+          showToast(res.error || 'Failed to record pass', COLORS.btnRed);
+          setIsProcessingSwipe(false);
+          return;
+        }
+      }
+
       skipDeveloper(currentDev.id);
       setHistory((prev) => [...prev, { dev: currentDev, action: 'PASS' }]);
       showToast(`SKIPPED ${currentDev.name.split(' ')[0]} ✖`, COLORS.btnRed);
+    } catch (err) {
+      showToast(err.message || 'Error processing pass', COLORS.btnRed);
+    } finally {
+      setIsProcessingSwipe(false);
     }
   };
 
-  const handleLike = () => {
-    if (currentDev) {
+  const handleLike = async () => {
+    if (isProcessingSwipe) return;
+    if (!canRecruit) {
+      showToast(isProjectClosed ? 'PROJECT IS CLOSED' : 'TEAM IS FULL', COLORS.btnRed);
+      return;
+    }
+    if (!currentDev) return;
+
+    setIsProcessingSwipe(true);
+    try {
+      // If active project is a real MongoDB ObjectId, dispatch invitation to backend
+      const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
+      if (isRealProject) {
+        const token = currentUser?.token || null;
+        const uid = currentUser?._id || currentUser?.id;
+        const res = await createInvitationApi(
+          {
+            projectId: activeProject.id,
+            developerId: currentDev._id || currentDev.id,
+            message: 'Invited to collaborate on project',
+            senderId: uid,
+          },
+          token
+        );
+        if (!res.success) {
+          showToast(res.error || 'Failed to send invitation', COLORS.btnRed);
+          setIsProcessingSwipe(false);
+          return;
+        }
+      }
+
       inviteDeveloper(currentDev, false);
       setHistory((prev) => [...prev, { dev: currentDev, action: 'LIKE' }]);
       setInviteModalData(currentDev);
+    } catch (err) {
+      showToast(err.message || 'Error sending invitation', COLORS.btnRed);
+    } finally {
+      setIsProcessingSwipe(false);
     }
   };
 
-  const handleSuperLike = () => {
-    if (currentDev) {
+  const handleSuperLike = async () => {
+    if (isProcessingSwipe) return;
+    if (!canRecruit) {
+      showToast(isProjectClosed ? 'PROJECT IS CLOSED' : 'TEAM IS FULL', COLORS.btnRed);
+      return;
+    }
+    if (!currentDev) return;
+
+    setIsProcessingSwipe(true);
+    try {
+      const isRealProject = activeProject?.id && /^[0-9a-fA-F]{24}$/.test(activeProject.id);
+      if (isRealProject) {
+        const token = currentUser?.token || null;
+        const uid = currentUser?._id || currentUser?.id;
+        const res = await createInvitationApi(
+          {
+            projectId: activeProject.id,
+            developerId: currentDev._id || currentDev.id,
+            message: '★ Super Liked your profile for this project!',
+            senderId: uid,
+          },
+          token
+        );
+        if (!res.success) {
+          showToast(res.error || 'Failed to send invitation', COLORS.btnRed);
+          setIsProcessingSwipe(false);
+          return;
+        }
+      }
+
       inviteDeveloper(currentDev, true);
       setHistory((prev) => [...prev, { dev: currentDev, action: 'SUPER' }]);
       setInviteModalData({ ...currentDev, isSuper: true });
+    } catch (err) {
+      showToast(err.message || 'Error sending invitation', COLORS.btnRed);
+    } finally {
+      setIsProcessingSwipe(false);
     }
   };
 
@@ -105,6 +256,9 @@ export default function HomeScreen({
 
   const handleResetDeck = () => {
     resetDiscoveryForProject(activeProject?.id);
+    if (loadDiscoveryDevelopers) {
+      loadDiscoveryDevelopers();
+    }
     setHistory([]);
     showToast(`RESET DECK FOR ${activeProject?.title || 'PROJECT'} ↺`, COLORS.btnYellow);
   };
@@ -134,7 +288,6 @@ export default function HomeScreen({
             activeOpacity={0.75}
             onPress={() => {
               setNotificationsVisible(true);
-              markAllNotificationsRead();
             }}
             style={styles.iconBtn}
           >
@@ -219,8 +372,39 @@ export default function HomeScreen({
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={Boolean(discoveryLoading)}
+            onRefresh={() => {
+              if (loadDiscoveryDevelopers) loadDiscoveryDevelopers();
+            }}
+            colors={[COLORS.btnYellow, COLORS.btnBlue]}
+            tintColor={COLORS.btnYellow}
+          />
+        }
       >
-        {currentDev ? (
+        {discoveryLoading && availableDevelopersForActiveProject.length === 0 ? (
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
+            <Text style={styles.emptyTitle}>SCANNING SQUAD... ⚡</Text>
+            <Text style={styles.emptySubtitle}>
+              Connecting to real developer database...
+            </Text>
+          </View>
+        ) : isProjectClosed ? (
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
+            <Text style={styles.emptyTitle}>PROJECT CLOSED 🔒</Text>
+            <Text style={styles.emptySubtitle}>
+              New member recruitment has stopped.
+            </Text>
+          </View>
+        ) : isProjectFull ? (
+          <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
+            <Text style={styles.emptyTitle}>TEAM FULL 👥</Text>
+            <Text style={styles.emptySubtitle}>
+              This project has reached its maximum team size.
+            </Text>
+          </View>
+        ) : currentDev ? (
           <SwipeableCard
             key={currentDev.id}
             cardKey={currentDev.id}
@@ -231,9 +415,9 @@ export default function HomeScreen({
           </SwipeableCard>
         ) : (
           <View style={[styles.emptyCard, BRUTAL_SHADOWS.md]}>
-            <Text style={styles.emptyTitle}>🎉 ALL PROFILES REVIEWED!</Text>
+            <Text style={styles.emptyTitle}>NO MORE DEVELOPERS 🚀</Text>
             <Text style={styles.emptySubtitle}>
-              You have explored all available developer matches for {activeProject?.title}.
+              You've gone through everyone available for this project.
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}
@@ -246,7 +430,7 @@ export default function HomeScreen({
         )}
 
         {/* Action Buttons Row */}
-        {currentDev && (
+        {canRecruit && currentDev && (
           <SwipeControls
             onRewind={handleRewind}
             onPass={handlePass}
@@ -392,14 +576,50 @@ export default function HomeScreen({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.pickerList} showsVerticalScrollIndicator={false}>
-              {notifications.map((n) => (
-                <View key={n.id} style={[styles.notificationCard, BRUTAL_SHADOWS.xs]}>
-                  <Text style={styles.notifTitle}>{n.title}</Text>
-                  <Text style={styles.notifMsg}>{n.message}</Text>
-                  <Text style={styles.notifTime}>{n.time}</Text>
+            <ScrollView
+              style={styles.pickerList}
+              showsVerticalScrollIndicator={false}
+              refreshControl={
+                <RefreshControl
+                  refreshing={Boolean(notificationsLoading)}
+                  onRefresh={() => {
+                    if (loadNotifications) loadNotifications();
+                  }}
+                  tintColor="#000000"
+                />
+              }
+            >
+              {notifications.length === 0 ? (
+                <View style={styles.notifEmptyContainer}>
+                  <Text style={styles.notifEmptyIcon}>🔔</Text>
+                  <Text style={styles.notifEmptyTitle}>NO NOTIFICATIONS</Text>
+                  <Text style={styles.notifEmptySubtitle}>You're completely caught up!</Text>
                 </View>
-              ))}
+              ) : (
+                notifications.map((n) => (
+                  <TouchableOpacity
+                    key={n.id}
+                    activeOpacity={0.75}
+                    onPress={() => handleNotificationPress(n)}
+                    style={[
+                      styles.notificationCard,
+                      BRUTAL_SHADOWS.xs,
+                      !n.read && styles.notificationCardUnread,
+                    ]}
+                  >
+                    <View style={styles.notifHeaderRow}>
+                      <Text style={styles.notifTitle}>{n.title}</Text>
+                      {!n.read && (
+                        <View style={styles.notifUnreadBadge}>
+                          <Text style={styles.notifUnreadBadgeText}>NEW</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.notifMsg}>{n.message}</Text>
+                    <Text style={styles.notifTime}>{n.time}</Text>
+                  </TouchableOpacity>
+                ))
+              )}
             </ScrollView>
 
             <TouchableOpacity
@@ -410,7 +630,7 @@ export default function HomeScreen({
               }}
               style={[styles.createProjectPromptBtn, BRUTAL_SHADOWS.xs]}
             >
-              <Text style={styles.createProjectPromptText}>DISMISS ALL</Text>
+              <Text style={styles.createProjectPromptText}>MARK ALL READ</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -781,6 +1001,48 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '800',
     color: '#888888',
+  },
+  notificationCardUnread: {
+    backgroundColor: '#FEF08A',
+  },
+  notifHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  notifUnreadBadge: {
+    backgroundColor: '#4ADE80',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  notifUnreadBadgeText: {
+    fontSize: 8,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  notifEmptyContainer: {
+    paddingVertical: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notifEmptyIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  notifEmptyTitle: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  notifEmptySubtitle: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#666666',
   },
 
   // Filters

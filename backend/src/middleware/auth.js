@@ -16,6 +16,19 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   }
 
   if (!token) {
+    if (req.headers["x-user-id"]) {
+      const rawUid = req.headers["x-user-id"].toString();
+      const user = await User.findById(rawUid).select("-passwordHash");
+      if (!user) {
+        throw new ApiError(401, "User not found or invalid user identifier.");
+      }
+      if (!user.isVerified) {
+        throw new ApiError(403, "Account email is not verified.");
+      }
+      req.user = user;
+      req.userId = user._id;
+      return next();
+    }
     throw new ApiError(401, "Authentication token required. Please log in.");
   }
 

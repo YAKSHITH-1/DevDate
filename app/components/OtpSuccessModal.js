@@ -15,6 +15,8 @@ export default function OtpSuccessModal({
   onClose,
   onEnterDiscord,
   onViewProfile,
+  primaryButtonText = '💬 PROCEED TO LOGIN 🚀',
+  secondaryButtonText = '👥 SQUAD DETAILS & LOGIN',
 }) {
   return (
     <Modal
@@ -136,27 +138,27 @@ export default function OtpSuccessModal({
 
           {/* ================= ACTIONS SECTION ================= */}
           <View style={styles.actionsSection}>
-            {/* Primary Action Button: Enter Discord */}
+            {/* Primary Action Button: Proceed to Login */}
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={onEnterDiscord}
               style={[styles.primaryModalBtn, POP_SHADOWS.sm]}
               accessibilityRole="button"
-              accessibilityLabel="Enter Squad Discord"
+              accessibilityLabel={primaryButtonText}
             >
-              <Text style={styles.primaryModalBtnText}>💬 ENTER SQUAD DISCORD 🚀</Text>
+              <Text style={styles.primaryModalBtnText}>{primaryButtonText}</Text>
             </TouchableOpacity>
 
-            {/* Secondary Action Button: View Squad Profile */}
+            {/* Secondary Action Button: Squad Details & Login */}
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={onViewProfile}
               style={styles.secondaryModalBtn}
               accessibilityRole="button"
-              accessibilityLabel="View Squad Profile and Details"
+              accessibilityLabel={secondaryButtonText}
             >
               <Text style={styles.secondaryModalBtnText}>
-                👥 VIEW SQUAD PROFILE & DETAILS
+                {secondaryButtonText}
               </Text>
             </TouchableOpacity>
           </View>

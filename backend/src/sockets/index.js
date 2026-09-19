@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Match from "../models/Match.js";
 import Message from "../models/Message.js";
+import chatService from "../modules/chat/chat.service.js";
 import { JWT_SECRET } from "../config/env.js";
 
 let io = null;
@@ -122,44 +123,7 @@ export const initSocket = (httpServer) => {
           return;
         }
 
-        const match = await Match.findById(matchId);
-        if (!match) {
-          if (callback) callback({ success: false, message: "Match not found" });
-          return;
-        }
-
-        if (match.status !== "ACCEPTED") {
-          if (callback) callback({ success: false, message: "Chat is only available for ACCEPTED matches" });
-          return;
-        }
-
-        const isLead = match.owner.toString() === userId.toString();
-        const isDev = match.user.toString() === userId.toString();
-
-        if (!isLead && !isDev) {
-          if (callback) callback({ success: false, message: "Forbidden: You are not a participant in this conversation" });
-          return;
-        }
-
-        const receiverId = isLead ? match.user : match.owner;
-
-        // 1. Persist to MongoDB
-        const newMessage = await Message.create({
-          match: match._id,
-          project: match.project,
-          sender: userId,
-          receiver: receiverId,
-          message: message.trim(),
-        });
-
-        const populatedMessage = await Message.findById(newMessage._id)
-          .populate("sender", "name email avatar role")
-          .populate("receiver", "name email avatar role");
-
-        // 2. Broadcast to conversation room and direct receiver room
-        io.to(`match:${matchId}`).emit("new_message", populatedMessage);
-        io.to(`user:${receiverId.toString()}`).emit("new_message", populatedMessage);
-
+        const populatedMessage = await chatService.sendMessage(matchId, userId, message.trim());
         if (callback) {
           callback({ success: true, data: populatedMessage });
         }

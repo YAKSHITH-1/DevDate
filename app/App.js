@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, StatusBar, Animated, Platform, ImageBackground } from 'react-native';
+import { View, StyleSheet, StatusBar, Animated, Platform, ImageBackground, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { AppProvider, useApp } from './context/AppContext';
 
@@ -14,6 +14,7 @@ import BottomNav from './components/BottomNav';
 function MainNavigator() {
   const {
     isAuthenticated,
+    authLoading,
     logout,
     invitations,
     chats,
@@ -26,12 +27,16 @@ function MainNavigator() {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
 
-  // Sync auth state
+  // Sync auth state once session restoration completes
   useEffect(() => {
-    if (!isAuthenticated && activeTab !== 'landing') {
-      setActiveTab('landing');
+    if (!authLoading) {
+      if (isAuthenticated && activeTab === 'landing') {
+        setActiveTab('discover');
+      } else if (!isAuthenticated && activeTab !== 'landing') {
+        setActiveTab('landing');
+      }
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   // Smooth transition on tab switch
   useEffect(() => {
@@ -138,6 +143,17 @@ function MainNavigator() {
     }
   };
 
+  if (authLoading) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar barStyle="light-content" backgroundColor="#091830" />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#38bdf8" />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   const isLanding = activeTab === 'landing';
   const ContainerComponent = isLanding ? View : ImageBackground;
   const containerProps = isLanding
@@ -213,5 +229,11 @@ const styles = StyleSheet.create({
   screenWrapper: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#091830',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

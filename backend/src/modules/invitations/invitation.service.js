@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Invitation from "../../models/Invitation.js";
 import Project from "../../models/Project.js";
 import User from "../../models/User.js";
+import Match from "../../models/Match.js";
 import ApiError from "../../utils/ApiError.js";
 import { createNotification } from "../notifications/notification.service.js";
 
@@ -46,23 +47,38 @@ export const createInvitation = async (senderId, { projectId, developerId, messa
     throw new ApiError(403, "Forbidden: You are not authorized to send invitations for this project");
   }
 
-  // 3. Verify Developer exists
+  // 3. Verify Project is OPEN
+  if (project.status === "CLOSED" || project.status !== "OPEN") {
+    throw new ApiError(400, "Project is closed and is not accepting new members");
+  }
+
+  // 4. Verify Project has available capacity
+  const currentMembers = project.members ? project.members.length : 0;
+  const maxCapacity = project.teamSize?.max ?? Infinity;
+  if (currentMembers >= maxCapacity) {
+    throw new ApiError(400, "Project has reached its maximum team size");
+  }
+
+  // 5. Verify Developer exists
   const developer = await User.findById(developerId);
   if (!developer) {
     throw new ApiError(404, "Developer not found");
   }
 
-  // 4. Verify Sender is not inviting themselves
-  if (developerId.toString() === senderId.toString()) {
-    throw new ApiError(400, "You cannot send an invitation to yourself");
+  // 6. Verify Sender is not inviting themselves or the project owner
+  if (
+    developerId.toString() === senderId.toString() ||
+    (project.owner && developerId.toString() === project.owner.toString())
+  ) {
+    throw new ApiError(400, "You cannot send an invitation to yourself or the project owner");
   }
 
-  // 5. Verify Developer is not already a member
+  // 7. Verify Developer is not already a member
   if (project.members && project.members.some((m) => m.toString() === developerId.toString())) {
     throw new ApiError(400, "Developer is already a member of this project");
   }
 
-  // 6. Check for duplicate ACTIVE (Pending) invitation
+  // 8. Check for duplicate ACTIVE (Pending) invitation
   const existingActiveInvitation = await Invitation.findOne({
     projectId,
     developerId,
@@ -70,10 +86,10 @@ export const createInvitation = async (senderId, { projectId, developerId, messa
   });
 
   if (existingActiveInvitation) {
-    throw new ApiError(409, "An active pending invitation already exists for this developer and project");
+    throw new ApiError(409, "An invitation is already pending for this developer");
   }
 
-  // 7. Check if already accepted
+  // 9. Check if already accepted or matched
   const existingAcceptedInvitation = await Invitation.findOne({
     projectId,
     developerId,
@@ -81,10 +97,20 @@ export const createInvitation = async (senderId, { projectId, developerId, messa
   });
 
   if (existingAcceptedInvitation) {
-    throw new ApiError(400, "Developer has already accepted an invitation for this project");
+    throw new ApiError(400, "Developer is already matched with this project");
   }
 
-  // 8. Create Invitation
+  const existingMatch = await Match.findOne({
+    project: projectId,
+    user: developerId,
+    status: "ACCEPTED",
+  });
+
+  if (existingMatch) {
+    throw new ApiError(400, "Developer is already matched with this project");
+  }
+
+  // 10. Create Invitation
   const invitation = await Invitation.create({
     projectId,
     developerId,
@@ -93,10 +119,10 @@ export const createInvitation = async (senderId, { projectId, developerId, messa
     status: "Pending",
   });
 
-  // 9. Fetch Sender details for notification
+  // 11. Fetch Sender details for notification
   const sender = await User.findById(senderId).select("name email role");
 
-  // 10. Create Notification for Developer
+  // 12. Create Notification for Developer
   await createNotification({
     recipient: developerId,
     actor: senderId,
@@ -119,35 +145,67 @@ export const acceptInvitation = async (invitationId, developerId) => {
     throw new ApiError(404, "Invitation not found");
   }
 
-  // Verify recipient
+  // 1. Verify recipient
   if (invitation.developerId._id.toString() !== developerId.toString()) {
     throw new ApiError(403, "Forbidden: You are not authorized to accept this invitation");
   }
 
-  // Check valid transition from Pending
+  // 2. Check valid transition from Pending
   if (invitation.status !== "Pending") {
     throw new ApiError(400, `Cannot accept invitation with status "${invitation.status}"`);
   }
 
+  // 3. Project exists
   const project = await Project.findById(invitation.projectId._id);
   if (!project) {
     throw new ApiError(404, "Associated project not found");
   }
 
-  if (project.status === "CLOSED") {
-    throw new ApiError(400, "Cannot accept invitation for a closed project");
+  // 4. Project is still OPEN
+  if (project.status === "CLOSED" || project.status !== "OPEN") {
+    throw new ApiError(400, "Project is closed and is not accepting new members");
+  }
+
+  // 5. Project still has available capacity
+  const currentMembers = project.members ? project.members.length : 0;
+  const maxCapacity = project.teamSize?.max ?? Infinity;
+  if (currentMembers >= maxCapacity) {
+    throw new ApiError(400, "Project has reached its maximum team size");
+  }
+
+  // 6. Developer is not already a member
+  const isMember = project.members && project.members.some((m) => m.toString() === developerId.toString());
+  if (isMember) {
+    throw new ApiError(400, "Developer is already a member of this project");
   }
 
   // Update invitation status
   invitation.status = "Accepted";
   await invitation.save();
 
-  // Add developer to project members if not already present
-  const isMember = project.members.some((m) => m.toString() === developerId.toString());
-  if (!isMember) {
-    project.members.push(developerId);
-    project.lastActivityAt = new Date();
-    await project.save();
+  // Add developer to project members
+  project.members.push(developerId);
+  project.lastActivityAt = new Date();
+  await project.save();
+
+  // Find or create Match document (Prevent duplicate creation)
+  const ownerId = invitation.senderId?._id || invitation.senderId || project.owner;
+
+  let match = await Match.findOne({
+    project: project._id,
+    user: developerId,
+  });
+
+  if (!match) {
+    match = await Match.create({
+      project: project._id,
+      user: developerId,
+      owner: ownerId,
+      status: "ACCEPTED",
+    });
+  } else if (match.status !== "ACCEPTED") {
+    match.status = "ACCEPTED";
+    await match.save();
   }
 
   // Notify the project owner (Lead)
@@ -157,6 +215,7 @@ export const acceptInvitation = async (invitationId, developerId) => {
     type: "INVITATION_ACCEPTED",
     project: project._id,
     invitation: invitation._id,
+    match: match?._id,
     message: `${invitation.developerId.name || "A developer"} accepted your invitation to join "${project.title}"`,
   });
 

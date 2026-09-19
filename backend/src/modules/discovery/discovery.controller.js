@@ -43,7 +43,30 @@ export const getDeveloperById = asyncHandler(async (req, res) => {
   });
 });
 
+export const recordSwipe = asyncHandler(async (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) {
+    throw new ApiError(401, "Authentication required to record swipe");
+  }
+
+  const { projectId, developerId, action } = req.body;
+
+  const swipe = await discoveryService.recordSwipe({
+    userId,
+    projectId,
+    developerId,
+    action,
+  });
+
+  return res.status(200).json({
+    success: true,
+    message: "Swipe recorded successfully",
+    data: swipe,
+  });
+});
+
 export default {
   getDevelopers,
   getDeveloperById,
+  recordSwipe,
 };

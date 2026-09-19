@@ -10,6 +10,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { POP_PALETTE, POP_SHADOWS, BORDER_RADIUS } from '../styles/theme';
@@ -19,29 +20,33 @@ import OtpSuccessModal from '../components/OtpSuccessModal';
 import { useApp } from '../context/AppContext';
 
 export default function LandingScreen({ onGetStarted }) {
-  const { login, register } = useApp();
+  const { login, register, verifyEmail } = useApp();
 
   // Screen flow: 'landing' | 'login' | 'signup' | 'otp'
   const [currentView, setCurrentView] = useState('landing');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Login Form
-  const [loginEmail, setLoginEmail] = useState('rahul.patel@stanford.edu');
-  const [loginPassword, setLoginPassword] = useState('treehacks2025');
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [rememberRig, setRememberRig] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
 
   // Signup Form
-  const [signupName, setSignupName] = useState('Alex Chen');
-  const [signupEmail, setSignupEmail] = useState('alex.chen@stanford.edu');
-  const [signupPassword, setSignupPassword] = useState('stanford2025');
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
   const [selectedRole, setSelectedRole] = useState('AI / ML');
   const [agreeTerms, setAgreeTerms] = useState(true);
 
   // OTP Form
-  const [otpDigits, setOtpDigits] = useState(['8', '4', '2', '0', '7', '1']);
-  const [otpCountdown, setOtpCountdown] = useState(42);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [verificationName, setVerificationName] = useState('');
+  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
+  const [otpCountdown, setOtpCountdown] = useState(60);
   const otpInputRefs = useRef([]);
 
   // Live countdown timer for OTP resend
@@ -58,16 +63,19 @@ export default function LandingScreen({ onGetStarted }) {
   // Navigation handlers
   const handleOpenLogin = () => {
     setErrorMessage(null);
+    setSuccessMessage(null);
     setCurrentView('login');
   };
 
   const handleOpenSignup = () => {
     setErrorMessage(null);
+    setSuccessMessage(null);
     setCurrentView('signup');
   };
 
   const handleBack = () => {
     setErrorMessage(null);
+    setSuccessMessage(null);
     if (currentView === 'otp') {
       setCurrentView('login');
     } else {
@@ -75,63 +83,182 @@ export default function LandingScreen({ onGetStarted }) {
     }
   };
 
-  const handleLoginSubmit = () => {
+  const handleLoginSubmit = async () => {
+    if (isSubmitting) return;
     if (!loginEmail || !loginEmail.includes('@')) {
       setErrorMessage('Enter a valid campus (.edu) email');
       return;
     }
+    if (!loginPassword) {
+      setErrorMessage('Access key (password) is required');
+      return;
+    }
+
     setErrorMessage(null);
-    setCurrentView('otp');
-    setOtpCountdown(42);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await login(loginEmail, loginPassword);
+      if (res.success) {
+        if (onGetStarted) {
+          onGetStarted();
+        }
+      } else {
+        const isUnverified =
+          res.status === 403 ||
+          (res.error && res.error.toLowerCase().includes('verify'));
+        if (isUnverified) {
+          setVerificationEmail(loginEmail.trim().toLowerCase());
+          setOtpDigits(['', '', '', '', '', '']);
+          setOtpCountdown(60);
+          setErrorMessage('Please verify your email address. Enter the 6-digit code sent to your inbox.');
+          setCurrentView('otp');
+        } else {
+          setErrorMessage(res.error || 'Invalid credentials. Please try again.');
+        }
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Unable to log in. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSignupSubmit = () => {
+  const handleSignupSubmit = async () => {
+    if (isSubmitting) return;
     if (!signupName.trim()) {
       setErrorMessage('Full name / alias is required');
       return;
     }
-    if (!signupEmail.includes('@')) {
-      setErrorMessage('Valid .edu campus email is required');
+    if (!signupEmail.trim() || !signupEmail.includes('@')) {
+      setErrorMessage('Valid campus email is required');
       return;
     }
+    if (!signupPassword || signupPassword.length < 6) {
+      setErrorMessage('Access key must be at least 6 characters long');
+      return;
+    }
+
     setErrorMessage(null);
-    setCurrentView('otp');
-    setOtpCountdown(42);
+    setSuccessMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await register({
+        name: signupName.trim(),
+        email: signupEmail.trim().toLowerCase(),
+        role: selectedRole,
+        password: signupPassword,
+      });
+
+      if (res.success) {
+        setVerificationEmail(signupEmail.trim().toLowerCase());
+        setVerificationName(signupName.trim());
+        const devOtpCode = res.data?.devOtp;
+        if (devOtpCode && typeof devOtpCode === 'string' && devOtpCode.length === 6) {
+          setOtpDigits(devOtpCode.split(''));
+        } else {
+          setOtpDigits(['', '', '', '', '', '']);
+        }
+        setOtpCountdown(60);
+        setCurrentView('otp');
+      } else {
+        setErrorMessage(res.error || 'Registration failed. Please check your information.');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Unable to register. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleOtpDigitChange = (value, index) => {
+    const sanitized = value.replace(/[^0-9]/g, '');
     const newDigits = [...otpDigits];
-    newDigits[index] = value;
+    newDigits[index] = sanitized.slice(-1);
     setOtpDigits(newDigits);
+    setErrorMessage(null);
 
-    if (value && index < 5 && otpInputRefs.current[index + 1]) {
+    if (sanitized && index < 5 && otpInputRefs.current[index + 1]) {
       otpInputRefs.current[index + 1].focus();
     }
   };
 
-  const handleVerifyOtp = () => {
-    setShowSuccessModal(true);
-  };
-
-  const handleEnterSquadDiscord = () => {
-    setShowSuccessModal(false);
-    if (currentView === 'signup') {
-      register({
-        name: signupName,
-        email: signupEmail,
-        role: selectedRole,
-        password: signupPassword,
-      });
-    } else {
-      login(loginEmail, loginPassword);
+  const handleOtpKeyPress = (e, index) => {
+    if (e.nativeEvent?.key === 'Backspace' && !otpDigits[index] && index > 0 && otpInputRefs.current[index - 1]) {
+      otpInputRefs.current[index - 1].focus();
     }
-    onGetStarted();
   };
 
-  const handleViewSquadProfile = () => {
+  const handleVerifyOtp = async () => {
+    if (isSubmitting) return;
+    const otpCode = otpDigits.join('');
+    if (otpCode.length !== 6) {
+      setErrorMessage('Please enter all 6 digits of the verification code');
+      return;
+    }
+    const targetEmail = verificationEmail || signupEmail || loginEmail;
+    if (!targetEmail) {
+      setErrorMessage('Email address missing. Please return to login.');
+      return;
+    }
+
+    setErrorMessage(null);
+    setIsSubmitting(true);
+
+    try {
+      const res = await verifyEmail(targetEmail, otpCode);
+      if (res.success) {
+        setShowSuccessModal(true);
+      } else {
+        setErrorMessage(res.error || 'Invalid or expired verification code');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Verification request failed. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (otpCountdown > 0 || isSubmitting) return;
+    const targetEmail = verificationEmail || signupEmail || loginEmail;
+    if (!targetEmail) {
+      setErrorMessage('Email address missing. Please return to signup.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await register({
+        name: verificationName || signupName || 'DevDate Builder',
+        email: targetEmail,
+        role: selectedRole,
+        password: signupPassword || 'DevDate2026!',
+      });
+      if (res.success) {
+        setOtpCountdown(60);
+        setSuccessMessage('A fresh verification code has been dispatched to your email.');
+      } else {
+        setErrorMessage(res.error || 'Failed to resend code');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to resend code');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleOtpSuccessModalDone = () => {
     setShowSuccessModal(false);
-    login(loginEmail || signupEmail, 'password');
-    onGetStarted();
+    const targetEmail = verificationEmail || signupEmail || loginEmail;
+    if (targetEmail) {
+      setLoginEmail(targetEmail);
+    }
+    setSuccessMessage('Email verified successfully! Please enter your access key to log in.');
+    setCurrentView('login');
   };
 
   /* ========================================================================= */
@@ -245,6 +372,12 @@ export default function LandingScreen({ onGetStarted }) {
               </View>
             )}
 
+            {successMessage && (
+              <View style={[styles.successBox, POP_SHADOWS.xs]}>
+                <Text style={styles.successBoxText}>★ {successMessage}</Text>
+              </View>
+            )}
+
             {/* ============================================================== */}
             {/* VIEW A: LOGIN SCREEN ('ENTER THE LAB')                         */}
             {/* ============================================================== */}
@@ -293,7 +426,7 @@ export default function LandingScreen({ onGetStarted }) {
 
                   </View>
                   <View style={styles.inputWrapper}>
-                    <Text style={styles.terminalPrompt}>{'>_'}</Text>
+                    <Text style={styles.terminalPrompt}>{'>'}</Text>
                     <TextInput
                       style={styles.textInput}
                       value={loginEmail}
@@ -342,11 +475,16 @@ export default function LandingScreen({ onGetStarted }) {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={handleLoginSubmit}
-                  style={[styles.blastOffBtn, POP_SHADOWS.md]}
+                  disabled={isSubmitting}
+                  style={[styles.blastOffBtn, POP_SHADOWS.md, isSubmitting && { opacity: 0.85 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Blast off to Canvas"
                 >
-                  <Text style={styles.blastOffBtnText}>LOGIN</Text>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={POP_PALETTE.inkBlack} size="small" />
+                  ) : (
+                    <Text style={styles.blastOffBtnText}>LOGIN</Text>
+                  )}
                 </TouchableOpacity>
 
 
@@ -420,7 +558,7 @@ export default function LandingScreen({ onGetStarted }) {
                     </View>
                   </View>
                   <View style={styles.inputWrapper}>
-                    <Text style={styles.terminalPrompt}>{'>_'}</Text>
+                    <Text style={styles.terminalPrompt}>{'>'}</Text>
                     <TextInput
                       style={styles.textInput}
                       value={signupName}
@@ -442,7 +580,7 @@ export default function LandingScreen({ onGetStarted }) {
 
                   </View>
                   <View style={styles.inputWrapper}>
-                    <Text style={styles.terminalPrompt}>{'>_'}</Text>
+                    <Text style={styles.terminalPrompt}>{'>'}</Text>
                     <TextInput
                       style={styles.textInput}
                       value={signupEmail}
@@ -530,11 +668,16 @@ export default function LandingScreen({ onGetStarted }) {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={handleSignupSubmit}
-                  style={[styles.claimPassBtn, POP_SHADOWS.md]}
+                  disabled={isSubmitting}
+                  style={[styles.claimPassBtn, POP_SHADOWS.md, isSubmitting && { opacity: 0.85 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Claim your pass"
                 >
-                  <Text style={styles.claimPassBtnText}>Signup</Text>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={POP_PALETTE.inkBlack} size="small" />
+                  ) : (
+                    <Text style={styles.claimPassBtnText}>Signup</Text>
+                  )}
                 </TouchableOpacity>
 
 
@@ -577,11 +720,15 @@ export default function LandingScreen({ onGetStarted }) {
 
                     <View style={styles.otpProfileInfo}>
                       <View style={styles.otpNameRow}>
-                        <Text style={styles.otpProfileName}>RAHUL PATEL</Text>
+                        <Text style={styles.otpProfileName}>
+                          {verificationName ? verificationName.toUpperCase() : 'NEW BUILDER'}
+                        </Text>
                         <Text style={styles.otpVerifiedCheck}>✔</Text>
                       </View>
-                      <Text style={styles.otpProjectText}>Project: AI Study Assistant</Text>
-                      <Text style={styles.otpEmailText}>rahul.patel@stanford.edu</Text>
+                      <Text style={styles.otpProjectText}>Project: DevDate Rig</Text>
+                      <Text style={styles.otpEmailText}>
+                        {verificationEmail || signupEmail || loginEmail || 'builder@campus.edu'}
+                      </Text>
                     </View>
 
                     <TouchableOpacity
@@ -618,8 +765,8 @@ export default function LandingScreen({ onGetStarted }) {
                   {/* 6 Digit Input Boxes */}
                   <View style={styles.otpTokensRow}>
                     {otpDigits.map((digit, idx) => {
-                      const isFilled = idx < 4;
-                      const isActive = idx === 4;
+                      const isFilled = Boolean(digit);
+                      const isActive = otpDigits.findIndex((d) => !d) === idx || (idx === 5 && isFilled);
                       return (
                         <View
                           key={idx}
@@ -637,6 +784,7 @@ export default function LandingScreen({ onGetStarted }) {
                             ]}
                             value={digit}
                             onChangeText={(val) => handleOtpDigitChange(val, idx)}
+                            onKeyPress={(e) => handleOtpKeyPress(e, idx)}
                             maxLength={1}
                             keyboardType="numeric"
                             textAlign="center"
@@ -660,16 +808,20 @@ export default function LandingScreen({ onGetStarted }) {
                     <View style={styles.resendActions}>
                       <TouchableOpacity
                         activeOpacity={0.8}
-                        onPress={() => setOtpCountdown(45)}
-                        style={styles.resendPillBtn}
+                        onPress={handleResendOtp}
+                        disabled={otpCountdown > 0 || isSubmitting}
+                        style={[
+                          styles.resendPillBtn,
+                          (otpCountdown > 0 || isSubmitting) && { opacity: 0.65 },
+                        ]}
                       >
                         <Text style={styles.resendPillText}>
-                          🔄 RESEND IN {otpCountdown}S
+                          {otpCountdown > 0 ? ` RESEND IN ${otpCountdown}S` : ' RESEND CODE'}
                         </Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity activeOpacity={0.8} style={styles.smsPillBtn}>
-                        <Text style={styles.smsPillText}>SMS 💬</Text>
+                        <Text style={styles.smsPillText}>SMS</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -677,9 +829,6 @@ export default function LandingScreen({ onGetStarted }) {
                   {/* Step Ribbon */}
                   <View style={styles.stepRibbonRow}>
                     <View style={styles.stepRibbonLeft}>
-                      <View style={styles.stepBadgeCyan}>
-                        <Text style={styles.stepBadgeCyanText}>AGENTIC RAG SQUAD</Text>
-                      </View>
                       <View style={styles.stepBadgePink}>
                         <Text style={styles.stepBadgePinkText}>DEVDATE</Text>
                       </View>
@@ -692,22 +841,24 @@ export default function LandingScreen({ onGetStarted }) {
                 <TouchableOpacity
                   activeOpacity={0.85}
                   onPress={handleVerifyOtp}
-                  style={[styles.claimPassBtn, POP_SHADOWS.md, { marginTop: 6 }]}
+                  disabled={isSubmitting}
+                  style={[styles.claimPassBtn, POP_SHADOWS.md, { marginTop: 6 }, isSubmitting && { opacity: 0.85 }]}
                   accessibilityRole="button"
-                  accessibilityLabel="Verify and blast off"
+                  accessibilityLabel="Verify"
                 >
-                  <Text style={styles.claimPassBtnText}>🚀 VERIFY & BLAST OFF 🚀</Text>
+                  {isSubmitting ? (
+                    <ActivityIndicator color={POP_PALETTE.inkBlack} size="small" />
+                  ) : (
+                    <Text style={styles.claimPassBtnText}> VERIFY</Text>
+                  )}
                 </TouchableOpacity>
 
                 {/* Action Links */}
                 <View style={styles.otpActionLinksRow}>
                   <TouchableOpacity onPress={() => setCurrentView('login')}>
-                    <Text style={styles.returnLoginLink}>{'< RETURN TO RIG LOGIN'}</Text>
+                    <Text style={styles.returnLoginLink}>{'<- LOGIN'}</Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => alert('Support dispatch sent to your terminal!')}>
-                    <Text style={styles.needHelpLink}>NEED HELP? ⚡</Text>
-                  </TouchableOpacity>
                 </View>
 
                 {/* TreeHacks Verified Stamp */}
@@ -749,9 +900,9 @@ export default function LandingScreen({ onGetStarted }) {
         {/* Success Modal */}
         <OtpSuccessModal
           visible={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
-          onEnterDiscord={handleEnterSquadDiscord}
-          onViewProfile={handleViewSquadProfile}
+          onClose={handleOtpSuccessModalDone}
+          onEnterDiscord={handleOtpSuccessModalDone}
+          onViewProfile={handleOtpSuccessModalDone}
         />
       </SafeAreaView>
     </PopArtHalftoneView>
@@ -874,6 +1025,22 @@ const styles = StyleSheet.create({
   },
   errorBoxText: {
     color: '#B91C1C',
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  successBox: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: '#DCFCE7',
+    borderWidth: 2.5,
+    borderColor: '#22C55E',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 10,
+  },
+  successBoxText: {
+    color: '#15803D',
     fontSize: 12,
     fontWeight: '900',
   },

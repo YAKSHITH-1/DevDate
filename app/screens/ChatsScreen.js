@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, BRUTAL_SHADOWS, COMIC_TEXT_SHADOW } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
@@ -20,11 +22,25 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
     activeChatId,
     setActiveChatId,
     sendMessage,
+    loadConversationMessages,
+    messagesLoading,
+    matchesLoading,
+    refreshMatchesAndInvitations,
     markChatAsRead,
     activeProject,
+    socketConnected,
+    joinMatchRoom,
+    leaveMatchRoom,
+    sendTyping,
+    sendStopTyping,
+    typingStatusByMatch,
   } = useApp();
 
   const [inputText, setInputText] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState(null);
+  const messageScrollRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
 
   // If instructed to open a specific developer chat from Matches
   useEffect(() => {
@@ -38,27 +54,91 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
     }
   }, [initialChatDeveloperName, chats]);
 
+  // When active chat opens, load persisted messages from REST and join Socket.IO match room
+  useEffect(() => {
+    if (activeChatId) {
+      if (loadConversationMessages) {
+        loadConversationMessages(activeChatId);
+      }
+      if (joinMatchRoom) {
+        joinMatchRoom(activeChatId);
+      }
+    }
+
+    return () => {
+      if (activeChatId) {
+        if (sendStopTyping) {
+          sendStopTyping(activeChatId);
+        }
+        if (leaveMatchRoom) {
+          leaveMatchRoom(activeChatId);
+        }
+      }
+    };
+  }, [activeChatId]);
+
   // Derived activeChat from central AppContext
-  const activeChat = activeChatId ? chats.find((c) => c.id === activeChatId) : null;
+  const activeChat = activeChatId
+    ? chats.find((c) => c.id === activeChatId || c.matchId === activeChatId)
+    : null;
 
-  const handleSendMessage = () => {
-    if (!inputText.trim() || !activeChat) return;
+  // Auto-scroll to bottom on messages change
+  useEffect(() => {
+    if (activeChat?.messages?.length) {
+      setTimeout(() => {
+        messageScrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [activeChat?.messages?.length]);
 
-    // 1. Instant local state update in AppContext (message appears immediately)
-    sendMessage(activeChat.id, inputText.trim());
+  const handleInputChange = (text) => {
+    setInputText(text);
 
-    // 2. SOCKET.IO INTEGRATION STRUCTURE (ready for future connection):
-    // if (socket && socket.connected) {
-    //   socket.emit('send_project_message', {
-    //     projectId: activeChat.projectId,
-    //     chatId: activeChat.id,
-    //     recipientId: activeChat.developerId,
-    //     text: inputText.trim(),
-    //     timestamp: Date.now(),
-    //   });
-    // }
+    if (activeChat) {
+      const chatId = activeChat.id || activeChat.matchId;
+      if (sendTyping) {
+        sendTyping(chatId);
+      }
 
-    setInputText('');
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      typingTimeoutRef.current = setTimeout(() => {
+        if (sendStopTyping) {
+          sendStopTyping(chatId);
+        }
+      }, 2500);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !activeChat || isSending) return;
+
+    const textToSend = inputText.trim();
+    const chatId = activeChat.id || activeChat.matchId;
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    if (sendStopTyping) {
+      sendStopTyping(chatId);
+    }
+
+    setIsSending(true);
+    setSendError(null);
+
+    const result = await sendMessage(chatId, textToSend);
+
+    if (result && result.success) {
+      setInputText('');
+      setTimeout(() => {
+        messageScrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    } else {
+      setSendError(result?.error || 'Failed to send message');
+      setTimeout(() => setSendError(null), 3500);
+    }
+    setIsSending(false);
   };
 
   return (
@@ -79,12 +159,20 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
               <Text style={styles.backBtnIcon}>←</Text>
             </TouchableOpacity>
 
-            <Image source={{ uri: activeChat.developerAvatar }} style={styles.threadAvatar} />
+            {activeChat.developerAvatar ? (
+              <Image source={{ uri: activeChat.developerAvatar }} style={styles.threadAvatar} onError={() => {}} />
+            ) : (
+              <View style={[styles.threadAvatar, styles.avatarFallback]}>
+                <Text style={styles.avatarFallbackText}>
+                  {activeChat.developerName?.charAt(0)?.toUpperCase() || '👤'}
+                </Text>
+              </View>
+            )}
 
             <View style={styles.threadHeaderInfo}>
               <View style={styles.threadNameRow}>
                 <Text style={styles.threadDevName}>{activeChat.developerName}</Text>
-                <View style={[styles.threadStatusDot, activeChat.status === 'Online' && styles.dotOnline]} />
+                <View style={[styles.threadStatusDot, (activeChat.status === 'Online' || socketConnected) && styles.dotOnline]} />
               </View>
               <Text style={styles.threadProjectSubtitle}>{activeChat.projectName}</Text>
             </View>
@@ -105,6 +193,7 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
 
           {/* Message Thread Feed */}
           <ScrollView
+            ref={messageScrollRef}
             style={styles.messageScroll}
             contentContainerStyle={styles.messageContent}
             showsVerticalScrollIndicator={false}
@@ -120,7 +209,14 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
               />
             </View>
 
-            {activeChat.messages.map((msg) => (
+            {messagesLoading && (!activeChat.messages || activeChat.messages.length === 0) ? (
+              <View style={styles.loadingMessagesContainer}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.loadingMessagesText}>Loading messages...</Text>
+              </View>
+            ) : null}
+
+            {activeChat.messages && activeChat.messages.map((msg) => (
               <View
                 key={msg.id}
                 style={[
@@ -129,7 +225,7 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
                 ]}
               >
                 {!msg.isMe && (
-                  <Text style={styles.senderLabel}>{activeChat.developerName.split(' ')[0]}</Text>
+                  <Text style={styles.senderLabel}>{(msg.sender || activeChat.developerName || 'Partner').split(' ')[0]}</Text>
                 )}
                 <View
                   style={[
@@ -148,7 +244,25 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
                 </View>
               </View>
             ))}
+
+            {/* Realtime Typing Indicator */}
+            {activeChatId && typingStatusByMatch[activeChatId]?.isTyping ? (
+              <View style={styles.typingIndicatorContainer}>
+                <View style={[styles.typingBubble, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.typingIndicatorText}>
+                    ✍️ {typingStatusByMatch[activeChatId]?.name || activeChat.developerName} is typing...
+                  </Text>
+                </View>
+              </View>
+            ) : null}
           </ScrollView>
+
+          {/* Send Error Notice */}
+          {sendError ? (
+            <View style={styles.sendErrorBanner}>
+              <Text style={styles.sendErrorText}>⚠️ {sendError}</Text>
+            </View>
+          ) : null}
 
           {/* Message Composer Input */}
           <View style={styles.composerBar}>
@@ -158,18 +272,30 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
 
             <TextInput
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleInputChange}
               placeholder="Type a pitch or message..."
               placeholderTextColor={COLORS.textSecondary}
               style={[styles.chatInput, BRUTAL_SHADOWS.xs]}
+              editable={!isSending}
+              onSubmitEditing={handleSendMessage}
+              returnKeyType="send"
             />
 
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleSendMessage}
-              style={[styles.sendBtn, BRUTAL_SHADOWS.xs]}
+              disabled={isSending || !inputText.trim()}
+              style={[
+                styles.sendBtn,
+                BRUTAL_SHADOWS.xs,
+                (!inputText.trim() || isSending) && { opacity: 0.6 },
+              ]}
             >
-              <Text style={styles.sendIcon}>🚀</Text>
+              {isSending ? (
+                <ActivityIndicator size="small" color={COLORS.black} />
+              ) : (
+                <Text style={styles.sendIcon}>🚀</Text>
+              )}
             </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
@@ -191,7 +317,18 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
             />
           </View>
 
-          <ScrollView contentContainerStyle={styles.chatListScroll} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            contentContainerStyle={styles.chatListScroll}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={matchesLoading}
+                onRefresh={refreshMatchesAndInvitations}
+                tintColor={COLORS.primary}
+                colors={[COLORS.primary]}
+              />
+            }
+          >
             {chats.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyIcon}>💬</Text>
@@ -221,7 +358,15 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
                   style={[styles.chatListItem, BRUTAL_SHADOWS.md]}
                 >
                   <View style={styles.avatarContainer}>
-                    <Image source={{ uri: item.developerAvatar }} style={styles.listAvatar} />
+                    {item.developerAvatar ? (
+                      <Image source={{ uri: item.developerAvatar }} style={styles.listAvatar} onError={() => {}} />
+                    ) : (
+                      <View style={[styles.listAvatar, styles.avatarFallback]}>
+                        <Text style={styles.avatarFallbackText}>
+                          {item.developerName?.charAt(0)?.toUpperCase() || '👤'}
+                        </Text>
+                      </View>
+                    )}
                     {item.status === 'Online' && <View style={styles.onlineBadge} />}
                   </View>
 
@@ -600,4 +745,60 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: COLORS.black,
   },
+  loadingMessagesContainer: {
+    paddingVertical: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  loadingMessagesText: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textTransform: 'uppercase',
+  },
+  sendErrorBanner: {
+    backgroundColor: COLORS.pink,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: BORDER_RADIUS.sm,
+    borderWidth: 1.5,
+    borderColor: COLORS.black,
+    marginBottom: 8,
+    alignSelf: 'center',
+  },
+  sendErrorText: {
+    fontFamily: FONTS.bold,
+    fontSize: 12,
+    color: COLORS.black,
+  },
+  typingIndicatorContainer: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+    alignItems: 'flex-start',
+  },
+  typingBubble: {
+    backgroundColor: COLORS.pastelYellow || COLORS.yellow,
+    borderWidth: 2,
+    borderColor: COLORS.black,
+    borderRadius: BORDER_RADIUS.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  typingIndicatorText: {
+    fontFamily: FONTS.bold,
+    fontSize: 11,
+    color: COLORS.black,
+  },
+  avatarFallback: {
+    backgroundColor: COLORS.yellow,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    fontFamily: FONTS.black,
+    fontSize: 18,
+    color: COLORS.black,
+  },
 });
+

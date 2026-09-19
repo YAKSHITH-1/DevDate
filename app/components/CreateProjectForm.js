@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ImageBackground,
+  Image,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from './ComicBadge';
@@ -23,7 +24,10 @@ import {
   PROJECT_INTERESTS,
   INTEREST_COLORS,
   PROJECT_ICONS,
+  getSkillPresentation,
 } from '../data/skillsDatabase';
+import { useApp } from '../context/AppContext';
+import { resolveSkillToId } from '../utils/api';
 
 /**
  * CreateProjectForm — High-Definition 3-Step Comic Wizard
@@ -46,8 +50,12 @@ export default function CreateProjectForm({
   const [description, setDescription] = useState(initialData?.description || '');
   const [category, setCategory] = useState(initialData?.category || 'Web Development');
   const [duration, setDuration] = useState(initialData?.duration || '1-2 months');
-  const [minDevs, setMinDevs] = useState(2);
-  const [maxDevs, setMaxDevs] = useState(initialData?.maxMembers || 5);
+  const [minDevs, setMinDevs] = useState(
+    initialData?.teamSize?.min ?? initialData?.minMembers ?? 2
+  );
+  const [maxDevs, setMaxDevs] = useState(
+    initialData?.teamSize?.max ?? initialData?.maxMembers ?? 5
+  );
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
 
@@ -66,24 +74,57 @@ export default function CreateProjectForm({
   const [selectedInterests, setSelectedInterests] = useState(
     initialData?.interests || ['AI & Neural Nets', 'Web Platform', 'Developer Tools']
   );
+  const [projectImage, setProjectImage] = useState(
+    initialData?.image && (initialData.image.startsWith('http') || initialData.image.startsWith('data:image/'))
+      ? initialData.image
+      : ''
+  );
   const [projectIcon, setProjectIcon] = useState(initialData?.icon || '🚀');
   const [showIconPicker, setShowIconPicker] = useState(false);
+
+  const { canonicalSkills = [] } = useApp ? useApp() : {};
 
   // ─── Reset / Sync on Open ───────────────────────────────────
   useEffect(() => {
     if (visible) {
       setStep(1);
+      const resolveList = (list) => {
+        if (!Array.isArray(list)) return [];
+        return list
+          .map((item) => {
+            if (!item) return null;
+            if (typeof item === 'string' && /^[0-9a-fA-F]{24}$/.test(item)) {
+              return item;
+            }
+            if (typeof item === 'object') {
+              const objId = (item._id || item.id || '').toString();
+              if (objId && /^[0-9a-fA-F]{24}$/.test(objId)) {
+                return objId;
+              }
+              if (item.name) {
+                const id = resolveSkillToId(item.name, canonicalSkills);
+                if (id) return id;
+              }
+            }
+            const id = resolveSkillToId(item, canonicalSkills);
+            return id || (typeof item === 'object' ? (item.id || item._id) : item);
+          })
+          .filter(Boolean);
+      };
+
       if (initialData) {
         setTitle(initialData.title || '');
         setDescription(initialData.description || '');
         setCategory(initialData.category || 'Web Development');
         setDuration(initialData.duration || '1-2 months');
-        setMinDevs(2);
-        setMaxDevs(initialData.maxMembers || 5);
-        setSelectedSkills(initialData.techStack || ['javascript', 'react']);
-        setSelectedRoles(initialData.wantedRoles || ['FULL STACK']);
+        setMinDevs(initialData.teamSize?.min ?? initialData.minMembers ?? 2);
+        setMaxDevs(initialData.teamSize?.max ?? initialData.maxMembers ?? 5);
+        const resolved = resolveList(initialData.requiredSkills || initialData.techStack || ['javascript', 'react']);
+        setSelectedSkills([...new Set(resolved)]);
+        setSelectedRoles(initialData.wantedRoles || initialData.requiredRoles || ['FULL STACK']);
         setSelectedInterests(initialData.interests || ['Web Platform']);
-        setProjectIcon(initialData.icon || '🚀');
+        setProjectIcon(initialData.icon || (initialData.image && !initialData.image.startsWith('http') ? initialData.image : '🚀'));
+        setProjectImage(initialData.image && (initialData.image.startsWith('http') || initialData.image.startsWith('data:image/')) ? initialData.image : '');
       } else {
         setTitle('DevDate');
         setDescription('');
@@ -91,10 +132,12 @@ export default function CreateProjectForm({
         setDuration('1-2 months');
         setMinDevs(2);
         setMaxDevs(5);
-        setSelectedSkills(['javascript', 'react', 'nodejs', 'mongodb']);
+        const resolved = resolveList(['javascript', 'react', 'nodejs', 'mongodb']);
+        setSelectedSkills([...new Set(resolved)]);
         setSelectedRoles(['FULL STACK', 'BACKEND DEV']);
         setSelectedInterests(['AI & Neural Nets', 'Web Platform', 'Developer Tools']);
         setProjectIcon('🚀');
+        setProjectImage('');
       }
       setSkillSearch('');
       setActiveCategoryTab('all');
@@ -103,23 +146,54 @@ export default function CreateProjectForm({
       setShowSkillCategoryDropdown(false);
       setShowIconPicker(false);
     }
-  }, [visible, initialData]);
+  }, [visible, initialData, canonicalSkills]);
+
+  // Available skills: prioritize canonical backend skills if loaded, otherwise fallback to local ALL_SKILLS
+  const allAvailableSkills = useMemo(() => {
+    if (canonicalSkills && canonicalSkills.length > 0) {
+      return canonicalSkills.map((cs) => {
+        const pres = getSkillPresentation(cs.name);
+        return {
+          id: (cs.id || cs._id).toString(),
+          label: cs.name,
+          name: cs.name,
+          categories: cs.categories || [],
+          aliases: cs.aliases || [],
+          badge: pres?.badge || { text: cs.name.slice(0, 2).toUpperCase(), bg: '#3B82F6', color: '#FFF' },
+          subtitle: cs.categories?.[0]?.toUpperCase() || 'TECH',
+        };
+      });
+    }
+    return ALL_SKILLS;
+  }, [canonicalSkills]);
 
   // ─── Filtered Skills ────────────────────────────────────────
   const filteredSkills = useMemo(() => {
     if (skillSearch.trim()) {
-      return searchSkills(skillSearch);
+      const q = skillSearch.trim().toLowerCase();
+      return allAvailableSkills.filter(
+        (s) =>
+          s.label.toLowerCase().includes(q) ||
+          (Array.isArray(s.aliases) && s.aliases.some((a) => a.toLowerCase().includes(q))) ||
+          (Array.isArray(s.categories) && s.categories.some((c) => c.toLowerCase().includes(q)))
+      );
     }
     if (activeCategoryTab === 'all') {
-      return ALL_SKILLS.slice(0, 18);
+      return allAvailableSkills.slice(0, 20);
     }
-    const cat = SKILL_CATEGORIES.find((c) => c.id === activeCategoryTab);
-    return cat ? cat.skills.map((s) => ({ ...s, categoryId: cat.id, categoryName: cat.name })) : ALL_SKILLS.slice(0, 18);
-  }, [skillSearch, activeCategoryTab]);
+    return allAvailableSkills
+      .filter((s) =>
+        Array.isArray(s.categories)
+          ? s.categories.some((c) => c.toLowerCase().includes(activeCategoryTab.toLowerCase()))
+          : s.categoryId === activeCategoryTab
+      )
+      .slice(0, 20);
+  }, [skillSearch, activeCategoryTab, allAvailableSkills]);
 
   const toggleSkill = (skillId) => {
+    const targetId = String(skillId);
     setSelectedSkills((prev) =>
-      prev.includes(skillId) ? prev.filter((s) => s !== skillId) : [...prev, skillId]
+      prev.includes(targetId) ? prev.filter((s) => s !== targetId) : [...new Set([...prev, targetId])]
     );
   };
 
@@ -154,7 +228,14 @@ export default function CreateProjectForm({
     }
   };
 
-  const handleSubmit = () => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  const handleSubmit = async () => {
+    if (isSubmitting) return; // Prevent double submission
+    setIsSubmitting(true);
+    setSubmitError(null);
+
     const formData = {
       title: title.trim(),
       description: description.trim() || 'Exciting collaborative project built with passion.',
@@ -162,13 +243,32 @@ export default function CreateProjectForm({
       duration: duration || '1-2 months',
       maxMembers: maxDevs,
       minMembers: minDevs,
+      teamSize: {
+        min: minDevs,
+        max: maxDevs,
+      },
       techStack: selectedSkills,
+      requiredSkills: selectedSkills,
       wantedRoles: selectedRoles.length > 0 ? selectedRoles : ['FULL STACK'],
+      requiredRoles: selectedRoles.length > 0 ? selectedRoles : ['FULL STACK'],
       interests: selectedInterests,
       icon: projectIcon,
+      image: projectImage.trim() || null,
     };
-    onSubmit(formData);
-    onClose();
+
+    try {
+      const result = await onSubmit(formData);
+      if (result && result.success === false) {
+        setSubmitError(result.error || (isEdit ? 'Failed to update project' : 'Failed to create project'));
+        setIsSubmitting(false);
+        return;
+      }
+      setIsSubmitting(false);
+      onClose();
+    } catch (err) {
+      setSubmitError(err.message || (isEdit ? 'Failed to update project' : 'Failed to create project'));
+      setIsSubmitting(false);
+    }
   };
 
   // ─── Category Tabs for Step 2 ───────────────────────────────
@@ -188,9 +288,9 @@ export default function CreateProjectForm({
 
   // ─── TOP WIZARD HEADER ──────────────────────────────────────
   const renderTopHeader = () => {
-    let stepTitle = 'STEP 1: PROJECT SCOPE';
-    if (step === 2) stepTitle = 'STEP 2: STACK & ARCHITECTURE';
-    if (step === 3) stepTitle = 'STEP 3: CO FOUNDER MATCHING';
+    let stepTitle = isEdit ? 'STEP 1: EDIT PROJECT SCOPE' : 'STEP 1: PROJECT SCOPE';
+    if (step === 2) stepTitle = isEdit ? 'STEP 2: EDIT TECH STACK' : 'STEP 2: STACK & ARCHITECTURE';
+    if (step === 3) stepTitle = isEdit ? 'STEP 3: EDIT TEAM REQUIREMENTS' : 'STEP 3: CO FOUNDER MATCHING';
 
     return (
       <View style={styles.topHeader}>
@@ -208,7 +308,7 @@ export default function CreateProjectForm({
           <View style={styles.headerSubtitleRow}>
             <Text style={styles.headerSubtitleDevDate}>DEVDATE :: WIZARD</Text>
             <Text style={styles.headerSubtitleSlash}> / </Text>
-            <Text style={styles.headerSubtitleDrafting}>★ DRAFTING</Text>
+            <Text style={styles.headerSubtitleDrafting}>{isEdit ? '★ EDITING' : '★ DRAFTING'}</Text>
           </View>
           <Text style={styles.headerMainTitle} numberOfLines={1}>
             {stepTitle}
@@ -363,7 +463,7 @@ export default function CreateProjectForm({
           <Text style={styles.stepSpecPillText}>STEP 1 OF 3 • PROJECT SPEC</Text>
         </View>
 
-        <Text style={styles.comicHeading}>CREATE YOUR PROJECT</Text>
+        <Text style={styles.comicHeading}>{isEdit ? 'EDIT YOUR PROJECT' : 'CREATE YOUR PROJECT'}</Text>
         <Text style={styles.comicSubheading}>TELL DEVELOPERS WHAT YOU'RE BUILDING.</Text>
       </View>
 
@@ -793,8 +893,10 @@ export default function CreateProjectForm({
 
         <View style={styles.drawerChipsWrap}>
           {selectedSkills.map((sId) => {
-            const sk = ALL_SKILLS.find((s) => s.id === sId);
-            const label = sk ? sk.label : sId;
+            const sk =
+              allAvailableSkills.find((s) => s.id === sId) ||
+              ALL_SKILLS.find((s) => s.id === sId);
+            const label = sk ? (sk.label || sk.name) : sId;
             return (
               <TouchableOpacity
                 key={sId}
@@ -965,21 +1067,34 @@ export default function CreateProjectForm({
       {/* Section: Project Cover Image */}
       <View style={[styles.coverCard, BRUTAL_SHADOWS.xs]}>
         <View style={styles.coverCardHeader}>
-          <Text style={styles.coverHeaderTitle}>🖼 PROJECT COVER IMAGE</Text>
+          <Text style={styles.coverHeaderTitle}>🖼 PROJECT COVER IMAGE & ICON</Text>
           <Text style={styles.coverHeaderOptional}>(Optional)</Text>
         </View>
 
         <View style={styles.coverUploadBox}>
-          <View style={styles.coverBlueprintIconBox}>
-            <Text style={styles.coverBlueprintEmoji}>{projectIcon}</Text>
-            <Text style={styles.coverBlueprintCaption}>ARCH/ICON</Text>
-          </View>
+          {projectImage.trim() ? (
+            <Image
+              source={{ uri: projectImage.trim() }}
+              style={styles.coverImagePreview}
+              onError={() => {}}
+            />
+          ) : (
+            <View style={styles.coverBlueprintIconBox}>
+              <Text style={styles.coverBlueprintEmoji}>{projectIcon}</Text>
+              <Text style={styles.coverBlueprintCaption}>ARCH/ICON</Text>
+            </View>
+          )}
 
           <View style={styles.coverUploadTextCol}>
-            <Text style={styles.coverUploadTitle}>UPLOAD ARCHITECTURE BANNER</Text>
-            <Text style={styles.coverUploadSubtext}>
-              PNG, JPG up to 5MB. Visuals enhance candidate response rates by <Text style={styles.boldHighlight}>3.2x</Text>.
-            </Text>
+            <Text style={styles.coverUploadTitle}>COVER IMAGE (URL) OR EMOJI ICON</Text>
+            <TextInput
+              value={projectImage}
+              onChangeText={setProjectImage}
+              placeholder="https://... image URL (optional)"
+              placeholderTextColor="#9CA3AF"
+              autoCapitalize="none"
+              style={[styles.formInput, { fontSize: 11, paddingVertical: 5, paddingHorizontal: 8, marginBottom: 6 }]}
+            />
 
             <View style={styles.coverBtnRow}>
               <TouchableOpacity
@@ -987,16 +1102,20 @@ export default function CreateProjectForm({
                 onPress={() => setShowIconPicker(!showIconPicker)}
                 style={[styles.addImageBtn, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.addImageBtnText}>+ ADD IMAGE</Text>
+                <Text style={styles.addImageBtnText}>
+                  {showIconPicker ? '▲ HIDE ICONS' : '⚡ SELECT EMOJI ICON'}
+                </Text>
               </TouchableOpacity>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => setShowIconPicker(false)}
-                style={styles.skipBtn}
-              >
-                <Text style={styles.skipBtnText}>SKIP</Text>
-              </TouchableOpacity>
+              {projectImage.trim() ? (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => setProjectImage('')}
+                  style={styles.skipBtn}
+                >
+                  <Text style={styles.skipBtnText}>✕ CLEAR URL</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
           </View>
         </View>
@@ -1038,6 +1157,13 @@ export default function CreateProjectForm({
         </View>
       </View>
 
+      {/* Error Message if Creation Rejected */}
+      {submitError && (
+        <View style={{ backgroundColor: '#FEE2E2', borderWidth: 2, borderColor: '#EF4444', borderRadius: 8, padding: 10, marginVertical: 10 }}>
+          <Text style={{ color: '#B91C1C', fontWeight: 'bold', fontSize: 13 }}>⚠️ {submitError}</Text>
+        </View>
+      )}
+
       {/* Step 3 Bottom Navigation */}
       <View style={styles.stepNavRow}>
         <TouchableOpacity
@@ -1051,10 +1177,19 @@ export default function CreateProjectForm({
         <TouchableOpacity
           activeOpacity={0.85}
           onPress={handleSubmit}
-          style={[styles.createProjectBtn, BRUTAL_SHADOWS.sm]}
+          disabled={isSubmitting}
+          style={[
+            styles.createProjectBtn,
+            isSubmitting && { opacity: 0.6 },
+            BRUTAL_SHADOWS.sm,
+          ]}
         >
           <Text style={styles.createProjectBtnText}>
-            {isEdit ? 'SAVE CHANGES ✔' : 'CREATE PROJECT 🚀'}
+            {isSubmitting
+              ? (isEdit ? 'SAVING... ⏳' : 'CREATING... ⏳')
+              : isEdit
+                ? 'SAVE CHANGES ✔'
+                : 'CREATE PROJECT 🚀'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -2209,6 +2344,13 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#00E5FF',
     marginTop: 2,
+  },
+  coverImagePreview: {
+    width: 64,
+    height: 64,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#000000',
   },
   coverUploadTextCol: {
     flex: 1,

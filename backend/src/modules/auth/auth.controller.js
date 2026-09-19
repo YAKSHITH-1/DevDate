@@ -9,6 +9,7 @@ import {
   forgotPassword as forgotPasswordService,
   resetPassword as resetPasswordService,
   getMe as getMeService,
+  updateUserProfile as updateUserService,
 } from "./auth.service.js";
 import {
   REFRESH_COOKIE_NAME,
@@ -72,11 +73,12 @@ export const login = asyncHandler(async (req, res) => {
   // Set refresh token in secure, HTTP-only cookie
   res.cookie(REFRESH_COOKIE_NAME, refreshToken, getRefreshCookieOptions());
 
-  // Return formatted login response without sensitive database information or raw refresh token
+  // Return formatted login response with accessToken and refreshToken for mobile clients
   return res.status(200).json({
     success: true,
     message: "Login successful",
     accessToken,
+    refreshToken,
     user: {
       id: user._id.toString(),
       name: user.name,
@@ -89,10 +91,13 @@ export const login = asyncHandler(async (req, res) => {
 /**
  * @desc    Rotate refresh token and issue new access token
  * @route   POST /api/auth/refresh
- * @access  Public (via HTTP-only cookie)
+ * @access  Public (via HTTP-only cookie or request body/header for mobile)
  */
 export const refresh = asyncHandler(async (req, res) => {
-  const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  const rawRefreshToken =
+    req.body?.refreshToken ||
+    req.headers["x-refresh-token"] ||
+    req.cookies?.[REFRESH_COOKIE_NAME];
 
   const { accessToken, refreshToken: newRefreshToken } =
     await rotateRefreshToken(rawRefreshToken);
@@ -103,6 +108,7 @@ export const refresh = asyncHandler(async (req, res) => {
     success: true,
     message: "Token refreshed successfully.",
     accessToken,
+    refreshToken: newRefreshToken,
   });
 });
 
@@ -112,7 +118,10 @@ export const refresh = asyncHandler(async (req, res) => {
  * @access  Public
  */
 export const logout = asyncHandler(async (req, res) => {
-  const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME];
+  const rawRefreshToken =
+    req.body?.refreshToken ||
+    req.headers["x-refresh-token"] ||
+    req.cookies?.[REFRESH_COOKIE_NAME];
 
   await logoutUser(rawRefreshToken);
 
@@ -189,6 +198,22 @@ export const getMe = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * @desc    Update authenticated user profile
+ * @route   PUT /api/auth/me, PATCH /api/auth/me
+ * @access  Private (Authenticated)
+ */
+export const updateMe = asyncHandler(async (req, res) => {
+  const userId = req.userId || req.user?._id;
+  const updatedUser = await updateUserService(userId, req.body);
+
+  return res.status(200).json({
+    success: true,
+    message: "Profile updated successfully",
+    data: updatedUser,
+  });
+});
+
 export default {
   register,
   verifyEmail,
@@ -199,4 +224,5 @@ export default {
   forgotPassword,
   resetPassword,
   getMe,
+  updateMe,
 };

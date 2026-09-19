@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
@@ -21,12 +22,16 @@ export default function ProjectsScreen({
 }) {
   const {
     projects,
+    projectsLoading,
+    projectsError,
+    loadProjects,
     viewedProject,
     activeProjectId,
     setActiveProjectId,
     setViewedProjectId,
     createProject,
     updateProject,
+    fetchProjectById,
     deleteProject,
     closeProject,
   } = useApp();
@@ -42,10 +47,12 @@ export default function ProjectsScreen({
   const [editingProject, setEditingProject] = useState(null);
   const [closeConfirmVisible, setCloseConfirmVisible] = useState(false);
   const [closeTargetId, setCloseTargetId] = useState(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   // For the detail view
   const [isBookmarked, setIsBookmarked] = useState(false);
   const [interestedModalVisible, setInterestedModalVisible] = useState(false);
+  const [bannerError, setBannerError] = useState(false);
 
   const proj = viewedProject || projects[0];
 
@@ -55,12 +62,26 @@ export default function ProjectsScreen({
   };
 
   // ─── HANDLERS ─────────────────────────────────────────────
-  const handleViewProject = (project) => {
+  const handleViewProject = async (project) => {
+    if (!project) return;
+    setBannerError(false);
     setViewedProjectId(project.id);
     setViewMode('detail');
+    if (project.id && /^[0-9a-fA-F]{24}$/.test(project.id)) {
+      await fetchProjectById(project.id);
+    }
   };
 
-  const handleEditProject = (project) => {
+  const handleEditProject = async (project) => {
+    if (!project) return;
+    if (project.id && /^[0-9a-fA-F]{24}$/.test(project.id)) {
+      const res = await fetchProjectById(project.id);
+      if (res.success && res.project) {
+        setEditingProject(res.project);
+        setEditModalVisible(true);
+        return;
+      }
+    }
     setEditingProject(project);
     setEditModalVisible(true);
   };
@@ -70,14 +91,24 @@ export default function ProjectsScreen({
     setCloseConfirmVisible(true);
   };
 
-  const confirmCloseProject = () => {
-    if (closeTargetId) {
+  const confirmCloseProject = async () => {
+    if (!closeTargetId || isClosing) return;
+    setIsClosing(true);
+    try {
       const p = projects.find((pr) => pr.id === closeTargetId);
-      closeProject(closeTargetId);
-      showToast(`CLOSED "${p?.title}" 🔒`);
+      const res = await closeProject(closeTargetId);
+      if (res && res.success) {
+        showToast(`CLOSED "${res.project?.title || p?.title}" 🔒`);
+        setCloseConfirmVisible(false);
+        setCloseTargetId(null);
+      } else {
+        showToast(`ERROR: ${res?.error || 'Failed to close project'}`);
+      }
+    } catch (err) {
+      showToast(`ERROR: ${err.message || 'Error closing project'}`);
+    } finally {
+      setIsClosing(false);
     }
-    setCloseConfirmVisible(false);
-    setCloseTargetId(null);
   };
 
   const handleFindMembers = (project) => {
@@ -86,54 +117,62 @@ export default function ProjectsScreen({
     if (onSelectForDiscovery) onSelectForDiscovery();
   };
 
-  const handleCreateSubmit = (formData) => {
-    const newProj = createProject(formData);
-    showToast(`CREATED "${newProj.title}" 🚀`);
+  const handleCreateSubmit = async (formData) => {
+    const result = await createProject(formData);
+    if (result && result.success && result.project) {
+      showToast(`CREATED "${result.project.title}" 🚀`);
+      return { success: true };
+    } else {
+      const errMsg = result?.error || 'Failed to create project';
+      showToast(`ERROR: ${errMsg}`);
+      return { success: false, error: errMsg };
+    }
   };
 
-  const handleEditSubmit = (formData) => {
-    if (!editingProject) return;
-    updateProject(editingProject.id, {
-      title: formData.title,
-      category: formData.category,
-      description: formData.description,
-      techStack: formData.techStack,
-      wantedRoles: formData.wantedRoles,
-      maxMembers: formData.maxMembers,
-      icon: formData.icon,
-      duration: formData.duration,
-      interests: formData.interests,
-    });
-    showToast('PROJECT UPDATED! ✔');
-    setEditingProject(null);
+  const handleEditSubmit = async (formData) => {
+    if (!editingProject) return { success: false, error: 'No project selected for editing' };
+    const result = await updateProject(editingProject.id, formData);
+    if (result && result.success && result.project) {
+      showToast('PROJECT UPDATED! ✔');
+      setEditingProject(null);
+      setEditModalVisible(false);
+      return { success: true, project: result.project };
+    } else {
+      const errMsg = result?.error || 'Failed to update project';
+      showToast(`ERROR: ${errMsg}`);
+      return { success: false, error: errMsg };
+    }
   };
 
   // ─── Skill label helper ──────────────────────────────────
   const getDisplaySkills = (techStack) => {
     if (!techStack || techStack.length === 0) return [];
     return techStack.map((s) => {
-      const skill = ALL_SKILLS.find((sk) => sk.id === s);
+      const skill = ALL_SKILLS.find((sk) => sk.id === s || sk.label === s || sk.name === s);
       return skill ? skill.label : s;
     });
   };
 
-  // ─── STATUS STYLING ──────────────────────────────────────
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case 'Recruiting':
-        return { bg: '#86EFAC', color: '#166534', label: 'RECRUITING' };
-      case 'Active MVP':
-        return { bg: '#93C5FD', color: '#1E40AF', label: 'ACTIVE MVP' };
-      case 'CLOSED':
-        return { bg: '#D1D5DB', color: '#374151', label: 'CLOSED' };
-      default:
-        return { bg: '#FCD34D', color: '#713F12', label: status?.toUpperCase() || 'ACTIVE' };
+  // ─── STATUS STYLING (Chunk 11E) ─────────────────────────
+  const getStatusStyle = (status, membersCount = 0, maxMembers = 0) => {
+    if (status === 'CLOSED') {
+      return { bg: '#D1D5DB', color: '#374151', label: 'PROJECT CLOSED' };
     }
+    if (maxMembers > 0 && membersCount >= maxMembers) {
+      return { bg: '#FED7AA', color: '#9A3412', label: 'TEAM FULL' };
+    }
+    if (status === 'OPEN' || status === 'Recruiting') {
+      return { bg: '#86EFAC', color: '#166534', label: 'RECRUITING' };
+    }
+    if (status === 'Active MVP') {
+      return { bg: '#93C5FD', color: '#1E40AF', label: 'ACTIVE MVP' };
+    }
+    return { bg: '#86EFAC', color: '#166534', label: status?.toUpperCase() || 'RECRUITING' };
   };
 
   // Category color for skill chips
   const getSkillColor = (skillId) => {
-    const skill = ALL_SKILLS.find((s) => s.id === skillId);
+    const skill = ALL_SKILLS.find((s) => s.id === skillId || s.label === skillId || s.name === skillId);
     if (!skill) return '#E5E7EB';
     const colors = {
       frontend: '#BFDBFE',
@@ -188,8 +227,24 @@ export default function ProjectsScreen({
         style={styles.scrollArea}
         contentContainerStyle={styles.listScrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={Boolean(projectsLoading)}
+            onRefresh={loadProjects}
+            tintColor="#FFE600"
+            colors={['#FFE600', '#00E5FF']}
+          />
+        }
       >
-        {projects.length === 0 ? (
+        {projectsLoading && projects.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>⏳</Text>
+            <Text style={styles.emptyTitle}>LOADING PROJECTS...</Text>
+            <Text style={styles.emptySubtitle}>
+              Fetching your projects from DevDate...
+            </Text>
+          </View>
+        ) : projects.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>📁</Text>
             <Text style={styles.emptyTitle}>NO PROJECTS YET</Text>
@@ -206,7 +261,9 @@ export default function ProjectsScreen({
           </View>
         ) : (
           projects.map((project) => {
-            const statusInfo = getStatusStyle(project.status);
+            const currentMembers = project.membersCount || (Array.isArray(project.members) ? project.members.length : 1);
+            const maxMembers = project.maxMembers || project.teamSize?.max || 4;
+            const statusInfo = getStatusStyle(project.status, currentMembers, maxMembers);
             const displaySkills = getDisplaySkills(project.techStack);
             const isActive = project.id === activeProjectId;
             const isClosed = project.status === 'CLOSED';
@@ -221,7 +278,15 @@ export default function ProjectsScreen({
                 {/* Card Header: Icon + Title + Status */}
                 <View style={styles.cardHeader}>
                   <View style={styles.cardTitleRow}>
-                    <Text style={styles.cardIcon}>{project.icon || '🚀'}</Text>
+                    {project.image && (project.image.startsWith('http') || project.image.startsWith('data:image/')) ? (
+                      <Image
+                        source={{ uri: project.image }}
+                        style={styles.cardImageThumb}
+                        onError={() => {}}
+                      />
+                    ) : (
+                      <Text style={styles.cardIcon}>{project.icon || '🚀'}</Text>
+                    )}
                     <View style={styles.cardTitleGroup}>
                       <Text style={styles.cardTitle} numberOfLines={1}>
                         {project.title}
@@ -412,6 +477,20 @@ export default function ProjectsScreen({
           style={styles.scrollArea}
           contentContainerStyle={styles.detailScrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={Boolean(projectsLoading)}
+              onRefresh={() => {
+                if (proj?.id && /^[0-9a-fA-F]{24}$/.test(proj.id)) {
+                  fetchProjectById(proj.id);
+                } else {
+                  loadProjects();
+                }
+              }}
+              tintColor="#FFE600"
+              colors={['#FFE600', '#00E5FF']}
+            />
+          }
         >
           {/* Banner */}
           <View style={styles.bannerContainer}>
@@ -420,6 +499,13 @@ export default function ProjectsScreen({
                 source={require('../assets/studysync_banner_clean.png')}
                 style={styles.bannerImage}
                 resizeMode="cover"
+              />
+            ) : proj?.image && (proj.image.startsWith('http') || proj.image.startsWith('data:image/')) && !bannerError ? (
+              <Image
+                source={{ uri: proj.image }}
+                style={styles.bannerImage}
+                resizeMode="cover"
+                onError={() => setBannerError(true)}
               />
             ) : (
               <View style={styles.customBannerWrap}>
@@ -432,7 +518,9 @@ export default function ProjectsScreen({
             {/* Status overlay badge */}
             <View style={styles.bannerStatusOverlay}>
               {(() => {
-                const si = getStatusStyle(proj?.status);
+                const currentMembers = proj?.membersCount || (Array.isArray(proj?.members) ? proj.members.length : 1);
+                const maxMembers = proj?.maxMembers || proj?.teamSize?.max || 4;
+                const si = getStatusStyle(proj?.status, currentMembers, maxMembers);
                 return (
                   <View style={[styles.bannerStatusBadge, { backgroundColor: si.bg }]}>
                     <Text style={[styles.bannerStatusText, { color: si.color }]}>{si.label}</Text>
@@ -621,23 +709,25 @@ export default function ProjectsScreen({
             <ComicBadge text="CLOSE PROJECT? 🔒" color="#FCA5A5" textColor="#000" size="md" />
             <Text style={styles.confirmTitle}>Are you sure?</Text>
             <Text style={styles.confirmSubtitle}>
-              Closing this project will change its status to CLOSED and prevent new member recruitment. You can still view and edit the project.
+              Closing this project will stop new member recruitment. The project will remain saved and you can still view and edit its details.
             </Text>
 
             <View style={styles.confirmBtnRow}>
               <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={() => setCloseConfirmVisible(false)}
-                style={[styles.confirmCancelBtn, BRUTAL_SHADOWS.xs]}
+                onPress={() => !isClosing && setCloseConfirmVisible(false)}
+                disabled={isClosing}
+                style={[styles.confirmCancelBtn, BRUTAL_SHADOWS.xs, isClosing && { opacity: 0.5 }]}
               >
                 <Text style={styles.confirmCancelText}>CANCEL</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={confirmCloseProject}
-                style={[styles.confirmCloseBtn, BRUTAL_SHADOWS.xs]}
+                disabled={isClosing}
+                style={[styles.confirmCloseBtn, BRUTAL_SHADOWS.xs, isClosing && { opacity: 0.6 }]}
               >
-                <Text style={styles.confirmCloseText}>CLOSE IT</Text>
+                <Text style={styles.confirmCloseText}>{isClosing ? 'CLOSING... ⏳' : 'CLOSE IT'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1368,5 +1458,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     color: '#000',
+  },
+  cardImageThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
 });

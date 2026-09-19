@@ -1,7 +1,9 @@
 import Match from "../../models/Match.js";
 import Message from "../../models/Message.js";
+import User from "../../models/User.js";
 import ApiError from "../../utils/ApiError.js";
 import { getIO } from "../../sockets/index.js";
+import { createNotification } from "../notifications/notification.service.js";
 
 const POPULATE_PROJECT = {
   path: "project",
@@ -168,6 +170,21 @@ export const sendMessage = async (matchId, senderId, messageText) => {
     }
   } catch (err) {
     console.error("Socket broadcast error:", err.message);
+  }
+
+  // 3. Create real-time notification for the recipient
+  try {
+    const senderName = populatedMessage?.sender?.name || "A collaborator";
+    await createNotification({
+      recipient: receiverId,
+      actor: senderId,
+      type: "MESSAGE",
+      project: match.project,
+      match: match._id,
+      message: `${senderName}: ${messageText.trim().substring(0, 80)}`,
+    });
+  } catch (notifErr) {
+    console.error("Failed to create message notification:", notifErr.message);
   }
 
   return populatedMessage;

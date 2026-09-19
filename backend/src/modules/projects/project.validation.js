@@ -62,10 +62,16 @@ export const createProjectValidation = [
     }),
 
   body("image")
-    .optional()
+    .optional({ nullable: true })
     .trim()
     .isString()
-    .withMessage("Image must be a valid string URL"),
+    .withMessage("Image must be a valid string URL")
+    .custom((value) => {
+      if (!value) return true;
+      if (/^(javascript|vbscript):/i.test(value)) throw new Error("Invalid project image URL scheme");
+      if (value.length > 2048) throw new Error("Project image URL exceeds maximum length");
+      return true;
+    }),
 ];
 
 export const updateProjectValidation = [
@@ -145,10 +151,16 @@ export const updateProjectValidation = [
     }),
 
   body("image")
-    .optional()
+    .optional({ nullable: true })
     .trim()
     .isString()
-    .withMessage("Image must be a valid string URL"),
+    .withMessage("Image must be a valid string URL")
+    .custom((value) => {
+      if (!value) return true;
+      if (/^(javascript|vbscript):/i.test(value)) throw new Error("Invalid project image URL scheme");
+      if (value.length > 2048) throw new Error("Project image URL exceeds maximum length");
+      return true;
+    }),
 ];
 
 export const projectIdParamValidation = [

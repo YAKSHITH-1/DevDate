@@ -95,10 +95,105 @@ export const resetPasswordValidation = [
     }),
 ];
 
+export const updateProfileValidation = [
+  body("name")
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 50 })
+    .withMessage("Name must be between 2 and 50 characters"),
+
+  body("bio")
+    .optional()
+    .trim()
+    .isLength({ max: 500 })
+    .withMessage("Bio cannot exceed 500 characters"),
+
+  body("introduction")
+    .optional()
+    .trim(),
+
+  body("role")
+    .optional()
+    .trim(),
+
+  body("preferredRole")
+    .optional()
+    .trim(),
+
+  body("experience")
+    .optional()
+    .trim(),
+
+  body("availability")
+    .optional()
+    .trim(),
+
+  body("location")
+    .optional()
+    .trim(),
+
+  body("github")
+    .optional()
+    .trim(),
+
+  body("linkedin")
+    .optional()
+    .trim(),
+
+  body("portfolio")
+    .optional()
+    .trim(),
+
+  body("avatar")
+    .optional({ nullable: true })
+    .trim()
+    .custom((value) => {
+      if (!value) return true;
+      if (typeof value !== "string") throw new Error("Avatar must be a string");
+      if (/^(javascript|vbscript):/i.test(value)) throw new Error("Invalid avatar image URL scheme");
+      if (value.length > 2048) throw new Error("Avatar URL exceeds maximum length");
+      return true;
+    }),
+
+  body("skills")
+    .optional()
+    .custom((value) => {
+      if (typeof value === "string") return true;
+      if (Array.isArray(value) && value.every((s) => typeof s === "string")) return true;
+      throw new Error("Skills must be an array of strings or a comma-separated string");
+    }),
+
+  body("interests")
+    .optional()
+    .custom((value) => {
+      if (typeof value === "string") return true;
+      if (Array.isArray(value) && value.every((s) => typeof s === "string")) return true;
+      throw new Error("Interests must be an array of strings or a comma-separated string");
+    }),
+
+  body("passwordHash")
+    .custom((value) => {
+      if (value !== undefined) {
+        throw new Error("passwordHash cannot be modified through profile update");
+      }
+      return true;
+    }),
+
+  body("isVerified")
+    .custom((value) => {
+      if (value !== undefined) {
+        throw new Error("isVerified cannot be modified through profile update");
+      }
+      return true;
+    }),
+];
+
 export default {
   registerValidation,
   verifyEmailValidation,
   loginValidation,
   forgotPasswordValidation,
   resetPasswordValidation,
+  updateProfileValidation,
 };
+

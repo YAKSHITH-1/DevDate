@@ -14,6 +14,12 @@ const swipeSchema = new mongoose.Schema(
       required: true,
     },
 
+    developer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
     action: {
       type: String,
       enum: ["PASS", "INTERESTED"],
@@ -26,8 +32,12 @@ const swipeSchema = new mongoose.Schema(
 );
 
 swipeSchema.index(
-  { user: 1, project: 1 },
+  { project: 1, user: 1, developer: 1 },
   { unique: true }
+);
+
+swipeSchema.index(
+  { project: 1, action: 1 }
 );
 
 export default mongoose.model("Swipe", swipeSchema);

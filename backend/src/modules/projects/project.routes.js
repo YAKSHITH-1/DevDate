@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   createProject,
+  getMyProjects,
   getProjectById,
   updateProject,
   closeProject,
@@ -15,10 +16,13 @@ import { authenticate } from "../../middleware/auth.js";
 
 const router = Router();
 
-// 1️POST /projects (Create Project)
+// 1️ POST /projects (Create Project)
 router.post("/", authenticate, validate(createProjectValidation), createProject);
 
-// 2GET /projects/:id (Get Project by ID)
+// 2️ GET /projects (Get My Projects)
+router.get("/", authenticate, getMyProjects);
+
+// 3️ GET /projects/:id (Get Project by ID)
 router.get("/:id", validate(projectIdParamValidation), getProjectById);
 
 // 3️PATCH /projects/:id (Update Project)

@@ -68,6 +68,18 @@ export const createProject = async (userId, projectData) => {
   return await populateProject(Project.findById(project._id));
 };
 
+export const getMyProjects = async (userId) => {
+  if (!userId) {
+    throw new ApiError(400, "User ID is required");
+  }
+
+  const projects = await populateProject(
+    Project.find({ owner: userId }).sort({ createdAt: -1 })
+  );
+
+  return projects;
+};
+
 export const getProjectById = async (projectId) => {
   const project = await populateProject(Project.findById(projectId));
 
@@ -164,6 +176,7 @@ export const closeProject = async (projectId, userId) => {
 
 export default {
   createProject,
+  getMyProjects,
   getProjectById,
   updateProject,
   closeProject,

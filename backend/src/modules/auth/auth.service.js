@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import User from "../../models/User.js";
+import Skill from "../../models/Skill.js";
 import EmailOTP from "../../models/EmailOTP.js";
 import Session from "../../models/Session.js";
 import PasswordReset from "../../models/PasswordReset.js";
@@ -65,6 +66,16 @@ export const registerUser = async ({ name, email, password }) => {
   try {
     await sendVerificationEmail(user.email, plainOTP, OTP_EXPIRY_MINUTES);
   } catch (emailError) {
+    if ((process.env.NODE_ENV || NODE_ENV) !== "production") {
+      return {
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        isVerified: user.isVerified,
+        devOtp: plainOTP,
+      };
+    }
+
     await EmailOTP.deleteMany({ userId: user._id });
     throw new ApiError(
       500,
@@ -77,6 +88,7 @@ export const registerUser = async ({ name, email, password }) => {
     name: user.name,
     email: user.email,
     isVerified: user.isVerified,
+    devOtp: (process.env.NODE_ENV || NODE_ENV) === "development" ? plainOTP : undefined,
   };
 };
 
@@ -299,8 +311,10 @@ export const forgotPassword = async ({ email }) => {
   try {
     await sendPasswordResetEmail(user.email, resetUrl, RESET_TOKEN_EXPIRY_MINUTES);
   } catch (error) {
-    await PasswordReset.deleteMany({ userId: user._id });
-    console.error(`❌ [Password Reset Error] Failed to send email: ${error.message}`);
+    if ((process.env.NODE_ENV || NODE_ENV) === "production") {
+      await PasswordReset.deleteMany({ userId: user._id });
+      console.error(`❌ [Password Reset Error] Failed to send email: ${error.message}`);
+    }
   }
 
   return { message: genericMessage };
@@ -364,6 +378,119 @@ export const getMe = async (userId) => {
   return user;
 };
 
+/**
+ * Updates authenticated user profile with canonical skill resolution and field sanitization.
+ * User ID is strictly derived from authenticated JWT context.
+ */
+export const updateUserProfile = async (userId, profileData = {}) => {
+  const user = await User.findById(userId);
+  if (!user) {
+    throw new ApiError(404, "User not found.");
+  }
+
+  // 1. Explicitly forbid updating sensitive fields
+  delete profileData.passwordHash;
+  delete profileData.email;
+  delete profileData.isVerified;
+  delete profileData._id;
+  delete profileData.userId;
+  delete profileData.id;
+  delete profileData.createdAt;
+  delete profileData.updatedAt;
+
+  // 2. Name validation & assignment
+  if (profileData.name !== undefined) {
+    const trimmedName = String(profileData.name).trim();
+    if (trimmedName.length < 2 || trimmedName.length > 50) {
+      throw new ApiError(400, "Name must be between 2 and 50 characters.");
+    }
+    user.name = trimmedName;
+  }
+
+  // 3. String profile fields
+  if (profileData.bio !== undefined) user.bio = String(profileData.bio).trim();
+  if (profileData.introduction !== undefined) user.introduction = String(profileData.introduction).trim();
+  if (profileData.role !== undefined) user.role = String(profileData.role).trim();
+  if (profileData.preferredRole !== undefined) user.preferredRole = String(profileData.preferredRole).trim();
+  if (profileData.experience !== undefined) user.experience = String(profileData.experience).trim();
+  if (profileData.availability !== undefined) user.availability = String(profileData.availability).trim();
+  if (profileData.location !== undefined) user.location = String(profileData.location).trim();
+  if (profileData.github !== undefined) user.github = String(profileData.github).trim();
+  if (profileData.linkedin !== undefined) user.linkedin = String(profileData.linkedin).trim();
+  if (profileData.portfolio !== undefined) user.portfolio = String(profileData.portfolio).trim();
+  if (profileData.avatar !== undefined) user.avatar = String(profileData.avatar).trim();
+
+  // 4. Skills canonicalization (Part 5: "JS" -> "JavaScript", no duplicates)
+  if (profileData.skills !== undefined) {
+    let rawSkills = profileData.skills;
+    if (typeof rawSkills === "string") {
+      rawSkills = rawSkills.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+    if (Array.isArray(rawSkills)) {
+      const canonicalSkills = [];
+      const seen = new Set();
+
+      for (const skillItem of rawSkills) {
+        if (!skillItem || typeof skillItem !== "string") continue;
+        const trimmed = skillItem.trim();
+        if (!trimmed) continue;
+
+        // Try finding matching canonical skill by exact name or alias (case-insensitive)
+        const escaped = trimmed.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
+        const matchedSkill = await Skill.findOne({
+          $or: [
+            { name: new RegExp(`^${escaped}$`, "i") },
+            { aliases: new RegExp(`^${escaped}$`, "i") },
+          ],
+        });
+
+        const canonicalName = matchedSkill ? matchedSkill.name : trimmed;
+        const lower = canonicalName.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          canonicalSkills.push(canonicalName);
+        }
+      }
+
+      user.skills = canonicalSkills;
+    }
+  }
+
+  // 5. Interests (Part 6: trimmed strings, no duplicates)
+  if (profileData.interests !== undefined) {
+    let rawInterests = profileData.interests;
+    if (typeof rawInterests === "string") {
+      rawInterests = rawInterests.split(",").map((i) => i.trim()).filter(Boolean);
+    }
+    if (Array.isArray(rawInterests)) {
+      const uniqueInterests = [];
+      const seen = new Set();
+      for (const item of rawInterests) {
+        if (!item || typeof item !== "string") continue;
+        const trimmed = item.trim();
+        if (!trimmed) continue;
+        const lower = trimmed.toLowerCase();
+        if (!seen.has(lower)) {
+          seen.add(lower);
+          uniqueInterests.push(trimmed);
+        }
+      }
+      user.interests = uniqueInterests;
+    }
+  }
+
+  // 6. LookingTo goals (supports string or array)
+  if (profileData.lookingTo !== undefined) {
+    user.lookingTo = profileData.lookingTo;
+  }
+
+  await user.save();
+
+  // Return updated user document stripped of passwordHash
+  const updatedUser = await User.findById(userId).select("-passwordHash");
+  return updatedUser;
+};
+
 export default {
   registerUser,
   verifyEmail,
@@ -374,4 +501,5 @@ export default {
   forgotPassword,
   resetPassword,
   getMe,
+  updateUserProfile,
 };

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Modal,
+  RefreshControl,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
@@ -17,6 +18,8 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
   const {
     invitations,
     matches,
+    matchesLoading,
+    refreshMatchesAndInvitations,
     acceptInvitation,
     rejectInvitation,
     pendingMatchCelebration,
@@ -35,22 +38,29 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
     setTimeout(() => setFeedbackToast(null), 1600);
   };
 
-  const handleAccept = (invite) => {
-    const newMatch = acceptInvitation(invite);
+  const handleAccept = async (invite) => {
     setSelectedInviteDetail(null);
-    showToast(`ACCEPTED INVITATION FOR ${newMatch.projectName}! 🚀`);
+    showToast('ACCEPTING INVITATION... ⏳', COLORS.yellow);
+    const res = await acceptInvitation(invite);
+    if (res && res.success !== false) {
+      const matchData = res.match || res;
+      showToast(`ACCEPTED INVITATION FOR ${matchData?.projectName || invite.projectName || 'PROJECT'}! 🚀`);
+    } else {
+      showToast(res?.error || 'Failed to accept invitation', COLORS.pink);
+    }
   };
 
-  const handleReject = (inviteId, devName) => {
-    rejectInvitation(inviteId, devName);
+  const handleReject = async (inviteId, devName) => {
     setSelectedInviteDetail(null);
+    await rejectInvitation(inviteId, devName);
     showToast(`DECLINED INVITATION FROM ${devName.split(' ')[0]} ✖`, COLORS.pink);
   };
 
   const handleOpenMatchChat = (match) => {
     const chat = getOrCreateChatForMatch(match);
     if (onOpenChat) {
-      onOpenChat(chat.id);
+      // Contract: Real MongoDB Match._id is used as the chat ID
+      onOpenChat(chat.id || match.id);
     }
   };
 
@@ -84,22 +94,40 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
           <Text style={styles.headerTitle}>MATCHES & INVITES</Text>
         </View>
 
-        <TouchableOpacity
-          activeOpacity={0.75}
-          onPress={() => {
-            if (onNavigateToSettings) onNavigateToSettings();
-          }}
-          style={styles.settingsIconBtn}
-        >
-          <Text style={styles.settingsIconText}>⚙️</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => {
+              if (refreshMatchesAndInvitations) {
+                showToast('SYNCING MATCHES... 🔄', COLORS.yellow);
+                refreshMatchesAndInvitations();
+              }
+            }}
+            style={styles.settingsIconBtn}
+          >
+            <Text style={styles.settingsIconText}>🔄</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.75}
+            onPress={() => {
+              if (onNavigateToSettings) onNavigateToSettings();
+            }}
+            style={styles.settingsIconBtn}
+          >
+            <Text style={styles.settingsIconText}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 2. SEGMENTED TABS (Invitations | My Matches) */}
       <View style={styles.segmentedBar}>
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setActiveSegment('invitations')}
+          onPress={() => {
+            setActiveSegment('invitations');
+            if (refreshMatchesAndInvitations) refreshMatchesAndInvitations();
+          }}
           style={[
             styles.segmentBtn,
             activeSegment === 'invitations' && styles.segmentBtnActive,
@@ -123,7 +151,10 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
 
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => setActiveSegment('matches')}
+          onPress={() => {
+            setActiveSegment('matches');
+            if (refreshMatchesAndInvitations) refreshMatchesAndInvitations();
+          }}
           style={[
             styles.segmentBtn,
             activeSegment === 'matches' && styles.segmentBtnActive,
@@ -156,6 +187,15 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
         style={styles.scrollArea}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={Boolean(matchesLoading)}
+            onRefresh={() => {
+              if (refreshMatchesAndInvitations) refreshMatchesAndInvitations();
+            }}
+            tintColor={COLORS.yellow}
+          />
+        }
       >
         {activeSegment === 'invitations' ? (
           /* --- INVITATIONS LIST --- */
@@ -235,7 +275,15 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
                   activeOpacity={0.8}
                   onPress={() => handleOpenDevProfile(m.developerId, m)}
                 >
-                  <Image source={{ uri: m.developerAvatar }} style={styles.devAvatar} />
+                  {m.developerAvatar ? (
+                    <Image source={{ uri: m.developerAvatar }} style={styles.devAvatar} onError={() => {}} />
+                  ) : (
+                    <View style={[styles.devAvatar, styles.avatarFallback]}>
+                      <Text style={styles.avatarFallbackText}>
+                        {m.developerName?.charAt(0)?.toUpperCase() || '👤'}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
                 <View style={styles.matchInfo}>
                   <View style={styles.nameScoreRow}>
@@ -288,11 +336,35 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
             {pendingMatchCelebration && (
               <>
                 <View style={styles.avatarsConnectedRow}>
-                  <Image source={{ uri: currentUser.avatar }} style={styles.connectedAvatar} />
+                  {currentUser?.avatar ? (
+                    <Image
+                      source={{ uri: currentUser.avatar }}
+                      style={styles.connectedAvatar}
+                      onError={() => {}}
+                    />
+                  ) : (
+                    <View style={[styles.connectedAvatar, styles.avatarFallback]}>
+                      <Text style={styles.avatarFallbackText}>
+                        {currentUser?.name?.charAt(0)?.toUpperCase() || '👤'}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.connectBurst}>
                     <Text style={styles.connectBurstText}>⚡</Text>
                   </View>
-                  <Image source={{ uri: pendingMatchCelebration.developerAvatar }} style={styles.connectedAvatar} />
+                  {pendingMatchCelebration.developerAvatar ? (
+                    <Image
+                      source={{ uri: pendingMatchCelebration.developerAvatar }}
+                      style={styles.connectedAvatar}
+                      onError={() => {}}
+                    />
+                  ) : (
+                    <View style={[styles.connectedAvatar, styles.avatarFallback]}>
+                      <Text style={styles.avatarFallbackText}>
+                        {pendingMatchCelebration.developerName?.charAt(0)?.toUpperCase() || '👤'}
+                      </Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.celebrationHeading}>
@@ -860,6 +932,16 @@ const styles = StyleSheet.create({
   },
   viewProfileModalBtnText: {
     fontSize: 12,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  avatarFallback: {
+    backgroundColor: '#FFE600',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 18,
     fontWeight: '900',
     color: '#000000',
   },

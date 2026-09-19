@@ -94,6 +94,16 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
     },
+
+    location: {
+      type: String,
+      trim: true,
+    },
+
+    lookingTo: {
+      type: mongoose.Schema.Types.Mixed,
+      default: [],
+    },
   },
   {
     timestamps: true,

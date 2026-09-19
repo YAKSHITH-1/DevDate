@@ -71,20 +71,33 @@ export const approveInvitation = async (matchId, developerId) => {
     throw new ApiError(400, `Cannot approve invitation with status "${match.status}". Only pending invitations can be processed.`);
   }
 
+  let project = null;
+  if (match.project) {
+    project = await Project.findById(match.project);
+    if (!project) {
+      throw new ApiError(404, "Associated project not found");
+    }
+    if (project.status === "CLOSED" || project.status !== "OPEN") {
+      throw new ApiError(400, "Project is closed and is not accepting new members");
+    }
+    const currentMembers = project.members ? project.members.length : 0;
+    const maxCapacity = project.teamSize?.max ?? Infinity;
+    if (currentMembers >= maxCapacity) {
+      throw new ApiError(400, "Project has reached its maximum team size");
+    }
+  }
+
   // Update status to ACCEPTED (unlocks chat)
   match.status = "ACCEPTED";
   await match.save();
 
   // Add developer to project members if not already joined
-  if (match.project) {
-    const project = await Project.findById(match.project);
-    if (project) {
-      const isMember = project.members && project.members.some((m) => m.toString() === developerId.toString());
-      if (!isMember) {
-        project.members.push(developerId);
-        project.lastActivityAt = new Date();
-        await project.save();
-      }
+  if (project) {
+    const isMember = project.members && project.members.some((m) => m.toString() === developerId.toString());
+    if (!isMember) {
+      project.members.push(developerId);
+      project.lastActivityAt = new Date();
+      await project.save();
     }
   }
 

@@ -11,6 +11,7 @@ import {
   Switch,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
@@ -19,6 +20,7 @@ import { useApp } from '../context/AppContext';
 export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }) {
   const {
     currentUser,
+    logout,
     updateProfile,
     pushNotificationsEnabled,
     setPushNotificationsEnabled,
@@ -36,20 +38,28 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   } = useApp();
 
   const isThirdParty = Boolean(selectedDeveloperForProfile);
-  const dev = selectedDeveloperForProfile || currentUser;
+  const dev = selectedDeveloperForProfile || currentUser || {};
 
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
 
   // Edit Profile Form State (For User's Own Profile)
-  const [editName, setEditName] = useState(currentUser?.name || 'Rahul Patel');
-  const [editRole, setEditRole] = useState(currentUser?.role || 'Full Stack Developer');
-  const [editExperience, setEditExperience] = useState(currentUser?.experience || '3+ Years (Senior)');
-  const [editLocation, setEditLocation] = useState(currentUser?.location || 'Bangalore / Remote');
-  const [editBio, setEditBio] = useState(currentUser?.bio || '');
+  const [editAvatar, setEditAvatar] = useState(currentUser?.avatar || '');
+  const [ownAvatarError, setOwnAvatarError] = useState(false);
+  const [devAvatarError, setDevAvatarError] = useState(false);
+  const [editName, setEditName] = useState(currentUser?.name || '');
+  const [editRole, setEditRole] = useState(currentUser?.role || currentUser?.preferredRole || '');
+  const [editExperience, setEditExperience] = useState(currentUser?.experience || '');
+  const [editAvailability, setEditAvailability] = useState(currentUser?.availability || '');
+  const [editLocation, setEditLocation] = useState(currentUser?.location || '');
+  const [editBio, setEditBio] = useState(currentUser?.bio || currentUser?.introduction || '');
   const [editSkills, setEditSkills] = useState((currentUser?.skills || []).join(', '));
   const [editInterests, setEditInterests] = useState((currentUser?.interests || []).join(', '));
+  const [editGithub, setEditGithub] = useState(currentUser?.github || '');
+  const [editLinkedin, setEditLinkedin] = useState(currentUser?.linkedin || '');
+  const [editPortfolio, setEditPortfolio] = useState(currentUser?.portfolio || '');
+  const [isSaving, setIsSaving] = useState(false);
 
   const showToast = (msg, color = '#FCD34D') => {
     setToastMessage({ text: msg, color });
@@ -103,17 +113,25 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
 
   // --- OWN PROFILE ACTIONS ---
   const handleOpenEditModal = () => {
+    setEditAvatar(currentUser?.avatar || '');
     setEditName(currentUser?.name || '');
-    setEditRole(currentUser?.role || '');
-    setEditExperience(currentUser?.experience || '3+ Years (Senior)');
-    setEditLocation(currentUser?.location || 'Bangalore / Remote');
-    setEditBio(currentUser?.bio || '');
+    setEditRole(currentUser?.role || currentUser?.preferredRole || '');
+    setEditExperience(currentUser?.experience || '');
+    setEditAvailability(currentUser?.availability || '');
+    setEditLocation(currentUser?.location || '');
+    setEditBio(currentUser?.bio || currentUser?.introduction || '');
     setEditSkills((currentUser?.skills || []).join(', '));
     setEditInterests((currentUser?.interests || []).join(', '));
+    setEditGithub(currentUser?.github || '');
+    setEditLinkedin(currentUser?.linkedin || '');
+    setEditPortfolio(currentUser?.portfolio || '');
     setEditModalVisible(true);
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+
     const parsedSkills = editSkills
       .split(',')
       .map((s) => s.trim())
@@ -123,18 +141,31 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
       .map((i) => i.trim())
       .filter(Boolean);
 
-    updateProfile({
-      name: editName.trim() || currentUser.name,
-      role: editRole.trim() || currentUser.role,
-      experience: editExperience.trim() || '3+ Years',
-      location: editLocation.trim() || 'Remote OK',
-      bio: editBio.trim() || currentUser.bio,
-      skills: parsedSkills.length > 0 ? parsedSkills : currentUser.skills,
-      interests: parsedInterests.length > 0 ? parsedInterests : currentUser.interests,
+    const res = await updateProfile({
+      name: editName.trim() || currentUser?.name || '',
+      role: editRole.trim() || currentUser?.role || '',
+      preferredRole: editRole.trim() || currentUser?.preferredRole || '',
+      experience: editExperience.trim(),
+      availability: editAvailability.trim(),
+      location: editLocation.trim(),
+      bio: editBio.trim(),
+      avatar: editAvatar.trim(),
+      skills: parsedSkills,
+      interests: parsedInterests,
+      github: editGithub.trim(),
+      linkedin: editLinkedin.trim(),
+      portfolio: editPortfolio.trim(),
     });
 
-    setEditModalVisible(false);
-    showToast('PROFILE SAVED! ★', '#FCD34D');
+    setIsSaving(false);
+
+    if (res?.success) {
+      setOwnAvatarError(false);
+      setEditModalVisible(false);
+      showToast('PROFILE SAVED! ★', '#FCD34D');
+    } else {
+      showToast(res?.error || 'FAILED TO SAVE PROFILE ✕', '#FF4B4B');
+    }
   };
 
   const handleToggleLookingTo = (index) => {
@@ -224,10 +255,19 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
             </View>
           ) : (
             <View style={styles.customDevBannerWrap}>
-              <Image
-                source={{ uri: dev?.avatar }}
-                style={styles.customDevBannerAvatar}
-              />
+              {dev?.avatar && !devAvatarError ? (
+                <Image
+                  source={{ uri: dev.avatar }}
+                  style={styles.customDevBannerAvatar}
+                  onError={() => setDevAvatarError(true)}
+                />
+              ) : (
+                <View style={[styles.customDevBannerAvatar, styles.avatarFallbackWrap]}>
+                  <Text style={styles.avatarFallbackText}>
+                    {dev?.name?.charAt(0)?.toUpperCase() || '👤'}
+                  </Text>
+                </View>
+              )}
               <View style={styles.customDevBannerTextGroup}>
                 <Text style={styles.customDevBannerName}>{dev?.name}</Text>
                 <Text style={styles.customDevBannerRole}>{dev?.role}</Text>
@@ -239,18 +279,34 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
           /* User's Own Hero Banner Card */
           <View style={[styles.ownHeroCard, BRUTAL_SHADOWS.sm]}>
             <View style={styles.ownHeroRow}>
-              <Image
-                source={{ uri: currentUser?.avatar }}
-                style={styles.ownHeroAvatar}
-              />
+              {currentUser?.avatar && !ownAvatarError ? (
+                <Image
+                  source={{ uri: currentUser.avatar }}
+                  style={styles.ownHeroAvatar}
+                  onError={() => setOwnAvatarError(true)}
+                />
+              ) : (
+                <View style={[styles.ownHeroAvatar, styles.avatarFallbackWrap]}>
+                  <Text style={styles.avatarFallbackText}>
+                    {currentUser?.name?.charAt(0)?.toUpperCase() || '👤'}
+                  </Text>
+                </View>
+              )}
               <View style={styles.ownHeroInfo}>
                 <View style={styles.nameRow}>
-                  <Text style={styles.devName}>{currentUser?.name || 'Rahul Patel'}</Text>
+                  <Text style={styles.devName}>{currentUser?.name || 'Developer'}</Text>
                   <View style={styles.onlineDot} />
                 </View>
-                <Text style={styles.devRole}>{currentUser?.role || 'Full Stack Developer'}</Text>
-                <Text style={styles.experienceText}>⚡ {currentUser?.experience || '3+ Years (Senior)'}</Text>
-                <Text style={styles.locationText}>📍 {currentUser?.location || 'Bangalore / Remote'}</Text>
+                <Text style={styles.devRole}>{currentUser?.role || currentUser?.preferredRole || 'Full Stack Developer'}</Text>
+                {currentUser?.experience ? (
+                  <Text style={styles.experienceText}>⚡ {currentUser.experience}</Text>
+                ) : null}
+                {currentUser?.availability ? (
+                  <Text style={styles.experienceText}>🕒 {currentUser.availability}</Text>
+                ) : null}
+                {currentUser?.location ? (
+                  <Text style={styles.locationText}>📍 {currentUser.location}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -281,10 +337,11 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
               <Text style={styles.devName}>{dev?.name}</Text>
               <View style={styles.onlineDot} />
             </View>
-            <Text style={styles.devRole}>{dev?.role}</Text>
+            <Text style={styles.devRole}>{dev?.role || dev?.preferredRole || 'Developer'}</Text>
             <View style={styles.metaRow}>
-              <Text style={styles.experienceText}>⚡ {dev?.experience || '3+ Years'}</Text>
-              <Text style={styles.locationText}>📍 {dev?.location || 'Remote OK'}</Text>
+              {dev?.experience ? <Text style={styles.experienceText}>⚡ {dev.experience}</Text> : null}
+              {dev?.availability ? <Text style={styles.experienceText}>🕒 {dev.availability}</Text> : null}
+              {dev?.location ? <Text style={styles.locationText}>📍 {dev.location}</Text> : null}
             </View>
           </>
         )}
@@ -348,12 +405,39 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
         {/* INTERESTS Section */}
         <Text style={styles.sectionHeader}>INTERESTS</Text>
         <View style={styles.tagsRow}>
-          {(dev?.interests || ['AI/ML', 'Developer Tools', 'Open Source', 'Product Design', 'Indie Hacking']).map((interest) => (
+          {(dev?.interests && dev.interests.length > 0
+            ? dev.interests
+            : ['AI/ML', 'Developer Tools', 'Open Source', 'Product Design', 'Indie Hacking']
+          ).map((interest) => (
             <View key={interest} style={styles.blueTag}>
               <Text style={styles.blueTagText}>{interest}</Text>
             </View>
           ))}
         </View>
+
+        {/* Social / Portfolio Links Section (Part 8) */}
+        {(Boolean(dev?.github) || Boolean(dev?.linkedin) || Boolean(dev?.portfolio)) && (
+          <>
+            <Text style={styles.sectionHeader}>LINKS & PORTFOLIO</Text>
+            <View style={styles.socialLinksRow}>
+              {Boolean(dev?.github) && (
+                <View style={[styles.socialPill, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.socialPillText}>🐙 GitHub: {dev.github}</Text>
+                </View>
+              )}
+              {Boolean(dev?.linkedin) && (
+                <View style={[styles.socialPill, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.socialPillText}>💼 LinkedIn: {dev.linkedin}</Text>
+                </View>
+              )}
+              {Boolean(dev?.portfolio) && (
+                <View style={[styles.socialPill, BRUTAL_SHADOWS.xs]}>
+                  <Text style={styles.socialPillText}>🌐 Portfolio: {dev.portfolio}</Text>
+                </View>
+              )}
+            </View>
+          </>
+        )}
 
         {/* Own Profile Quick Action Buttons */}
         {!isThirdParty && (
@@ -378,6 +462,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
               activeOpacity={0.85}
               onPress={() => {
                 if (onLogout) onLogout();
+                else logout();
               }}
               style={[styles.ownLogoutBtn, BRUTAL_SHADOWS.xs]}
             >
@@ -493,6 +578,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
               onPress={() => {
                 setSettingsModalVisible(false);
                 if (onLogout) onLogout();
+                else logout();
               }}
               style={[styles.logoutBtn, BRUTAL_SHADOWS.xs]}
             >
@@ -525,6 +611,64 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
             </View>
 
             <ScrollView style={styles.editFormScroll} showsVerticalScrollIndicator={false}>
+              {/* Avatar Section with Live Preview & Presets */}
+              <Text style={styles.inputLabel}>AVATAR IMAGE (URL OR PRESET)</Text>
+              <View style={styles.editAvatarWrap}>
+                {editAvatar.trim() ? (
+                  <Image
+                    source={{ uri: editAvatar.trim() }}
+                    style={styles.editAvatarPreview}
+                    onError={() => {}}
+                  />
+                ) : (
+                  <View style={[styles.editAvatarPreview, styles.avatarFallbackWrap]}>
+                    <Text style={styles.avatarFallbackText}>
+                      {editName?.charAt(0)?.toUpperCase() || '👤'}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.editAvatarControls}>
+                  <TextInput
+                    value={editAvatar}
+                    onChangeText={setEditAvatar}
+                    placeholder="https://... image URL or select preset"
+                    placeholderTextColor="#9CA3AF"
+                    autoCapitalize="none"
+                    style={[styles.formInput, { marginBottom: 8 }]}
+                  />
+                  <View style={styles.presetRow}>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setEditAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80')}
+                      style={[styles.presetBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.presetBtnText}>⚡ DEV 1</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setEditAvatar('https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80')}
+                      style={[styles.presetBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.presetBtnText}>🚀 DEV 2</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setEditAvatar('https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&q=80')}
+                      style={[styles.presetBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.presetBtnText}>💻 DEV 3</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      activeOpacity={0.8}
+                      onPress={() => setEditAvatar('')}
+                      style={[styles.presetClearBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.presetClearBtnText}>✕ CLEAR</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+
               <Text style={styles.inputLabel}>FULL NAME</Text>
               <TextInput
                 value={editName}
@@ -590,12 +734,56 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
                 style={styles.formInput}
               />
 
+              <Text style={styles.inputLabel}>AVAILABILITY</Text>
+              <TextInput
+                value={editAvailability}
+                onChangeText={setEditAvailability}
+                placeholder="e.g. Full-time, 15-20 hrs/week, Open to hackathons"
+                placeholderTextColor="#9CA3AF"
+                style={styles.formInput}
+              />
+
+              <Text style={styles.inputLabel}>GITHUB PROFILE / URL</Text>
+              <TextInput
+                value={editGithub}
+                onChangeText={setEditGithub}
+                placeholder="https://github.com/username"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                style={styles.formInput}
+              />
+
+              <Text style={styles.inputLabel}>LINKEDIN PROFILE / URL</Text>
+              <TextInput
+                value={editLinkedin}
+                onChangeText={setEditLinkedin}
+                placeholder="https://linkedin.com/in/username"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                style={styles.formInput}
+              />
+
+              <Text style={styles.inputLabel}>PORTFOLIO / WEBSITE URL</Text>
+              <TextInput
+                value={editPortfolio}
+                onChangeText={setEditPortfolio}
+                placeholder="https://yourportfolio.dev"
+                placeholderTextColor="#9CA3AF"
+                autoCapitalize="none"
+                style={styles.formInput}
+              />
+
               <TouchableOpacity
                 activeOpacity={0.85}
                 onPress={handleSaveProfile}
-                style={[styles.saveProfileBtn, BRUTAL_SHADOWS.xs]}
+                disabled={isSaving}
+                style={[styles.saveProfileBtn, BRUTAL_SHADOWS.xs, isSaving && { opacity: 0.7 }]}
               >
-                <Text style={styles.saveProfileBtnText}>SAVE PROFILE CHANGES 💾</Text>
+                {isSaving ? (
+                  <ActivityIndicator color="#000000" size="small" />
+                ) : (
+                  <Text style={styles.saveProfileBtnText}>SAVE PROFILE CHANGES 💾</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1143,5 +1331,85 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#000000',
     letterSpacing: 0.5,
+  },
+  socialLinksRow: {
+    flexDirection: 'column',
+    gap: 8,
+    marginBottom: 16,
+  },
+  socialPill: {
+    backgroundColor: '#F3F4F6',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  socialPillText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  avatarFallbackWrap: {
+    backgroundColor: '#FFE600',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarFallbackText: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  editAvatarWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#FAF6EB',
+    borderWidth: 2,
+    borderColor: '#000000',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 14,
+  },
+  editAvatarPreview: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: '#000000',
+  },
+  editAvatarControls: {
+    flex: 1,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  presetBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  presetBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  presetClearBtn: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1.5,
+    borderColor: '#EF4444',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  presetClearBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#EF4444',
   },
 });

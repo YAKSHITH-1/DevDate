@@ -39,7 +39,23 @@ export const createNotification = async ({
     readAt: null,
   });
 
-  return notification;
+  const populated = await Notification.findById(notification._id)
+    .populate("actor", "name email role avatar")
+    .populate("project", "title category status")
+    .populate("invitation", "status message createdAt")
+    .populate("match", "_id status project user owner");
+
+  try {
+    const { getIO } = await import("../../sockets/index.js");
+    const io = getIO();
+    if (io) {
+      io.to(`user:${recipient.toString()}`).emit("new_notification", populated || notification);
+    }
+  } catch (err) {
+    console.error("Socket notification emit error:", err.message);
+  }
+
+  return populated || notification;
 };
 
 /**
@@ -56,7 +72,8 @@ export const getUserNotifications = async (userId, { unreadOnly = false, limit =
     .limit(Number(limit))
     .populate("actor", "name email role avatar")
     .populate("project", "title category status")
-    .populate("invitation", "status message createdAt");
+    .populate("invitation", "status message createdAt")
+    .populate("match", "_id status project user owner");
 
   return notifications;
 };
