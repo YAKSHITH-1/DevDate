@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "collab-match-app",
-    "slug": "collab-match-app",
+    "name": "DevDate",
+    "slug": "devdate",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/Devdatelogo.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#6A1B9A"
+      "backgroundColor": "#FAF6EB"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -25,12 +25,12 @@
         "android.permission.DETECT_SCREEN_CAPTURE"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#6A1B9A"
+        "foregroundImage": "./assets/Devdatelogo.png",
+        "backgroundColor": "#FAF6EB"
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/Devdatelogo.png"
     },
     "plugins": [
       "expo-secure-store",

@@ -1,6 +1,6 @@
-# Collab Match App
+# DevDate
 
-A React Native with Expo app that matches the provided design exactly.
+A React Native with Expo app for developer project collaboration.
 
 ## Project Structure
 - `/app` - Main React Native Expo project
