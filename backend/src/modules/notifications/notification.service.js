@@ -40,10 +40,11 @@ export const createNotification = async ({
   });
 
   const populated = await Notification.findById(notification._id)
-    .populate("actor", "name email role avatar")
+    .populate("actor", "name avatar")
     .populate("project", "title category status")
-    .populate("invitation", "status message createdAt")
-    .populate("match", "_id status project user owner");
+    .populate("invitation", "status")
+    .populate("match", "_id status")
+    .lean();
 
   try {
     const { getIO } = await import("../../sockets/index.js");
@@ -70,10 +71,11 @@ export const getUserNotifications = async (userId, { unreadOnly = false, limit =
   const notifications = await Notification.find(query)
     .sort({ createdAt: -1 })
     .limit(Number(limit))
-    .populate("actor", "name email role avatar")
+    .populate("actor", "name avatar")
     .populate("project", "title category status")
-    .populate("invitation", "status message createdAt")
-    .populate("match", "_id status project user owner");
+    .populate("invitation", "status")
+    .populate("match", "_id status")
+    .lean();
 
   return notifications;
 };

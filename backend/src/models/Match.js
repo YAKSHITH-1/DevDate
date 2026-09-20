@@ -36,4 +36,8 @@ matchSchema.index(
   { unique: true }
 );
 
+// Indexes for chat conversations and match lookups
+matchSchema.index({ user: 1, status: 1, updatedAt: -1 });
+matchSchema.index({ owner: 1, status: 1, updatedAt: -1 });
+
 export default mongoose.model("Match", matchSchema);

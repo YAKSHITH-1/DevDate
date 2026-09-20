@@ -7,17 +7,17 @@ import { createNotification } from "../notifications/notification.service.js";
 
 const POPULATE_PROJECT = {
   path: "project",
-  select: "title description category image duration teamSize status",
+  select: "title description category image status",
 };
 
 const POPULATE_OWNER = {
   path: "owner",
-  select: "name email avatar role bio",
+  select: "name avatar role",
 };
 
 const POPULATE_USER = {
   path: "user",
-  select: "name email avatar role bio skills experience",
+  select: "name avatar role",
 };
 
 /**
@@ -31,44 +31,70 @@ export const getUserConversations = async (userId) => {
     .populate(POPULATE_PROJECT)
     .populate(POPULATE_OWNER)
     .populate(POPULATE_USER)
-    .sort({ updatedAt: -1 });
+    .sort({ updatedAt: -1 })
+    .lean();
 
-  // For each accepted match, retrieve the last message
-  const conversations = await Promise.all(
-    matches.map(async (match) => {
-      const matchObj = match.toObject ? match.toObject() : match;
-      const isLead = matchObj.owner?._id?.toString() === userId.toString();
-      const otherParticipant = isLead ? matchObj.user : matchObj.owner;
+  const matchIds = matches.map((m) => m._id);
+  if (matchIds.length === 0) {
+    return [];
+  }
 
-      const lastMessage = await Message.findOne({ match: matchObj._id })
-        .sort({ createdAt: -1 })
-        .populate("sender", "name email avatar role");
+  // Batch-fetch the last message for all matches in a single aggregation pipeline
+  const latestMessageDocs = await Message.aggregate([
+    { $match: { match: { $in: matchIds } } },
+    { $sort: { createdAt: -1 } },
+    {
+      $group: {
+        _id: "$match",
+        lastMessage: { $first: "$$ROOT" },
+      },
+    },
+  ]);
 
-      return {
-        _id: matchObj._id,
-        matchId: matchObj._id,
-        project: matchObj.project,
-        projectName: matchObj.project?.title || "",
-        projectDescription: matchObj.project?.description || "",
-        lead: matchObj.owner,
-        developer: matchObj.user,
-        otherParticipant,
-        isLead,
-        status: matchObj.status,
-        lastMessage: lastMessage
-          ? {
-              _id: lastMessage._id,
-              message: lastMessage.message,
-              sender: lastMessage.sender,
-              receiver: lastMessage.receiver,
-              createdAt: lastMessage.createdAt,
-            }
-          : null,
-        createdAt: matchObj.createdAt,
-        updatedAt: lastMessage ? lastMessage.createdAt : matchObj.updatedAt,
-      };
-    })
-  );
+  // Batch-populate sender details for the aggregated last messages (only name and avatar)
+  const lastMessages = latestMessageDocs.map((item) => item.lastMessage);
+  await Message.populate(lastMessages, {
+    path: "sender",
+    select: "name avatar",
+  });
+
+  const lastMessageMap = new Map();
+  for (const item of latestMessageDocs) {
+    if (item._id && item.lastMessage) {
+      lastMessageMap.set(item._id.toString(), item.lastMessage);
+    }
+  }
+
+  // Assemble conversations in memory without querying inside a loop
+  const conversations = matches.map((matchObj) => {
+    const isLead = matchObj.owner?._id?.toString() === userId.toString();
+    const otherParticipant = isLead ? matchObj.user : matchObj.owner;
+    const lastMessage = lastMessageMap.get(matchObj._id.toString()) || null;
+
+    return {
+      _id: matchObj._id,
+      matchId: matchObj._id,
+      project: matchObj.project,
+      projectName: matchObj.project?.title || "",
+      projectDescription: matchObj.project?.description || "",
+      lead: matchObj.owner,
+      developer: matchObj.user,
+      otherParticipant,
+      isLead,
+      status: matchObj.status,
+      lastMessage: lastMessage
+        ? {
+            _id: lastMessage._id,
+            message: lastMessage.message,
+            sender: lastMessage.sender,
+            receiver: lastMessage.receiver,
+            createdAt: lastMessage.createdAt,
+          }
+        : null,
+      createdAt: matchObj.createdAt,
+      updatedAt: lastMessage ? lastMessage.createdAt : matchObj.updatedAt,
+    };
+  });
 
   // Sort conversations by most recent message or update
   return conversations.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
@@ -77,12 +103,14 @@ export const getUserConversations = async (userId) => {
 /**
  * 2. Get message history for a conversation
  * Verifies user is a participant and Match status is ACCEPTED.
+ * Supports limit and page pagination.
  */
-export const getConversationMessages = async (matchId, userId) => {
+export const getConversationMessages = async (matchId, userId, { limit = 50, page = 1 } = {}) => {
   const match = await Match.findById(matchId)
     .populate(POPULATE_PROJECT)
     .populate(POPULATE_OWNER)
-    .populate(POPULATE_USER);
+    .populate(POPULATE_USER)
+    .lean();
 
   if (!match) {
     throw new ApiError(404, "Conversation not found");
@@ -101,10 +129,21 @@ export const getConversationMessages = async (matchId, userId) => {
     throw new ApiError(403, "Forbidden: You are not a participant in this conversation");
   }
 
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10) || 50));
+  const skip = (pageNum - 1) * limitNum;
+
+  // Fetch recent messages with pagination, then reverse to chronological order
   const messages = await Message.find({ match: matchId })
-    .populate("sender", "name email avatar role")
-    .populate("receiver", "name email avatar role")
-    .sort({ createdAt: 1 });
+    .select("match sender receiver message createdAt")
+    .populate("sender", "name avatar")
+    .populate("receiver", "name avatar")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limitNum)
+    .lean();
+
+  messages.reverse();
 
   const otherParticipant = isLead ? match.user : match.owner;
 
@@ -127,7 +166,7 @@ export const getConversationMessages = async (matchId, userId) => {
  * Persists message to MongoDB and broadcasts via Socket.IO
  */
 export const sendMessage = async (matchId, senderId, messageText) => {
-  const match = await Match.findById(matchId);
+  const match = await Match.findById(matchId).lean();
 
   if (!match) {
     throw new ApiError(404, "Conversation not found");
@@ -158,10 +197,12 @@ export const sendMessage = async (matchId, senderId, messageText) => {
   });
 
   const populatedMessage = await Message.findById(newMessage._id)
-    .populate("sender", "name email avatar role")
-    .populate("receiver", "name email avatar role");
+    .select("match project sender receiver message createdAt")
+    .populate("sender", "name avatar")
+    .populate("receiver", "name avatar")
+    .lean();
 
-  // 2. Real-time broadcast via Socket.IO
+  // 2. Real-time broadcast via Socket.IO with compact payload
   try {
     const io = getIO();
     if (io) {

@@ -37,6 +37,8 @@ import {
   fetchMyProjectsApi,
   fetchProjectByIdApi,
   updateProjectApi,
+  closeProjectApi,
+  deleteProjectApi,
   getMeApi,
   updateProfileApi,
   normalizeDeveloper,
@@ -387,6 +389,26 @@ export function AppProvider({ children }) {
     try {
       const res = await verifyEmailApi(email, otp);
       if (res.success) {
+        // Automatic authentication on successful signup verification
+        if (res.accessToken) {
+          const { accessToken: newAccess, refreshToken: newRefresh, user } = res;
+          await saveAuthTokens(newAccess, newRefresh);
+          setAuthToken(newAccess, newRefresh);
+          setAccessToken(newAccess);
+          setRefreshToken(newRefresh);
+          let userObj = { ...(user || {}), token: newAccess };
+          try {
+            const meRes = await getMeApi(newAccess);
+            if (meRes.success && meRes.user) {
+              userObj = { ...meRes.user, token: newAccess };
+            }
+          } catch {}
+          setCurrentUser(userObj);
+          setIsAuthenticated(true);
+          setAuthError(null);
+          loadDiscoveryDevelopers();
+          return { success: true, user: userObj, accessToken: newAccess, data: res.data, message: res.message };
+        }
         return { success: true, data: res.data, message: res.message };
       } else {
         const msg = res.error || 'Verification failed';
@@ -651,17 +673,42 @@ export function AppProvider({ children }) {
   };
 
 
-  const deleteProject = (id) => {
+  const deleteProject = async (id) => {
+    if (!id) return { success: false, error: 'Project ID is required' };
+
+    const token = currentUser?.token || null;
+    const uid = currentUser?._id || currentUser?.id;
+
+    // If it's a valid MongoDB project ID, delete it on the backend (creator only)
+    if (/^[0-9a-fA-F]{24}$/.test(id.toString())) {
+      try {
+        const res = await deleteProjectApi(id, token, uid);
+        if (!res.success) {
+          return { success: false, error: res.error || 'Failed to delete project on server' };
+        }
+      } catch (err) {
+        return { success: false, error: err.message || 'Error deleting project' };
+      }
+    }
+
     setProjects((prev) => {
       const filtered = prev.filter((p) => p.id !== id);
-      if (activeProjectId === id && filtered.length > 0) {
-        setActiveProjectId(filtered[0].id);
+      if (activeProjectId === id) {
+        setActiveProjectId(filtered.length > 0 ? filtered[0].id : null);
       }
-      if (viewedProjectId === id && filtered.length > 0) {
-        setViewedProjectId(filtered[0].id);
+      if (viewedProjectId === id) {
+        setViewedProjectId(filtered.length > 0 ? filtered[0].id : null);
       }
       return filtered;
     });
+
+    addNotification({
+      type: 'PROJECT',
+      title: 'Project Deleted',
+      message: 'Project has been deleted successfully.',
+    });
+
+    return { success: true };
   };
 
   const closeProject = async (projectId) => {
@@ -967,15 +1014,19 @@ export function AppProvider({ children }) {
         setNotifications(normalized);
       }
 
-      // 2. Fetch unread count
-      const countRes = await fetchUnreadNotificationCount(uid, token);
-      if (sessionVersion.current !== currentVer || !isAuthenticatedRef.current || isLoggingOutRef.current) {
-        return;
-      }
-      if (countRes.success && countRes.data && countRes.data.unreadCount !== undefined) {
-        setUnreadNotificationsCount(countRes.data.unreadCount);
-      } else if (notifRes.success && Array.isArray(notifRes.data)) {
-        setUnreadNotificationsCount(notifRes.data.filter((n) => !n.readAt).length);
+      // 2. Fetch unread count (if not already included in notifRes)
+      if (notifRes.unreadCount !== undefined) {
+        setUnreadNotificationsCount(notifRes.unreadCount);
+      } else {
+        const countRes = await fetchUnreadNotificationCount(uid, token);
+        if (sessionVersion.current !== currentVer || !isAuthenticatedRef.current || isLoggingOutRef.current) {
+          return;
+        }
+        if (countRes.success && countRes.data && countRes.data.unreadCount !== undefined) {
+          setUnreadNotificationsCount(countRes.data.unreadCount);
+        } else if (notifRes.success && Array.isArray(notifRes.data)) {
+          setUnreadNotificationsCount(notifRes.data.filter((n) => !n.readAt).length);
+        }
       }
     } catch (err) {
       console.warn('Failed to load notifications from backend:', err.message);
@@ -986,15 +1037,16 @@ export function AppProvider({ children }) {
     }
   };
 
-  // Sync on mount & when currentUser changes
+  // Sync on mount & when authenticated user ID changes (avoids re-firing on profile object mutation)
+  const currentUserId = currentUser?._id || currentUser?.id;
   useEffect(() => {
     loadCanonicalSkills();
-    if (isAuthenticated && currentUser) {
+    if (isAuthenticated && currentUserId) {
       loadProjects();
       refreshMatchesAndInvitations();
       loadNotifications();
     }
-  }, [currentUser, isAuthenticated]);
+  }, [currentUserId, isAuthenticated]);
 
   // --- INVITATIONS & MATCHES ---
   const acceptInvitation = async (invitation) => {

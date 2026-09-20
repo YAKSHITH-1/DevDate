@@ -9,6 +9,7 @@ import {
   Modal,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS, TYPOGRAPHY } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
 import {
@@ -43,6 +44,17 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
   const [activeSegment, setActiveSegment] = useState('invitations'); // 'invitations' | 'matches'
   const [selectedInviteDetail, setSelectedInviteDetail] = useState(null);
   const [feedbackToast, setFeedbackToast] = useState(null);
+  const insets = useSafeAreaInsets();
+
+  const modalBackdropStyle = [
+    styles.modalBackdrop,
+    {
+      paddingTop: Math.max(insets.top + 12, 24),
+      paddingBottom: Math.max(insets.bottom + 12, 24),
+      paddingLeft: Math.max(insets.left + 16, 20),
+      paddingRight: Math.max(insets.right + 16, 20),
+    },
+  ];
 
   const showToast = (message, color = COLORS.lime) => {
     setFeedbackToast({ message, color });
@@ -211,7 +223,10 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
          ═══════════════════════════════════════════════════════════════ */}
       <ScrollView
         style={styles.scrollArea}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: Math.max(insets.bottom + 20, 28) },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -414,7 +429,7 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
         animationType="fade"
         onRequestClose={() => setPendingMatchCelebration(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.modalCard, styles.celebrationCard, BRUTAL_SHADOWS.md]}>
             {/* Corner sparkles */}
             <DoodleSparkle size={20} color={COLORS.yellow} style={{ position: 'absolute', top: 12, left: 14 }} />
@@ -522,7 +537,7 @@ export default function MatchesScreen({ onOpenChat, onNavigateToSettings, onNavi
         animationType="slide"
         onRequestClose={() => setSelectedInviteDetail(null)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.modalCard, BRUTAL_SHADOWS.md]}>
             {/* Header Row */}
             <View style={styles.modalHeaderRow}>

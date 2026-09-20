@@ -33,9 +33,11 @@ function getStatusInfo(status, currentMembers = 0, maxMembers = 0) {
 export default function ProjectCard({
   project,
   isActiveForDiscovery = false,
+  isOwner = false,
   onView,
   onEdit,
   onClose,
+  onDelete,
   onFindMembers,
   onBookmark,
   isBookmarked = false,
@@ -227,55 +229,82 @@ export default function ProjectCard({
       )}
 
       {/* 8. CARD ACTIONS */}
-      <View style={styles.actionsRow}>
-        {onView && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => onView(project)}
-            style={[styles.actionBtn, styles.actionBtnView, BRUTAL_SHADOWS.xs]}
-          >
-            <Text style={styles.actionBtnViewText}>VIEW</Text>
-          </TouchableOpacity>
-        )}
-
-        {onEdit && (
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => onEdit(project)}
-            style={[styles.actionBtn, styles.actionBtnEdit, BRUTAL_SHADOWS.xs]}
-          >
-            <Text style={styles.actionBtnEditText}>EDIT</Text>
-          </TouchableOpacity>
-        )}
-
-        {!isClosed ? (
-          <>
-            {onClose && (
+      {isOwner ? (
+        <View style={styles.ownerActionsWrapper}>
+          <View style={styles.actionsRow}>
+            {onView && (
               <TouchableOpacity
                 activeOpacity={0.8}
-                onPress={() => onClose(project.id)}
-                style={[styles.actionBtn, styles.actionBtnClose, BRUTAL_SHADOWS.xs]}
+                onPress={() => onView(project)}
+                style={[styles.actionBtn, styles.actionBtnView, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.actionBtnCloseText}>CLOSE</Text>
+                <Text style={styles.actionBtnViewText}>VIEW</Text>
               </TouchableOpacity>
             )}
 
-            {onFindMembers && (
+            {onEdit && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => onEdit(project)}
+                style={[styles.actionBtn, styles.actionBtnEdit, BRUTAL_SHADOWS.xs]}
+              >
+                <Text style={styles.actionBtnEditText}>EDIT</Text>
+              </TouchableOpacity>
+            )}
+
+            {!isClosed && onFindMembers && (
               <TouchableOpacity
                 activeOpacity={0.8}
                 onPress={() => onFindMembers(project)}
                 style={[styles.actionBtn, styles.actionBtnFind, BRUTAL_SHADOWS.xs]}
+                accessibilityLabel="Recruit developers for this project"
               >
-                <Text style={styles.actionBtnFindText}>FIND</Text>
+                <Text style={styles.actionBtnFindText}>RECRUIT</Text>
               </TouchableOpacity>
             )}
-          </>
-        ) : (
-          <View style={styles.actionBtnClosed}>
-            <Text style={styles.actionBtnClosedText}>CLOSED</Text>
           </View>
-        )}
-      </View>
+
+          <View style={[styles.actionsRow, { marginTop: 8 }]}>
+            {!isClosed ? (
+              onClose && (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => onClose(project.id)}
+                  style={[styles.actionBtn, styles.actionBtnClose, BRUTAL_SHADOWS.xs]}
+                >
+                  <Text style={styles.actionBtnCloseText}>CLOSE</Text>
+                </TouchableOpacity>
+              )
+            ) : (
+              <View style={styles.actionBtnClosed}>
+                <Text style={styles.actionBtnClosedText}>CLOSED</Text>
+              </View>
+            )}
+
+            {onDelete && (
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => onDelete(project.id)}
+                style={[styles.actionBtn, styles.actionBtnDelete, BRUTAL_SHADOWS.xs]}
+              >
+                <Text style={styles.actionBtnDeleteText}>DELETE</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.actionsRow}>
+          {onView && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onView(project)}
+              style={[styles.actionBtn, styles.actionBtnView, styles.actionBtnViewFull, BRUTAL_SHADOWS.xs]}
+            >
+              <Text style={styles.actionBtnViewText}>VIEW PROJECT</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -655,6 +684,23 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     color: COLORS.textMuted,
+    letterSpacing: 0.5,
+  },
+  ownerActionsWrapper: {
+    marginTop: 4,
+  },
+  actionBtnViewFull: {
+    height: 42,
+    backgroundColor: COLORS.white,
+  },
+  actionBtnDelete: {
+    backgroundColor: '#FEE2E2',
+    borderColor: COLORS.ink,
+  },
+  actionBtnDeleteText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#DC2626',
     letterSpacing: 0.5,
   },
 });

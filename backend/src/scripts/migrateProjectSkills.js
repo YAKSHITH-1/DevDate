@@ -25,8 +25,25 @@ export const migrateProjectSkills = async () => {
   let migratedCount = 0;
   let alreadyUpToDate = 0;
 
+  // Batch-fetch all existing canonical skills into an in-memory lookup map
+  const allSkills = await Skill.find({}).lean();
+  const skillLookup = new Map();
+  for (const s of allSkills) {
+    skillLookup.set(s.name.toLowerCase(), s._id);
+    if (Array.isArray(s.aliases)) {
+      for (const a of s.aliases) {
+        if (a && typeof a === "string") {
+          skillLookup.set(a.toLowerCase(), s._id);
+        }
+      }
+    }
+  }
+
+  // Find projects needing migration and gather all unique missing legacy skills
+  const projectsToMigrate = [];
+  const missingSkillNamesMap = new Map();
+
   for (const rawProject of rawProjects) {
-    // If project already has requiredSkills as ObjectId array, skip unless empty with legacy skills
     const hasRequiredSkills = Array.isArray(rawProject.requiredSkills) && rawProject.requiredSkills.length > 0;
     const hasLegacySkills = Array.isArray(rawProject.skills) && rawProject.skills.length > 0;
 
@@ -35,47 +52,70 @@ export const migrateProjectSkills = async () => {
       continue;
     }
 
+    projectsToMigrate.push(rawProject);
+
+    const legacySkills = rawProject.skills || [];
+    for (const skillStr of legacySkills) {
+      if (typeof skillStr !== "string" || !skillStr.trim()) continue;
+      const trimmed = skillStr.trim();
+      const lower = trimmed.toLowerCase();
+      if (!skillLookup.has(lower) && !missingSkillNamesMap.has(lower)) {
+        missingSkillNamesMap.set(lower, trimmed);
+      }
+    }
+  }
+
+  // Bulk-create any missing canonical skills
+  if (missingSkillNamesMap.size > 0) {
+    const missingList = Array.from(missingSkillNamesMap.values());
+    console.log(`⚠️ Creating ${missingList.length} custom canonical skill entries in batch...`);
+    const newSkills = await Skill.insertMany(
+      missingList.map((name) => ({
+        name,
+        aliases: [],
+        categories: ["Full Stack Development"],
+      }))
+    );
+    for (const doc of newSkills) {
+      skillLookup.set(doc.name.toLowerCase(), doc._id);
+    }
+  }
+
+  // Prepare bulkWrite operations for projects to execute all updates in one roundtrip
+  const bulkOps = [];
+  for (const rawProject of projectsToMigrate) {
     const legacySkills = rawProject.skills || [];
     const matchedSkillIds = [];
+    const seenIdStrings = new Set();
 
     for (const skillStr of legacySkills) {
       if (typeof skillStr !== "string" || !skillStr.trim()) continue;
-
       const trimmed = skillStr.trim();
-      const regex = new RegExp(`^${escapeRegex(trimmed)}$`, "i");
-
-      let skillDoc = await Skill.findOne({
-        $or: [{ name: regex }, { aliases: regex }],
-      });
-
-      if (!skillDoc) {
-        // Create canonical skill if not found
-        console.log(`⚠️ Skill '${trimmed}' not found in canonical DB. Creating custom skill entry...`);
-        skillDoc = await Skill.create({
-          name: trimmed,
-          aliases: [],
-          categories: ["Full Stack Development"],
-        });
-      }
-
-      if (skillDoc && !matchedSkillIds.some((id) => id.equals(skillDoc._id))) {
-        matchedSkillIds.push(skillDoc._id);
+      const skillId = skillLookup.get(trimmed.toLowerCase());
+      if (skillId && !seenIdStrings.has(skillId.toString())) {
+        seenIdStrings.add(skillId.toString());
+        matchedSkillIds.push(skillId);
       }
     }
 
-    // Update project with requiredSkills and remove legacy skills
-    await projectCollection.updateOne(
-      { _id: rawProject._id },
-      {
-        $set: {
-          requiredSkills: matchedSkillIds.length > 0 ? matchedSkillIds : (rawProject.requiredSkills || []),
+    bulkOps.push({
+      updateOne: {
+        filter: { _id: rawProject._id },
+        update: {
+          $set: {
+            requiredSkills: matchedSkillIds.length > 0 ? matchedSkillIds : (rawProject.requiredSkills || []),
+          },
+          $unset: { skills: "" },
         },
-        $unset: { skills: "" },
-      }
-    );
+      },
+    });
 
     migratedCount++;
-    console.log(`✅ Migrated project '${rawProject.title}' (${rawProject._id}) with ${matchedSkillIds.length} requiredSkills.`);
+    console.log(` Migrated project '${rawProject.title}' (${rawProject._id}) with ${matchedSkillIds.length} requiredSkills.`);
+  }
+
+  if (bulkOps.length > 0) {
+    await projectCollection.bulkWrite(bulkOps);
   }
 
   console.log(`\n🎉 Migration Completed! Migrated: ${migratedCount}, Already up-to-date: ${alreadyUpToDate}`);

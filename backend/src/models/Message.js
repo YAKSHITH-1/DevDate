@@ -39,6 +39,7 @@ const messageSchema = new mongoose.Schema(
 );
 
 messageSchema.index({ match: 1, createdAt: 1 });
+messageSchema.index({ match: 1, createdAt: -1 });
 messageSchema.index({ project: 1, createdAt: 1 });
 
 export default mongoose.model("Message", messageSchema);

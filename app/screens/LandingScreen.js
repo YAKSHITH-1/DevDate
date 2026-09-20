@@ -10,8 +10,11 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   ActivityIndicator,
+  Animated,
+  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import LandingBackgroundVideo from './LandingBackgroundVideo';
 import {
   COLORS,
   FONTS,
@@ -22,7 +25,9 @@ import {
 } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
 import PopArtHeader from '../components/PopArtHeader';
-import OtpSuccessModal from '../components/OtpSuccessModal';
+
+// Code-split OtpSuccessModal loaded on-demand only after OTP is verified
+const OtpSuccessModal = React.lazy(() => import('../components/OtpSuccessModal'));
 import {
   DoodleStar,
   DoodleSparkle,
@@ -43,7 +48,11 @@ import { getDiceBearAvatar, resolveProfileAvatar } from '../utils/avatar';
  * Visual Language: Playful Developer Sketchbook + Pop Art Graphic Design + Modern Mobile Product
  * Zero Unicode Emojis.
  */
+// Landing video asset — do NOT move, rename, or duplicate this file
+const LANDING_VIDEO = require('../assets/landervideo.mp4');
+
 export default function LandingScreen({ onGetStarted }) {
+  const insets = useSafeAreaInsets();
   const { login, register, verifyEmail } = useApp();
 
   // Screen flow: 'landing' | 'login' | 'signup' | 'otp' | 'forgot_password' | 'reset_password'
@@ -52,6 +61,9 @@ export default function LandingScreen({ onGetStarted }) {
   const [errorMessage, setErrorMessage] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Video background state & animation — immediate visibility
+  const videoFadeAnim = useRef(new Animated.Value(1)).current;
 
   // Login Form
   const [loginEmail, setLoginEmail] = useState('');
@@ -80,6 +92,15 @@ export default function LandingScreen({ onGetStarted }) {
   const [confirmResetPassword, setConfirmResetPassword] = useState('');
   const [showResetPassword, setShowResetPassword] = useState(false);
 
+
+  const handleVideoLoad = () => {
+    Animated.timing(videoFadeAnim, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  };
+
   // Live countdown timer for OTP resend
   useEffect(() => {
     let timer;
@@ -90,6 +111,21 @@ export default function LandingScreen({ onGetStarted }) {
     }
     return () => clearInterval(timer);
   }, [currentView, otpCountdown]);
+
+  // On Web: detect reset-password token from URL if user opened link from email in browser
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        const searchParams = new URLSearchParams(window.location.search);
+        const urlToken = searchParams.get('token');
+        if (urlToken) {
+          setResetToken(urlToken);
+          setSuccessMessage('Recovery token loaded from URL. Enter your fresh access key below.');
+          setCurrentView('reset_password');
+        }
+      } catch {}
+    }
+  }, []);
 
   // Navigation handlers
   const handleOpenLogin = () => {
@@ -321,12 +357,9 @@ export default function LandingScreen({ onGetStarted }) {
 
   const handleOtpSuccessModalDone = () => {
     setShowSuccessModal(false);
-    const targetEmail = verificationEmail || signupEmail || loginEmail;
-    if (targetEmail) {
-      setLoginEmail(targetEmail);
+    if (onGetStarted) {
+      onGetStarted();
     }
-    setSuccessMessage('Email verified successfully! Please enter your access key to log in.');
-    setCurrentView('login');
   };
 
   const handleForgotPasswordSubmit = async () => {
@@ -343,7 +376,8 @@ export default function LandingScreen({ onGetStarted }) {
     try {
       const res = await forgotPasswordApi(forgotEmail.trim().toLowerCase());
       if (res.success) {
-        setSuccessMessage('If an account exists, a recovery token has been sent to your email.');
+        setSuccessMessage(`Recovery token dispatched! Enter the token below to set a fresh key, or click the link in your email.`);
+        setCurrentView('reset_password');
       } else {
         setErrorMessage(res.error || 'Unable to process recovery request.');
       }
@@ -365,7 +399,7 @@ export default function LandingScreen({ onGetStarted }) {
       return;
     }
     if (resetPassword !== confirmResetPassword) {
-      setErrorMessage('Passwords do not match');
+      setErrorMessage('Access keys do not match. Please verify both fields.');
       return;
     }
 
@@ -380,10 +414,14 @@ export default function LandingScreen({ onGetStarted }) {
       });
 
       if (res.success) {
-        setSuccessMessage('Access key successfully updated! Please log in with your new key.');
+        if (forgotEmail) {
+          setLoginEmail(forgotEmail);
+        }
+        setLoginPassword(resetPassword);
+        setSuccessMessage('Access key successfully updated! Please log in with your fresh access key.');
         setCurrentView('login');
       } else {
-        setErrorMessage(res.error || 'Invalid or expired token.');
+        setErrorMessage(res.error || 'Invalid or expired recovery token.');
       }
     } catch (err) {
       setErrorMessage(err.message || 'Reset password failed');
@@ -397,130 +435,30 @@ export default function LandingScreen({ onGetStarted }) {
   /* ========================================================================= */
   if (currentView === 'landing') {
     return (
-      <View style={styles.container}>
-        <ScrollView
-          style={styles.landingScroll}
-          contentContainerStyle={styles.landingScrollContent}
-          showsVerticalScrollIndicator={false}
+      <View style={[styles.container, { backgroundColor: '#0B0C10' }]}>
+        {/* Fullscreen Video Background */}
+        <Animated.View style={[styles.videoBgContainer, { opacity: videoFadeAnim }]}>
+          <LandingBackgroundVideo
+            source={LANDING_VIDEO}
+            style={styles.videoBg}
+            isActive={currentView === 'landing'}
+            onLoad={handleVideoLoad}
+          />
+          {/* Dark overlay for text readability */}
+          <View style={styles.videoOverlay} />
+        </Animated.View>
+
+        {/* CTA Buttons — pinned to bottom with safe area insets */}
+        <View
+          style={[
+            styles.landingCtaContainer,
+            {
+              paddingBottom: Math.max(insets.bottom + 16, 36),
+              paddingLeft: Math.max(insets.left + 24, 24),
+              paddingRight: Math.max(insets.right + 24, 24),
+            },
+          ]}
         >
-          {/* Top Brand Bar */}
-          <View style={styles.topBrandBar}>
-            <View style={styles.logoBadge}>
-              <DoodleCode symbol="//" color={COLORS.ink} bgColor={COLORS.yellow} style={styles.logoCodeIcon} />
-              <Text style={styles.logoText}>DEVDATE</Text>
-            </View>
-
-            <ComicBadge
-              text="POW! // v1.0"
-              color={COLORS.coral}
-              textColor={COLORS.white}
-              rotate="2deg"
-              size="sm"
-            />
-          </View>
-
-          {/* Hero Section */}
-          <View style={styles.heroSection}>
-            <View style={[styles.heroPill, BRUTAL_SHADOWS.xs]}>
-              <DoodleStar size={12} color={COLORS.ink} />
-              <Text style={styles.heroPillText}>THE DEVELOPER SQUAD NETWORK</Text>
-            </View>
-
-            <Text style={styles.heroTitle}>
-              MATCH.{' '}
-              <Text style={{ color: COLORS.cyanDark || '#0284C7' }}>CODE.</Text>{' '}
-              <Text style={{ color: COLORS.coral }}>SHIP.</Text>
-            </Text>
-
-            <DoodleUnderline width="75%" color={COLORS.yellow} height={4} style={{ marginVertical: 6 }} />
-
-            <Text style={styles.heroSubtitle}>
-              The matchmaking platform built for builders. Swipe on projects, squad up with compatible developers, and ship real software together.
-            </Text>
-          </View>
-
-          {/* Sketchbook Graphic Area: Browser-like Frame */}
-          <View style={[styles.sketchWindowFrame, BRUTAL_SHADOWS.md]}>
-            {/* Window Top Bar with folder tab and dots */}
-            <View style={styles.windowTopBar}>
-              <View style={styles.windowDotsRow}>
-                <View style={[styles.windowDot, { backgroundColor: COLORS.coral }]} />
-                <View style={[styles.windowDot, { backgroundColor: COLORS.yellow }]} />
-                <View style={[styles.windowDot, { backgroundColor: COLORS.lime }]} />
-              </View>
-
-              <View style={styles.windowTitlePill}>
-                <DoodleCode symbol="rig.dev" color={COLORS.textMuted} bgColor={COLORS.white} style={styles.miniWindowCode} />
-                <Text style={styles.windowTitleText}>devdate.local/squad-up</Text>
-              </View>
-
-              <DoodleSparkle size={14} color={COLORS.ink} />
-            </View>
-
-            {/* Window Sketch Content */}
-            <View style={styles.windowContent}>
-              {/* Co-founder Match Card Preview */}
-              <View style={styles.previewCoFounders}>
-                <View style={[styles.miniDevCard, BRUTAL_SHADOWS.xs]}>
-                  <Image
-                    source={{ uri: resolveProfileAvatar('', 'Maya Lin', 'voxel-bot') }}
-                    style={styles.miniDevAvatar}
-                  />
-                  <Text style={styles.miniDevName}>MAYA LIN</Text>
-                  <Text style={styles.miniDevRole}>Full Stack</Text>
-                  <View style={[styles.miniTagPill, { backgroundColor: COLORS.cyan }]}>
-                    <Text style={styles.miniTagText}>REACT</Text>
-                  </View>
-                </View>
-
-                {/* Connection burst */}
-                <View style={styles.matchBurstWrap}>
-                  <View style={[styles.matchBurstCircle, BRUTAL_SHADOWS.xs]}>
-                    <Text style={styles.matchBurstPercent}>96%</Text>
-                    <Text style={styles.matchBurstLabel}>MATCH</Text>
-                  </View>
-                  <DoodleSparkle size={16} color={COLORS.yellow} style={styles.burstSparkle} />
-                </View>
-
-                <View style={[styles.miniDevCard, BRUTAL_SHADOWS.xs]}>
-                  <Image
-                    source={{ uri: resolveProfileAvatar('', 'Alex Chen', 'voxel-bot') }}
-                    style={styles.miniDevAvatar}
-                  />
-                  <Text style={styles.miniDevName}>ALEX CHEN</Text>
-                  <Text style={styles.miniDevRole}>Backend</Text>
-                  <View style={[styles.miniTagPill, { backgroundColor: COLORS.lime }]}>
-                    <Text style={styles.miniTagText}>PYTHON</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Doodle annotation below cards */}
-              <View style={styles.annotationBanner}>
-                <DoodleStar size={12} color={COLORS.ink} />
-                <Text style={styles.annotationText}>// 100% COLLAB-READY HACKERS</Text>
-                <DoodleCode symbol="</>" color={COLORS.ink} bgColor={COLORS.white} style={styles.miniWindowCode} />
-              </View>
-            </View>
-          </View>
-
-          {/* Feature Highlight Pills */}
-          <View style={styles.featuresRow}>
-            <View style={[styles.featurePill, BRUTAL_SHADOWS.xs]}>
-              <DoodleCheck size={11} color={COLORS.green} />
-              <Text style={styles.featurePillText}>SWIPE DEVS</Text>
-            </View>
-            <View style={[styles.featurePill, BRUTAL_SHADOWS.xs]}>
-              <DoodleCheck size={11} color={COLORS.green} />
-              <Text style={styles.featurePillText}>3D VOXEL RIGS</Text>
-            </View>
-            <View style={[styles.featurePill, BRUTAL_SHADOWS.xs]}>
-              <DoodleCheck size={11} color={COLORS.green} />
-              <Text style={styles.featurePillText}>LIVE CHAT</Text>
-            </View>
-          </View>
-
-          {/* Action CTAs */}
           <View style={styles.actionButtonsWrap}>
             {/* Primary Action Button */}
             <TouchableOpacity
@@ -548,15 +486,7 @@ export default function LandingScreen({ onGetStarted }) {
               </Text>
             </TouchableOpacity>
           </View>
-
-          {/* Footer note */}
-          <View style={styles.landingFooter}>
-            <DoodleSeparator style={{ marginBottom: 8 }} />
-            <Text style={styles.landingFooterText}>
-              DEV ENVIRONMENT // BUILT FOR HACKERS & CREATORS
-            </Text>
-          </View>
-        </ScrollView>
+        </View>
       </View>
     );
   }
@@ -621,8 +551,11 @@ export default function LandingScreen({ onGetStarted }) {
   };
 
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeAreaContainer} edges={['top', 'bottom']}>
+    <View style={[styles.container, { backgroundColor: COLORS.creamBg }]}>
+      <SafeAreaView
+        style={[styles.safeAreaContainer, { backgroundColor: COLORS.creamBg }]}
+        edges={['top', 'bottom', 'left', 'right']}
+      >
         {renderHeader()}
 
         <KeyboardAvoidingView
@@ -1180,7 +1113,7 @@ export default function LandingScreen({ onGetStarted }) {
                     onPress={() => handleOpenResetPassword()}
                     style={[styles.secondarySubmitBtn, BRUTAL_SHADOWS.xs, { marginTop: 10 }]}
                   >
-                    <Text style={styles.secondarySubmitBtnText}>I HAVE A TOKEN -> RESET KEY</Text>
+                    <Text style={styles.secondarySubmitBtnText}>I HAVE A TOKEN --- RESET KEY</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1212,6 +1145,13 @@ export default function LandingScreen({ onGetStarted }) {
                 </View>
 
                 <View style={styles.cardBody}>
+                  {forgotEmail ? (
+                    <View style={{ backgroundColor: '#FAF6EB', borderWidth: 2, borderColor: COLORS.borderBlack, borderRadius: 10, padding: 10, marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: COLORS.textMuted }}>RECOVERY FOR:</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '900', color: COLORS.ink }}>{forgotEmail}</Text>
+                    </View>
+                  ) : null}
+
                   {/* Token Input */}
                   <View style={styles.inputGroup}>
                     <View style={styles.labelRow}>
@@ -1296,6 +1236,16 @@ export default function LandingScreen({ onGetStarted }) {
                     )}
                   </TouchableOpacity>
 
+                  {/* Resend / Change email option */}
+                  <TouchableOpacity
+                    onPress={() => setCurrentView('forgot_password')}
+                    style={[styles.returnLoginLinkWrap, { marginTop: 6 }]}
+                  >
+                    <Text style={[styles.returnLoginLink, { color: COLORS.coral, fontSize: 11 }]}>
+                      {'RESEND OR CHANGE RECOVERY EMAIL'}
+                    </Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     onPress={() => setCurrentView('login')}
                     style={styles.returnLoginLinkWrap}
@@ -1308,15 +1258,19 @@ export default function LandingScreen({ onGetStarted }) {
           </ScrollView>
         </KeyboardAvoidingView>
 
-        {/* Celebratory Modal on OTP Success */}
-        <OtpSuccessModal
-          visible={showSuccessModal}
-          onClose={handleOtpSuccessModalDone}
-          onEnterDiscord={handleOtpSuccessModalDone}
-          onViewProfile={handleOtpSuccessModalDone}
-          primaryButtonText="PROCEED TO LOGIN"
-          secondaryButtonText="VIEW SQUAD DETAILS"
-        />
+        {/* Celebratory Modal on OTP Success - loaded lazily on demand */}
+        {showSuccessModal && (
+          <React.Suspense fallback={null}>
+            <OtpSuccessModal
+              visible={showSuccessModal}
+              onClose={handleOtpSuccessModalDone}
+              onEnterDiscord={handleOtpSuccessModalDone}
+              onViewProfile={handleOtpSuccessModalDone}
+              primaryButtonText="ENTER DEVDATE & DISCOVER ➔"
+              secondaryButtonText="VIEW SQUAD DETAILS"
+            />
+          </React.Suspense>
+        )}
       </SafeAreaView>
     </View>
   );
@@ -1325,10 +1279,50 @@ export default function LandingScreen({ onGetStarted }) {
 // ============================================================================
 // STYLES — Pop Art x Doodle Art Aesthetic System
 // ============================================================================
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.creamBg,
+  },
+
+  // ========= VIDEO BACKGROUND =========
+  videoBgContainer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 0,
+  },
+  videoBg: {
+    width: SCREEN_W,
+    height: SCREEN_H,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+  },
+  videoOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.52)',
+  },
+  videoTextWhite: {
+    color: '#FFFFFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  videoSubtextWhite: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  landingCtaContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    paddingBottom: 48,
+    zIndex: 2,
   },
   safeAreaContainer: {
     flex: 1,

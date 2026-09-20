@@ -4,17 +4,17 @@ import ApiError from "../../utils/ApiError.js";
 
 const POPULATE_PROJECT = {
   path: "project",
-  select: "title description category duration teamSize image status members",
+  select: "title description status",
 };
 
 const POPULATE_OWNER = {
   path: "owner",
-  select: "name email avatar role bio",
+  select: "name avatar role preferredRole",
 };
 
 const POPULATE_USER = {
   path: "user",
-  select: "name email avatar role skills experience",
+  select: "name avatar role preferredRole",
 };
 
 /**
@@ -28,10 +28,10 @@ export const getPendingInvitations = async (developerId) => {
   })
     .populate(POPULATE_PROJECT)
     .populate(POPULATE_OWNER)
-    .sort({ createdAt: -1 });
+    .sort({ createdAt: -1 })
+    .lean();
 
-  return matches.map((match) => {
-    const matchObj = match.toObject ? match.toObject() : match;
+  return matches.map((matchObj) => {
     return {
       _id: matchObj._id,
       matchId: matchObj._id,
@@ -101,12 +101,11 @@ export const approveInvitation = async (matchId, developerId) => {
     }
   }
 
-  const populatedMatch = await Match.findById(match._id)
+  const matchObj = await Match.findById(match._id)
     .populate(POPULATE_PROJECT)
     .populate(POPULATE_OWNER)
-    .populate(POPULATE_USER);
-
-  const matchObj = populatedMatch.toObject ? populatedMatch.toObject() : populatedMatch;
+    .populate(POPULATE_USER)
+    .lean();
 
   return {
     ...matchObj,
@@ -143,12 +142,11 @@ export const rejectInvitation = async (matchId, developerId) => {
   match.status = "REJECTED";
   await match.save();
 
-  const populatedMatch = await Match.findById(match._id)
+  const matchObj = await Match.findById(match._id)
     .populate(POPULATE_PROJECT)
     .populate(POPULATE_OWNER)
-    .populate(POPULATE_USER);
-
-  const matchObj = populatedMatch.toObject ? populatedMatch.toObject() : populatedMatch;
+    .populate(POPULATE_USER)
+    .lean();
 
   return {
     ...matchObj,

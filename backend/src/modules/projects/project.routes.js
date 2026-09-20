@@ -5,6 +5,7 @@ import {
   getProjectById,
   updateProject,
   closeProject,
+  deleteProject,
 } from "./project.controller.js";
 import {
   createProjectValidation,
@@ -30,5 +31,8 @@ router.patch("/:id", authenticate, validate(updateProjectValidation), updateProj
 
 // 4️POST /projects/:id/close (Close Project)
 router.post("/:id/close", authenticate, validate(projectIdParamValidation), closeProject);
+
+// 5️ DELETE /projects/:id (Delete Project - Creator Only)
+router.delete("/:id", authenticate, validate(projectIdParamValidation), deleteProject);
 
 export default router;

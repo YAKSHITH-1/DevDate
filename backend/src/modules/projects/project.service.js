@@ -6,15 +6,15 @@ import { validateSkillIds } from "../skills/skill.service.js";
 const POPULATE_CONFIG = [
   {
     path: "owner",
-    select: "name email avatar role bio github linkedin portfolio",
+    select: "name avatar role",
   },
   {
     path: "members",
-    select: "name email avatar role skills",
+    select: "name avatar role",
   },
   {
     path: "requiredSkills",
-    select: "name categories aliases",
+    select: "name",
   },
 ];
 
@@ -22,7 +22,8 @@ const populateProject = (query) => {
   return query
     .populate(POPULATE_CONFIG[0])
     .populate(POPULATE_CONFIG[1])
-    .populate(POPULATE_CONFIG[2]);
+    .populate(POPULATE_CONFIG[2])
+    .lean();
 };
 
 export const createProject = async (userId, projectData) => {
@@ -73,9 +74,14 @@ export const getMyProjects = async (userId) => {
     throw new ApiError(400, "User ID is required");
   }
 
-  const projects = await populateProject(
-    Project.find({ owner: userId }).sort({ createdAt: -1 })
-  );
+  // Caller is owner; populate owner, members for squad avatar previews, and requiredSkills with lean
+  const projects = await Project.find({ owner: userId })
+    .select("title description requiredSkills interests requiredRoles category duration teamSize members image status lastActivityAt createdAt owner")
+    .populate({ path: "owner", select: "name avatar role" })
+    .populate({ path: "members", select: "name avatar role" })
+    .populate({ path: "requiredSkills", select: "name" })
+    .sort({ createdAt: -1 })
+    .lean();
 
   return projects;
 };
@@ -174,10 +180,27 @@ export const closeProject = async (projectId, userId) => {
   return await populateProject(Project.findById(project._id));
 };
 
+export const deleteProject = async (projectId, userId) => {
+  const project = await Project.findById(projectId);
+
+  if (!project) {
+    throw new ApiError(404, "Project not found");
+  }
+
+  if (project.owner.toString() !== userId.toString()) {
+    throw new ApiError(403, "Forbidden: You do not have permission to delete this project");
+  }
+
+  await Project.findByIdAndDelete(projectId);
+  return { id: projectId, message: "Project deleted successfully" };
+};
+
 export default {
   createProject,
   getMyProjects,
   getProjectById,
   updateProject,
   closeProject,
+  deleteProject,
 };
+

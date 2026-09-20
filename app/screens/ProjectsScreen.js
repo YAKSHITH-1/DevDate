@@ -9,10 +9,13 @@ import {
   Modal,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
 import ProjectCard from '../components/ProjectCard';
-import CreateProjectForm from '../components/CreateProjectForm';
+
+// Code-split heavy 59KB form loaded on-demand when user opens create/edit modal
+const CreateProjectForm = React.lazy(() => import('../components/CreateProjectForm'));
 import {
   DoodleStar,
   DoodleSparkle,
@@ -53,6 +56,7 @@ export default function ProjectsScreen({
     fetchProjectById,
     deleteProject,
     closeProject,
+    currentUser,
   } = useApp();
 
   // View mode: 'list' = My Projects cards, 'detail' = single project view
@@ -67,17 +71,46 @@ export default function ProjectsScreen({
   const [closeConfirmVisible, setCloseConfirmVisible] = useState(false);
   const [closeTargetId, setCloseTargetId] = useState(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // For the detail view
-  const [isBookmarked, setIsBookmarked] = useState(false);
+  // Bookmark state for projects
+  const [savedProjectIds, setSavedProjectIds] = useState([]);
   const [interestedModalVisible, setInterestedModalVisible] = useState(false);
   const [bannerError, setBannerError] = useState(false);
 
+  const insets = useSafeAreaInsets();
   const proj = viewedProject || projects[0];
+
+  const modalBackdropStyle = [
+    styles.modalBackdrop,
+    {
+      paddingTop: Math.max(insets.top + 12, 24),
+      paddingBottom: Math.max(insets.bottom + 12, 24),
+      paddingLeft: Math.max(insets.left + 16, 20),
+      paddingRight: Math.max(insets.right + 16, 20),
+    },
+  ];
 
   const showToast = (msg) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 1800);
+  };
+
+  const currentUserId = (currentUser?._id || currentUser?.id || '').toString();
+
+  const isProjectOwner = (project) => {
+    if (!project || !currentUserId) return false;
+    const ownerId = (
+      project.owner?._id ||
+      project.owner?.id ||
+      (typeof project.owner === 'string' ? project.owner : '') ||
+      project.ownerId ||
+      ''
+    ).toString();
+
+    return Boolean(ownerId && currentUserId && ownerId === currentUserId);
   };
 
   // ─── HANDLERS ─────────────────────────────────────────────
@@ -93,9 +126,17 @@ export default function ProjectsScreen({
 
   const handleEditProject = async (project) => {
     if (!project) return;
+    if (!isProjectOwner(project)) {
+      showToast('ONLY THE PROJECT CREATOR CAN EDIT THIS PROJECT');
+      return;
+    }
     if (project.id && /^[0-9a-fA-F]{24}$/.test(project.id)) {
       const res = await fetchProjectById(project.id);
       if (res.success && res.project) {
+        if (!isProjectOwner(res.project)) {
+          showToast('ONLY THE PROJECT CREATOR CAN EDIT THIS PROJECT');
+          return;
+        }
         setEditingProject(res.project);
         setEditModalVisible(true);
         return;
@@ -106,6 +147,11 @@ export default function ProjectsScreen({
   };
 
   const handleCloseProject = (projectId) => {
+    const p = projects.find((pr) => pr.id === projectId) || (viewedProject?.id === projectId ? viewedProject : null);
+    if (p && !isProjectOwner(p)) {
+      showToast('ONLY THE PROJECT CREATOR CAN CLOSE THIS PROJECT');
+      return;
+    }
     setCloseTargetId(projectId);
     setCloseConfirmVisible(true);
   };
@@ -130,10 +176,56 @@ export default function ProjectsScreen({
     }
   };
 
+  const handleDeleteProject = (projectId) => {
+    const p = projects.find((pr) => pr.id === projectId) || (viewedProject?.id === projectId ? viewedProject : null);
+    if (p && !isProjectOwner(p)) {
+      showToast('ONLY THE PROJECT CREATOR CAN DELETE THIS PROJECT');
+      return;
+    }
+    setDeleteTargetId(projectId);
+    setDeleteConfirmVisible(true);
+  };
+
+  const confirmDeleteProject = async () => {
+    if (!deleteTargetId || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      const p = projects.find((pr) => pr.id === deleteTargetId) || (viewedProject?.id === deleteTargetId ? viewedProject : null);
+      const res = await deleteProject(deleteTargetId);
+      if (res && res.success) {
+        showToast(`DELETED "${p?.title || 'PROJECT'}"`);
+        setDeleteConfirmVisible(false);
+        const deletedId = deleteTargetId;
+        setDeleteTargetId(null);
+        if (viewMode === 'detail' && viewedProjectId === deletedId) {
+          setViewMode('list');
+        }
+      } else {
+        showToast(`ERROR: ${res?.error || 'Failed to delete project'}`);
+      }
+    } catch (err) {
+      showToast(`ERROR: ${err.message || 'Error deleting project'}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const handleFindMembers = (project) => {
     setActiveProjectId(project.id);
     showToast(`DISCOVERING FOR: ${project.title}`);
     if (onSelectForDiscovery) onSelectForDiscovery();
+  };
+
+  const handleBookmark = (projectId) => {
+    const targetId = projectId || viewedProjectId || proj?.id;
+    if (!targetId) return;
+    setSavedProjectIds((prev) => {
+      const exists = prev.includes(targetId);
+      const updated = exists ? prev.filter((id) => id !== targetId) : [...prev, targetId];
+      const p = projects.find((pr) => pr.id === targetId) || (proj?.id === targetId ? proj : null);
+      showToast(exists ? 'REMOVED BOOKMARK' : `BOOKMARKED ${p?.title || 'PROJECT'}`);
+      return updated;
+    });
   };
 
   const handleCreateSubmit = async (formData) => {
@@ -247,7 +339,10 @@ export default function ProjectsScreen({
       {/* Project Cards List */}
       <ScrollView
         style={styles.scrollArea}
-        contentContainerStyle={styles.listScrollContent}
+        contentContainerStyle={[
+          styles.listScrollContent,
+          { paddingBottom: Math.max(insets.bottom + 20, 24) },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -283,17 +378,29 @@ export default function ProjectsScreen({
             </TouchableOpacity>
           </View>
         ) : (
-          projects.map((project) => (
-            <ProjectCard
-              key={project.id}
-              project={project}
-              isActiveForDiscovery={project.id === activeProjectId}
-              onView={handleViewProject}
-              onEdit={handleEditProject}
-              onClose={handleCloseProject}
-              onFindMembers={handleFindMembers}
-            />
-          ))
+          projects.map((project) => {
+            const isOwner = isProjectOwner(project);
+            return (
+              <ProjectCard
+                key={project.id}
+                project={project}
+                isOwner={isOwner}
+                isActiveForDiscovery={isOwner && project.id === activeProjectId}
+                onView={handleViewProject}
+                onEdit={isOwner ? handleEditProject : undefined}
+                onClose={isOwner ? handleCloseProject : undefined}
+                onDelete={isOwner ? handleDeleteProject : undefined}
+                onFindMembers={isOwner ? handleFindMembers : undefined}
+                onBookmark={handleBookmark}
+                isBookmarked={savedProjectIds.includes(project.id)}
+                onApply={() => {
+                  setViewedProjectId(project.id);
+                  setViewMode('detail');
+                  setInterestedModalVisible(true);
+                }}
+              />
+            );
+          })
         )}
       </ScrollView>
     </View>
@@ -304,7 +411,9 @@ export default function ProjectsScreen({
   // ═══════════════════════════════════════════════════════════
   const renderProjectDetail = () => {
     const isSelectedForDiscovery = proj?.id === activeProjectId;
+    const isOwner = isProjectOwner(proj);
     const isClosed = proj?.status === 'CLOSED';
+    const isCurrentBookmarked = proj?.id ? savedProjectIds.includes(proj.id) : false;
     const displaySkills = getDisplaySkills(proj?.techStack);
     const currentMembers =
       proj?.membersCount ||
@@ -334,29 +443,29 @@ export default function ProjectsScreen({
           <View style={styles.headerRightGroup}>
             <TouchableOpacity
               activeOpacity={0.75}
-              onPress={() => {
-                setIsBookmarked(!isBookmarked);
-                showToast(isBookmarked ? 'REMOVED BOOKMARK' : `BOOKMARKED ${proj?.title}`);
-              }}
+              onPress={() => handleBookmark(proj?.id)}
               style={styles.detailHeaderIconBtn}
             >
               <Image
                 source={require('../assets/bookmark.png')}
                 style={[
                   styles.headerBookmarkImg,
-                  !isBookmarked && styles.headerBookmarkInactive,
+                  !isCurrentBookmarked && styles.headerBookmarkInactive,
                 ]}
                 resizeMode="contain"
               />
             </TouchableOpacity>
 
-            <TouchableOpacity
-              activeOpacity={0.75}
-              onPress={() => handleEditProject(proj)}
-              style={styles.detailHeaderIconBtn}
-            >
-              <Text style={styles.editShortcutText}>EDIT</Text>
-            </TouchableOpacity>
+            {isOwner && (
+              <TouchableOpacity
+                activeOpacity={0.75}
+                onPress={() => handleEditProject(proj)}
+                style={styles.detailHeaderIconBtn}
+                accessibilityLabel="Edit Project"
+              >
+                <Text style={styles.editShortcutText}>EDIT</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -369,7 +478,10 @@ export default function ProjectsScreen({
 
         <ScrollView
           style={styles.scrollArea}
-          contentContainerStyle={styles.detailScrollContent}
+          contentContainerStyle={[
+            styles.detailScrollContent,
+            { paddingBottom: Math.max(insets.bottom + 80, 110) },
+          ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -548,42 +660,64 @@ export default function ProjectsScreen({
             </View>
           )}
 
-          {/* Detail Action Buttons */}
-          <View style={styles.detailActionRow}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => handleEditProject(proj)}
-              style={[styles.detailActionBtn, styles.detailActionEdit, BRUTAL_SHADOWS.xs]}
-            >
-              <Text style={styles.detailActionBtnText}>EDIT PROJECT</Text>
-            </TouchableOpacity>
+          {/* Detail Action Buttons - Only project owner can edit, close, or delete */}
+          {isOwner ? (
+            <View style={styles.detailActionCol}>
+              <View style={styles.detailActionRow}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  onPress={() => handleEditProject(proj)}
+                  style={[styles.detailActionBtn, styles.detailActionEdit, BRUTAL_SHADOWS.xs]}
+                >
+                  <Text style={styles.detailActionBtnText}>EDIT PROJECT</Text>
+                </TouchableOpacity>
 
-            {!isClosed ? (
+                {!isClosed ? (
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => handleCloseProject(proj.id)}
+                    style={[styles.detailActionBtn, styles.detailActionClose, BRUTAL_SHADOWS.xs]}
+                  >
+                    <Text style={styles.detailActionCloseText}>CLOSE PROJECT</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={[styles.detailActionBtn, styles.detailActionClosed]}>
+                    <Text style={styles.detailActionClosedText}>PROJECT CLOSED</Text>
+                  </View>
+                )}
+              </View>
+
               <TouchableOpacity
                 activeOpacity={0.85}
-                onPress={() => handleCloseProject(proj.id)}
-                style={[styles.detailActionBtn, styles.detailActionClose, BRUTAL_SHADOWS.xs]}
+                onPress={() => handleDeleteProject(proj.id)}
+                style={[styles.detailDeleteBtn, BRUTAL_SHADOWS.xs]}
               >
-                <Text style={styles.detailActionCloseText}>CLOSE PROJECT</Text>
+                <Text style={styles.detailDeleteBtnText}>DELETE PROJECT</Text>
               </TouchableOpacity>
-            ) : (
-              <View style={[styles.detailActionBtn, styles.detailActionClosed]}>
-                <Text style={styles.detailActionClosedText}>PROJECT CLOSED</Text>
-              </View>
-            )}
-          </View>
+            </View>
+          ) : null}
         </ScrollView>
 
-        {/* Floating "I'm Interested" Button (only visible if not closed) */}
+        {/* Floating Action Button (Owners find teammates; Non-owners apply to join) */}
         {!isClosed && (
-          <View style={styles.bottomCtaContainer}>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              onPress={() => setInterestedModalVisible(true)}
-              style={[styles.interestedBtn, BRUTAL_SHADOWS.button]}
-            >
-              <Text style={styles.interestedBtnText}>I'M INTERESTED IN THIS PROJECT</Text>
-            </TouchableOpacity>
+          <View style={[styles.bottomCtaContainer, { bottom: Math.max(insets.bottom + 8, 20) }]}>
+            {isOwner ? (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => handleFindMembers(proj)}
+                style={[styles.interestedBtn, BRUTAL_SHADOWS.button]}
+              >
+                <Text style={styles.interestedBtnText}>FIND TEAMMATES ON DISCOVER</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => setInterestedModalVisible(true)}
+                style={[styles.interestedBtn, BRUTAL_SHADOWS.button]}
+              >
+                <Text style={styles.interestedBtnText}>I'M INTERESTED IN THIS PROJECT</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -597,25 +731,33 @@ export default function ProjectsScreen({
     <View style={styles.container}>
       {viewMode === 'list' ? renderProjectsList() : renderProjectDetail()}
 
-      {/* CREATE PROJECT FORM (3-step) */}
-      <CreateProjectForm
-        visible={createModalVisible}
-        onClose={() => setCreateModalVisible(false)}
-        onSubmit={handleCreateSubmit}
-        mode="create"
-      />
+      {/* CREATE PROJECT FORM (3-step) - loaded lazily on demand */}
+      {createModalVisible && (
+        <React.Suspense fallback={null}>
+          <CreateProjectForm
+            visible={createModalVisible}
+            onClose={() => setCreateModalVisible(false)}
+            onSubmit={handleCreateSubmit}
+            mode="create"
+          />
+        </React.Suspense>
+      )}
 
-      {/* EDIT PROJECT FORM (3-step, pre-filled) */}
-      <CreateProjectForm
-        visible={editModalVisible}
-        onClose={() => {
-          setEditModalVisible(false);
-          setEditingProject(null);
-        }}
-        onSubmit={handleEditSubmit}
-        initialData={editingProject}
-        mode="edit"
-      />
+      {/* EDIT PROJECT FORM (3-step, pre-filled) - loaded lazily on demand */}
+      {editModalVisible && (
+        <React.Suspense fallback={null}>
+          <CreateProjectForm
+            visible={editModalVisible}
+            onClose={() => {
+              setEditModalVisible(false);
+              setEditingProject(null);
+            }}
+            onSubmit={handleEditSubmit}
+            initialData={editingProject}
+            mode="edit"
+          />
+        </React.Suspense>
+      )}
 
       {/* CLOSE PROJECT CONFIRMATION MODAL */}
       <Modal
@@ -624,7 +766,7 @@ export default function ProjectsScreen({
         animationType="fade"
         onRequestClose={() => setCloseConfirmVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.confirmCard, BRUTAL_SHADOWS.modal]}>
             <ComicBadge text="CLOSE PROJECT?" color={COLORS.pillCoral} textColor="#000" size="md" />
             <Text style={styles.confirmTitle}>Are you sure?</Text>
@@ -654,6 +796,48 @@ export default function ProjectsScreen({
         </View>
       </Modal>
 
+      {/* DELETE PROJECT CONFIRMATION MODAL */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !isDeleting && setDeleteConfirmVisible(false)}
+      >
+        <View style={modalBackdropStyle}>
+          <View style={[styles.confirmCard, BRUTAL_SHADOWS.modal]}>
+            <ComicBadge text="DELETE PROJECT?" color="#FEE2E2" textColor="#DC2626" size="md" />
+            <Text style={styles.confirmTitle}>Delete this project?</Text>
+            <Text style={styles.confirmSubtitle}>
+              This action cannot be undone. All project details, invitations, and team matches associated with this project will be permanently removed.
+            </Text>
+
+            <View style={styles.confirmBtnRow}>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  if (!isDeleting) {
+                    setDeleteConfirmVisible(false);
+                    setDeleteTargetId(null);
+                  }
+                }}
+                disabled={isDeleting}
+                style={[styles.confirmCancelBtn, BRUTAL_SHADOWS.xs, isDeleting && { opacity: 0.5 }]}
+              >
+                <Text style={styles.confirmCancelText}>CANCEL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={confirmDeleteProject}
+                disabled={isDeleting}
+                style={[styles.confirmDeleteBtn, BRUTAL_SHADOWS.xs, isDeleting && { opacity: 0.6 }]}
+              >
+                <Text style={styles.confirmDeleteText}>{isDeleting ? 'DELETING...' : 'YES, DELETE'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* APPLICATION CONFIRMATION MODAL (detail view) */}
       <Modal
         visible={interestedModalVisible}
@@ -661,7 +845,7 @@ export default function ProjectsScreen({
         animationType="fade"
         onRequestClose={() => setInterestedModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.confirmCard, BRUTAL_SHADOWS.modal]}>
             <ComicBadge text="APPLICATION FILED!" color={COLORS.yellow} textColor="#000" rotate="-3deg" size="md" />
             <Text style={styles.confirmTitle}>{proj?.title} Squad</Text>
@@ -1354,5 +1538,46 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: COLORS.ink,
     letterSpacing: 0.5,
+  },
+  detailActionCol: {
+    gap: 10,
+    marginTop: 6,
+  },
+  detailDeleteBtn: {
+    width: '100%',
+    height: 42,
+    backgroundColor: '#FEE2E2',
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detailDeleteBtnText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: '#DC2626',
+    letterSpacing: 0.5,
+  },
+  confirmDeleteBtn: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#DC2626',
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 11,
+    borderBottomRightRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmDeleteText: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: COLORS.white,
   },
 });

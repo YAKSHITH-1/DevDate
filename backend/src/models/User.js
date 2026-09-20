@@ -110,6 +110,9 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+// Index for Discovery and recent user sorting
+userSchema.index({ createdAt: -1 });
+
 // Compare candidate plain text password with stored bcrypt hash
 userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.passwordHash);

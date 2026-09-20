@@ -19,14 +19,18 @@ export const getNotifications = asyncHandler(async (req, res) => {
   const unreadOnly = req.query.unread === "true";
   const limit = req.query.limit || 50;
 
-  const notifications = await notificationService.getUserNotifications(userId, {
-    unreadOnly,
-    limit,
-  });
+  const [notifications, { unreadCount }] = await Promise.all([
+    notificationService.getUserNotifications(userId, {
+      unreadOnly,
+      limit,
+    }),
+    notificationService.getUnreadCount(userId),
+  ]);
 
   return res.status(200).json({
     success: true,
     data: notifications,
+    unreadCount,
   });
 });
 

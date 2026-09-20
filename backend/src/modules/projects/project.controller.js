@@ -48,10 +48,21 @@ export const closeProject = asyncHandler(async (req, res) => {
   });
 });
 
+export const deleteProject = asyncHandler(async (req, res) => {
+  const userId = req.user?._id || req.userId;
+  const result = await projectService.deleteProject(req.params.id, userId);
+  return res.status(200).json({
+    success: true,
+    message: "Project deleted successfully",
+    data: result,
+  });
+});
+
 export default {
   createProject,
   getMyProjects,
   getProjectById,
   updateProject,
   closeProject,
+  deleteProject,
 };

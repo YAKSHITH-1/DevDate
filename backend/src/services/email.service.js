@@ -281,8 +281,10 @@ export const sendVerificationEmail = async (email, otp, expiryMinutes = 10) => {
  * @param {string} resetUrl - Complete password reset URL containing the raw token
  * @param {number} expiryMinutes - Expiration time in minutes (default: 15)
  */
-export const sendPasswordResetEmail = async (email, resetUrl, expiryMinutes = 15) => {
+export const sendPasswordResetEmail = async (email, resetUrl, expiryMinutes = 15, rawToken = null) => {
   try {
+    const tokenDisplay = rawToken || (resetUrl.includes("token=") ? resetUrl.split("token=")[1].split("&")[0] : "");
+
     const htmlContent = `
       <!DOCTYPE html>
       <html lang="en">
@@ -333,17 +335,32 @@ export const sendPasswordResetEmail = async (email, resetUrl, expiryMinutes = 15
                   <td style="padding: 28px 24px; background-color: #FFFFFF;">
                     
                     <!-- Speech bubble notice -->
-                    <div style="background-color: #FAF6EB; border: 2.5px solid #18181B; border-radius: 12px; padding: 14px 16px; box-shadow: 3px 3px 0px #18181B; margin-bottom: 22px;">
+                    <div style="background-color: #FAF6EB; border: 2.5px solid #18181B; border-radius: 12px; padding: 14px 16px; box-shadow: 3px 3px 0px #18181B; margin-bottom: 20px;">
                       <p style="margin: 0; color: #18181B; font-size: 14px; font-weight: 900;">
                         RESET YOUR ACCESS KEY (PASSWORD)
                       </p>
                       <p style="margin: 6px 0 0 0; color: #4B5563; font-size: 13px; font-weight: 600; line-height: 1.4;">
-                        We received a dispatch to reset the access key for your DevDate profile. Click the big button below to choose a fresh password:
+                        We received a dispatch to reset the access key for your DevDate profile. Click the big button below to reset in browser, or copy the recovery token into your mobile app:
                       </p>
                     </div>
 
+                    ${tokenDisplay ? `
+                    <!-- RECOVERY TOKEN BOX FOR MOBILE APP -->
+                    <div style="background-color: #FEF3C7; border: 3px solid #18181B; border-radius: 14px; padding: 16px; margin-bottom: 22px; text-align: center; box-shadow: 4px 4px 0px #18181B;">
+                      <p style="margin: 0 0 8px 0; font-size: 11px; font-weight: 900; letter-spacing: 1px; color: #92400E; text-transform: uppercase;">
+                        MOBILE APP RECOVERY TOKEN:
+                      </p>
+                      <div style="font-family: 'Courier New', Courier, monospace; font-size: 17px; font-weight: 900; color: #18181B; letter-spacing: 1.5px; word-break: break-all; background: #FFFFFF; border: 2.5px solid #18181B; border-radius: 8px; padding: 10px 14px; display: inline-block;">
+                        ${tokenDisplay}
+                      </div>
+                      <p style="margin: 8px 0 0 0; font-size: 11.5px; font-weight: 700; color: #78350F;">
+                        Paste this code directly into the "SET NEW ACCESS KEY" screen in your app.
+                      </p>
+                    </div>
+                    ` : ''}
+
                     <!-- POP ART BIG CTA BUTTON -->
-                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 24px 0 20px 0;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin: 18px 0 16px 0;">
                       <tr>
                         <td align="center">
                           <a href="${resetUrl}" target="_blank" style="display: inline-block; background-color: #FFDE00; color: #18181B; font-size: 16px; font-weight: 900; text-transform: uppercase; letter-spacing: 1px; text-decoration: none; padding: 16px 36px; border: 3.5px solid #18181B; border-radius: 9999px; box-shadow: 5px 5px 0px #18181B; font-family: 'Arial Black', Impact, sans-serif;">

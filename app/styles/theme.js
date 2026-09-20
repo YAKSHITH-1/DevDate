@@ -5,6 +5,7 @@ const isWeb = Platform.OS === 'web';
 
 export const COLORS = {
   // Primary canvas (Warm Cream / Off-white)
+  cream: '#FAF6EB',
   creamBg: '#FAF6EB',
   creamDark: '#F4EEDD',
   creamLight: '#FFFDF9',
@@ -15,6 +16,7 @@ export const COLORS = {
   black: '#18181B',
   darkInk: '#18181B',
   ink: '#18181B',
+  inkMuted: '#4B5563',
 
   // Pop Art Primaries
   btnYellow: '#FFDE00',
@@ -206,6 +208,24 @@ export const BRUTAL_SHADOWS = {
         shadowOpacity: 1,
         shadowRadius: 0,
         elevation: 0,
+      },
+  button: isWeb
+    ? { boxShadow: '2px 2px 0px #18181B' }
+    : {
+        shadowColor: '#18181B',
+        shadowOffset: { width: 2, height: 2 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 0,
+      },
+  modal: isWeb
+    ? { boxShadow: '5px 5px 0px #18181B' }
+    : {
+        shadowColor: '#18181B',
+        shadowOffset: { width: 5, height: 5 },
+        shadowOpacity: 1,
+        shadowRadius: 0,
+        elevation: 6,
       },
 };
 

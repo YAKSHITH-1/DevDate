@@ -965,6 +965,24 @@ export async function closeProjectApi(projectId, token = null, userId = null) {
   });
 }
 
+/**
+ * Delete an existing project via DELETE /api/projects/:id (Creator only)
+ */
+export async function deleteProjectApi(projectId, token = null, userId = null) {
+  if (!projectId || !/^[0-9a-fA-F]{24}$/.test(projectId.toString())) {
+    return { success: false, error: 'Invalid MongoDB project ID', status: 400, data: null };
+  }
+
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (userId) headers['x-user-id'] = userId;
+
+  return await request(`/projects/${projectId}`, {
+    method: 'DELETE',
+    headers,
+  });
+}
+
 
 
 /**
@@ -1474,8 +1492,11 @@ export async function verifyEmailApi(emailOrPayload, maybeOtp) {
   return {
     success: true,
     status: result.status,
-    message: payload.message || 'Email verified successfully! You can now log in to your account.',
+    message: payload.message || 'Email verified successfully! Welcome to DevDate.',
     data: payload.data || payload,
+    accessToken: payload.accessToken || (payload.data && payload.data.accessToken),
+    refreshToken: payload.refreshToken || (payload.data && payload.data.refreshToken),
+    user: payload.user || (payload.data && payload.data.user),
   };
 }
 

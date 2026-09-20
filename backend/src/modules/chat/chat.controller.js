@@ -41,7 +41,8 @@ export const getMessages = asyncHandler(async (req, res) => {
     throw new ApiError(401, "Authentication required to view messages");
   }
 
-  const result = await chatService.getConversationMessages(req.params.matchId, userId);
+  const { limit, page } = req.query;
+  const result = await chatService.getConversationMessages(req.params.matchId, userId, { limit, page });
 
   return res.status(200).json({
     success: true,

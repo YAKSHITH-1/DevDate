@@ -10,7 +10,9 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
+import * as ImagePicker from 'expo-image-picker';
 import ComicBadge from './ComicBadge';
 import {
   SKILL_CATEGORIES,
@@ -86,13 +88,25 @@ export default function CreateProjectForm({
   const [selectedInterests, setSelectedInterests] = useState(
     initialData?.interests || ['AI & Neural Nets', 'Web Platform', 'Developer Tools']
   );
-  const [projectImage, setProjectImage] = useState(
-    initialData?.image && (initialData.image.startsWith('http') || initialData.image.startsWith('data:image/'))
-      ? initialData.image
-      : ''
-  );
+  const [projectImage, setProjectImage] = useState(initialData?.image || '');
   const [projectIcon, setProjectIcon] = useState(initialData?.icon || '</>');
   const [showIconPicker, setShowIconPicker] = useState(false);
+
+  const handlePickProjectImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        setProjectImage(result.assets[0].uri);
+      }
+    } catch (err) {
+      console.warn('Project image pick error:', err);
+    }
+  };
 
   const { canonicalSkills = [] } = useApp ? useApp() : {};
 
@@ -136,7 +150,7 @@ export default function CreateProjectForm({
         setSelectedRoles(initialData.wantedRoles || initialData.requiredRoles || ['FULL STACK']);
         setSelectedInterests(initialData.interests || ['Web Platform']);
         setProjectIcon(initialData.icon || (initialData.image && !initialData.image.startsWith('http') ? initialData.image : '</>'));
-        setProjectImage(initialData.image && (initialData.image.startsWith('http') || initialData.image.startsWith('data:image/')) ? initialData.image : '');
+        setProjectImage(initialData.image || '');
       } else {
         setTitle('DevDate');
         setDescription('');
@@ -931,14 +945,16 @@ export default function CreateProjectForm({
           )}
 
           <View style={styles.coverInputsCol}>
-            <TextInput
-              value={projectImage}
-              onChangeText={setProjectImage}
-              placeholder="https://... image URL (optional)"
-              placeholderTextColor={COLORS.textMuted}
-              autoCapitalize="none"
-              style={styles.coverUrlInput}
-            />
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={handlePickProjectImage}
+              style={[styles.pickImageBtn, BRUTAL_SHADOWS.xs]}
+            >
+              <DoodleSparkle size={13} color={COLORS.ink} />
+              <Text style={styles.pickImageBtnText}>
+                {projectImage.trim() ? 'CHANGE IMAGE' : 'PICK IMAGE FROM GALLERY'}
+              </Text>
+            </TouchableOpacity>
 
             <View style={styles.coverActionsRow}>
               <TouchableOpacity
@@ -957,7 +973,7 @@ export default function CreateProjectForm({
                   onPress={() => setProjectImage('')}
                   style={styles.clearImageBtn}
                 >
-                  <Text style={styles.clearImageBtnText}>CLEAR URL</Text>
+                  <Text style={styles.clearImageBtnText}>REMOVE</Text>
                 </TouchableOpacity>
               ) : null}
             </View>
@@ -1046,7 +1062,7 @@ export default function CreateProjectForm({
       transparent={false}
       onRequestClose={onClose}
     >
-      <View style={styles.screenContainer}>
+      <SafeAreaView style={styles.screenContainer} edges={['top', 'bottom', 'left', 'right']}>
         {renderTopHeader()}
         {renderStepTracker()}
 
@@ -1060,7 +1076,7 @@ export default function CreateProjectForm({
           {step === 2 && renderStep2()}
           {step === 3 && renderStep3()}
         </ScrollView>
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }
@@ -1857,6 +1873,25 @@ const styles = StyleSheet.create({
   },
   coverInputsCol: {
     flex: 1,
+  },
+  pickImageBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.yellow,
+    borderWidth: 1.5,
+    borderColor: COLORS.ink,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    marginBottom: 6,
+  },
+  pickImageBtnText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
   },
   coverUrlInput: {
     backgroundColor: COLORS.creamLight,

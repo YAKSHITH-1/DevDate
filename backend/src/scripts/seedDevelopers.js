@@ -29,7 +29,8 @@ export const seedDevelopersAndProjects = async () => {
         .filter(Boolean);
     };
 
-    const defaultPassword = await bcrypt.hash("password123", 10);
+    const seedPassword = process.env.SEED_DEFAULT_PASSWORD || "password123";
+    const defaultPassword = await bcrypt.hash(seedPassword, 10);
 
     // 2. Seed / Upsert Test Project Lead
     const leadData = {
@@ -196,9 +197,15 @@ export const seedDevelopersAndProjects = async () => {
       },
     ];
 
+    // Batch fetch existing developers by email
+    const devEmails = sampleDevelopers.map((d) => d.email);
+    const existingUsers = await User.find({ email: { $in: devEmails } });
+    const userMap = new Map();
+    existingUsers.forEach((u) => userMap.set(u.email, u));
+
     const seededDevs = [];
     for (const dev of sampleDevelopers) {
-      let user = await User.findOne({ email: dev.email });
+      let user = userMap.get(dev.email);
       if (!user) {
         user = await User.create(dev);
         console.log(`  + Seeded developer: ${user.name} (${user.preferredRole})`);
@@ -256,9 +263,18 @@ export const seedDevelopersAndProjects = async () => {
       },
     ];
 
+    // Batch fetch existing projects by title and owner
+    const projectTitles = sampleProjects.map((p) => p.title);
+    const existingProjects = await Project.find({
+      title: { $in: projectTitles },
+      owner: leadUser._id,
+    });
+    const projectMap = new Map();
+    existingProjects.forEach((p) => projectMap.set(p.title, p));
+
     const seededProjects = [];
     for (const proj of sampleProjects) {
-      let project = await Project.findOne({ title: proj.title, owner: leadUser._id });
+      let project = projectMap.get(proj.title);
       if (!project) {
         project = await Project.create(proj);
         console.log(`  + Created project: "${project.title}"`);

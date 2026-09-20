@@ -9,19 +9,15 @@ import { createNotification } from "../notifications/notification.service.js";
 const POPULATE_CONFIG = [
   {
     path: "projectId",
-    select: "title description category status owner duration teamSize members requiredSkills",
-    populate: {
-      path: "owner",
-      select: "name email avatar role",
-    },
+    select: "title description status",
   },
   {
     path: "developerId",
-    select: "name email role preferredRole skills experience availability bio introduction avatar github linkedin portfolio",
+    select: "name role preferredRole avatar",
   },
   {
     path: "senderId",
-    select: "name email role avatar",
+    select: "name avatar",
   },
 ];
 
@@ -29,7 +25,8 @@ const populateInvitation = (query) => {
   return query
     .populate(POPULATE_CONFIG[0])
     .populate(POPULATE_CONFIG[1])
-    .populate(POPULATE_CONFIG[2]);
+    .populate(POPULATE_CONFIG[2])
+    .lean();
 };
 
 /**

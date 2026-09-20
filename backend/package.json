@@ -10,7 +10,8 @@
     "dev": "nodemon server.js",
     "seed:skills": "node src/scripts/seedSkills.js",
     "seed:devs": "node src/scripts/seedDevelopers.js",
-    "migrate:skills": "node src/scripts/migrateProjectSkills.js"
+    "migrate:skills": "node src/scripts/migrateProjectSkills.js",
+    "test:ratelimit": "node src/scripts/testRateLimiting.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

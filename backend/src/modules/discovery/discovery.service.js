@@ -29,7 +29,9 @@ export const getDevelopers = async ({
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
       throw new ApiError(400, "Invalid Project ID format");
     }
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId)
+      .select("status members teamSize owner")
+      .lean();
     if (!project) {
       throw new ApiError(404, "Project not found");
     }
@@ -58,7 +60,9 @@ export const getDevelopers = async ({
     const pendingInvs = await Invitation.find({
       projectId,
       status: "Pending",
-    }).select("developerId");
+    })
+      .select("developerId")
+      .lean();
     pendingInvs.forEach((inv) => {
       if (inv.developerId) excludedUserIds.add(inv.developerId.toString());
     });
@@ -67,7 +71,9 @@ export const getDevelopers = async ({
     const acceptedMatches = await Match.find({
       project: projectId,
       status: "ACCEPTED",
-    }).select("user");
+    })
+      .select("user")
+      .lean();
     acceptedMatches.forEach((m) => {
       if (m.user) excludedUserIds.add(m.user.toString());
     });
@@ -76,7 +82,9 @@ export const getDevelopers = async ({
     const passedSwipes = await Swipe.find({
       project: projectId,
       action: "PASS",
-    }).select("developer");
+    })
+      .select("developer")
+      .lean();
     passedSwipes.forEach((s) => {
       if (s.developer) excludedUserIds.add(s.developer.toString());
     });
@@ -138,24 +146,29 @@ export const getDevelopers = async ({
 
   const skip = (Number(page) - 1) * Number(limit);
 
+  // Return only fields consumed by Discovery Card UI with .lean()
   const [developers, total] = await Promise.all([
     User.find(query)
-      .select("name email role preferredRole skills experience availability bio introduction avatar github linkedin portfolio createdAt")
+      .select("name avatar role preferredRole skills experience availability bio introduction location")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(Number(limit))
+      .lean(),
     User.countDocuments(query),
   ]);
 
   // If a projectId is provided, attach active invitation status for each developer
-  let developersWithStatus = developers.map((dev) => dev.toObject());
+  let developersWithStatus = developers;
 
-  if (projectId) {
+  if (projectId && developers.length > 0) {
     const developerIds = developers.map((d) => d._id);
     const invitations = await Invitation.find({
       projectId,
       developerId: { $in: developerIds },
-    }).sort({ createdAt: -1 });
+    })
+      .select("developerId status")
+      .sort({ createdAt: -1 })
+      .lean();
 
     const invitationMap = new Map();
     invitations.forEach((inv) => {
@@ -164,7 +177,6 @@ export const getDevelopers = async ({
         invitationMap.set(inv.developerId.toString(), {
           invitationId: inv._id,
           status: inv.status,
-          createdAt: inv.createdAt,
         });
       }
     });
@@ -194,21 +206,25 @@ export const getDevelopers = async ({
  * Get developer full profile details
  */
 export const getDeveloperById = async (developerId, projectId = null) => {
-  const developer = await User.findById(developerId).select(
-    "name email role preferredRole skills experience availability bio introduction avatar github linkedin portfolio createdAt"
-  );
+  const developer = await User.findById(developerId)
+    .select(
+      "name email role preferredRole skills experience availability bio introduction avatar github linkedin portfolio location createdAt"
+    )
+    .lean();
 
   if (!developer) {
     throw new ApiError(404, "Developer not found");
   }
 
-  const devObj = developer.toObject();
+  const devObj = { ...developer };
 
   if (projectId) {
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
       throw new ApiError(400, "Invalid Project ID format");
     }
-    const project = await Project.findById(projectId);
+    const project = await Project.findById(projectId)
+      .select("status members teamSize")
+      .lean();
     if (!project) {
       throw new ApiError(404, "Project not found");
     }
@@ -224,7 +240,10 @@ export const getDeveloperById = async (developerId, projectId = null) => {
     const latestInvitation = await Invitation.findOne({
       projectId,
       developerId,
-    }).sort({ createdAt: -1 });
+    })
+      .select("status")
+      .sort({ createdAt: -1 })
+      .lean();
 
     devObj.invitationStatus = latestInvitation ? latestInvitation.status : "None";
     devObj.invitationId = latestInvitation ? latestInvitation._id : null;
@@ -250,8 +269,8 @@ export const recordSwipe = async ({ userId, projectId, developerId, action }) =>
     throw new ApiError(400, "Action must be PASS or INTERESTED");
   }
 
-  // 3. Verify Project exists
-  const project = await Project.findById(projectId);
+  // 3. Verify Project exists with lean projection
+  const project = await Project.findById(projectId).select("owner status members teamSize").lean();
   if (!project) {
     throw new ApiError(404, "Project not found");
   }
@@ -274,7 +293,7 @@ export const recordSwipe = async ({ userId, projectId, developerId, action }) =>
   }
 
   // 7. Verify developer exists
-  const developer = await User.findById(developerId);
+  const developer = await User.findById(developerId).select("_id").lean();
   if (!developer) {
     throw new ApiError(404, "Developer not found");
   }
@@ -294,7 +313,9 @@ export const recordSwipe = async ({ userId, projectId, developerId, action }) =>
     project: projectId,
     user: developerId,
     status: "ACCEPTED",
-  });
+  })
+    .select("_id")
+    .lean();
   if (existingMatch) {
     throw new ApiError(400, "Developer is already matched with this project");
   }
@@ -304,7 +325,7 @@ export const recordSwipe = async ({ userId, projectId, developerId, action }) =>
     { project: projectId, user: userId, developer: developerId },
     { action },
     { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
-  );
+  ).lean();
 
   return swipe;
 };

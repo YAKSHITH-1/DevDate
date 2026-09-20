@@ -86,5 +86,6 @@ const projectSchema = new mongoose.Schema(
 
 projectSchema.index({ status: 1, lastActivityAt: -1 });
 projectSchema.index({ owner: 1, status: 1 });
+projectSchema.index({ owner: 1, createdAt: -1 });
 
 export default mongoose.model("Project", projectSchema);

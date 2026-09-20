@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Animated } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, BORDERS, BRUTAL_SHADOWS, SHELL } from '../styles/theme';
 import { DoodleUser, DoodleFolder, DoodleStar, DoodleUnderline } from './DoodleElements';
 
 export default function BottomNav({ activeTab, onTabChange, matchesCount = 0 }) {
+  const insets = useSafeAreaInsets();
   const tabs = [
     {
       id: 'discover',
@@ -41,7 +43,15 @@ export default function BottomNav({ activeTab, onTabChange, matchesCount = 0 }) 
   ];
 
   return (
-    <View style={styles.navContainer}>
+    <View
+      style={[
+        styles.navContainer,
+        {
+          paddingBottom: insets.bottom,
+          height: SHELL.navHeight + insets.bottom,
+        },
+      ]}
+    >
       {/* Decorative top border accent — doodle-style uneven line */}
       <View style={styles.topBorderAccent} />
 

@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
 import { DoodleStar, DoodleCode, DoodleArrow, DoodleSparkle } from '../components/DoodleElements';
@@ -41,6 +42,8 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
     sendStopTyping,
     typingStatusByMatch,
   } = useApp();
+
+  const insets = useSafeAreaInsets();
 
   // Screen state
   const [inputText, setInputText] = useState('');
@@ -418,7 +421,10 @@ export default function ChatsScreen({ initialChatDeveloperName, onBackToMatches 
 
           {/* CONVERSATION LIST */}
           <ScrollView
-            contentContainerStyle={styles.chatListScroll}
+            contentContainerStyle={[
+              styles.chatListScroll,
+              { paddingBottom: Math.max(insets.bottom + 24, 32) },
+            ]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl

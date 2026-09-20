@@ -12,7 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { COLORS, FONTS, SPACING, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS, TYPOGRAPHY } from '../styles/theme';
 import ComicBadge from '../components/ComicBadge';
 import {
@@ -53,6 +56,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
     invitations,
   } = useApp();
 
+  const insets = useSafeAreaInsets();
   const isThirdParty = Boolean(selectedDeveloperForProfile);
   const dev = selectedDeveloperForProfile || currentUser || {};
 
@@ -62,6 +66,16 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
   const [settingsModalVisible, setSettingsModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState(null);
+
+  const modalBackdropStyle = [
+    styles.modalBackdrop,
+    {
+      paddingTop: Math.max(insets.top + 12, 24),
+      paddingBottom: Math.max(insets.bottom + 12, 24),
+      paddingLeft: Math.max(insets.left + 16, 20),
+      paddingRight: Math.max(insets.right + 16, 20),
+    },
+  ];
 
   // Edit Profile Form State (For User's Own Profile)
   const [editAvatar, setEditAvatar] = useState(currentUser?.avatar || '');
@@ -94,42 +108,6 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
     }
   };
 
-  // --- THIRD PARTY ACTIONS (SKIP, INVITE, LET'S BUILD) ---
-  const handleThirdPartySkip = () => {
-    if (!dev) return;
-    skipDeveloper(dev.id);
-    showToast(`SKIPPED ${dev.name.split(' ')[0]}`, COLORS.coral);
-    if (setSelectedDeveloperForProfile) setSelectedDeveloperForProfile(null);
-    if (onBackToDiscover) onBackToDiscover();
-  };
-
-  const handleThirdPartyLike = () => {
-    if (!dev) return;
-    inviteDeveloper(dev, false);
-    showToast(`INVITED ${dev.name.split(' ')[0]}!`, COLORS.lime);
-    if (setSelectedDeveloperForProfile) setSelectedDeveloperForProfile(null);
-    if (onBackToDiscover) onBackToDiscover();
-  };
-
-  const handleThirdPartyLetsBuild = () => {
-    if (!dev) return;
-    inviteDeveloper(dev, true);
-    showToast("LET'S BUILD TOGETHER!", COLORS.yellow);
-
-    // Create / retrieve chat thread and navigate to it
-    const chat = getOrCreateChatForMatch({
-      projectId: activeProject?.id || 'p4',
-      projectName: activeProject?.title || 'StudySync',
-      developerId: dev.id,
-      developerName: dev.name,
-      developerRole: dev.role,
-      developerAvatar: dev.avatar,
-    });
-
-    if (setSelectedDeveloperForProfile) setSelectedDeveloperForProfile(null);
-    if (onOpenChat) onOpenChat(chat.id);
-  };
-
   // --- OWN PROFILE ACTIONS ---
   const handleOpenEditModal = () => {
     setEditAvatar(resolveProfileAvatar(currentUser?.avatar, currentUser?.name || 'Developer', 'voxel-bot'));
@@ -145,6 +123,48 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
     setEditLinkedin(currentUser?.linkedin || '');
     setEditPortfolio(currentUser?.portfolio || '');
     setEditModalVisible(true);
+  };
+
+  const [showDicebearPicker, setShowDicebearPicker] = useState(false);
+
+  const handlePickProfileImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets && result.assets[0]?.uri) {
+        setEditAvatar(result.assets[0].uri);
+        setOwnAvatarError(false);
+      }
+    } catch (err) {
+      console.warn('Profile image pick error:', err);
+    }
+  };
+
+  const promptAvatarChoice = () => {
+    Alert.alert(
+      'Profile Picture',
+      'Would you like to upload a picture of yourself from your gallery, or generate a developer avatar?',
+      [
+        {
+          text: 'Upload Photo',
+          onPress: handlePickProfileImage,
+        },
+        {
+          text: 'Use DiceBear Avatar',
+          onPress: () => {
+            setShowDicebearPicker(true);
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   const handleSaveProfile = async () => {
@@ -281,7 +301,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
         style={styles.scrollArea}
         contentContainerStyle={[
           styles.scrollContent,
-          isThirdParty && { paddingBottom: 120 },
+          { paddingBottom: Math.max(insets.bottom + 20, 30) },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -360,8 +380,15 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
             <View style={styles.heroYellowStripe} />
 
             <View style={styles.heroTopRow}>
-              {/* Avatar */}
-              <View style={styles.heroAvatarWrap}>
+              {/* Avatar (Click to edit/choose photo) */}
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => {
+                  handleOpenEditModal();
+                  promptAvatarChoice();
+                }}
+                style={styles.heroAvatarWrap}
+              >
                 {!ownAvatarError ? (
                   <Image
                     source={{ uri: ownAvatarUri }}
@@ -376,7 +403,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
                   </View>
                 )}
                 <View style={styles.avatarOnlineDot} />
-              </View>
+              </TouchableOpacity>
 
               {/* Name + Role */}
               <View style={styles.heroInfoCol}>
@@ -474,37 +501,66 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
               { label: 'Find co-founders', selected: false },
               { label: 'Contribute to open source', selected: true },
               { label: 'Just meet devs', selected: false },
-            ]).map((item, idx) => {
-              const label = typeof item === 'string' ? item : item.label;
-              const selected = typeof item === 'string' ? true : item.selected;
+            ])
+              .filter((item) => {
+                if (!isThirdParty) return true;
+                const selected = typeof item === 'string' ? true : item.selected;
+                return Boolean(selected);
+              })
+              .map((item, idx) => {
+                const label = typeof item === 'string' ? item : item.label;
+                const selected = typeof item === 'string' ? true : item.selected;
 
-              return (
-                <TouchableOpacity
-                  key={label || idx}
-                  activeOpacity={isThirdParty ? 1 : 0.8}
-                  onPress={() => handleToggleLookingTo(idx)}
-                  style={[
-                    styles.lookingToPill,
-                    selected && styles.lookingToPillActive,
-                    selected && BRUTAL_SHADOWS.xs,
-                  ]}
-                >
-                  {selected ? (
-                    <DoodleCheck size={11} color={COLORS.green} />
-                  ) : (
-                    <View style={styles.emptyCheckbox} />
-                  )}
-                  <Text
+                if (isThirdParty) {
+                  return (
+                    <View
+                      key={label || idx}
+                      style={[
+                        styles.lookingToPill,
+                        styles.lookingToPillActive,
+                        BRUTAL_SHADOWS.xs,
+                      ]}
+                    >
+                      <DoodleCheck size={11} color={COLORS.green} />
+                      <Text
+                        style={[
+                          styles.lookingToText,
+                          styles.lookingToTextActive,
+                        ]}
+                      >
+                        {label}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={label || idx}
+                    activeOpacity={0.8}
+                    onPress={() => handleToggleLookingTo(idx)}
                     style={[
-                      styles.lookingToText,
-                      selected && styles.lookingToTextActive,
+                      styles.lookingToPill,
+                      selected && styles.lookingToPillActive,
+                      selected && BRUTAL_SHADOWS.xs,
                     ]}
                   >
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                    {selected ? (
+                      <DoodleCheck size={11} color={COLORS.green} />
+                    ) : (
+                      <View style={styles.emptyCheckbox} />
+                    )}
+                    <Text
+                      style={[
+                        styles.lookingToText,
+                        selected && styles.lookingToTextActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
           </View>
         </View>
 
@@ -633,47 +689,6 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
         )}
       </ScrollView>
 
-      {/* ========== 3. FLOATING ACTIONS (THIRD-PARTY ONLY) ========== */}
-      {isThirdParty && (
-        <View style={styles.floatingActionsRow}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleThirdPartySkip}
-            style={[styles.actionBtnRound, styles.actionBtnSkip, BRUTAL_SHADOWS.sm]}
-          >
-            <Image
-              source={require('../assets/reject.png')}
-              style={styles.actionIconImg}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleThirdPartyLike}
-            style={[styles.actionBtnRound, styles.actionBtnLike, BRUTAL_SHADOWS.sm]}
-          >
-            <Image
-              source={require('../assets/like.png')}
-              style={styles.actionIconImg}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={handleThirdPartyLetsBuild}
-            style={styles.letsBuildStickerBtn}
-          >
-            <Image
-              source={require('../assets/lets_build_burst.png')}
-              style={[styles.letsBuildImage, { backgroundColor: 'transparent' }]}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-      )}
-
       {/* ========== 4. SETTINGS MODAL ========== */}
       <Modal
         visible={settingsModalVisible}
@@ -681,7 +696,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
         animationType="slide"
         onRequestClose={() => setSettingsModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.settingsModalCard, BRUTAL_SHADOWS.md]}>
             {/* Settings Header */}
             <View style={styles.settingsHeader}>
@@ -790,7 +805,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalBackdrop}
+          style={modalBackdropStyle}
         >
           <View style={[styles.editModalCard, BRUTAL_SHADOWS.md]}>
             {/* Edit Header */}
@@ -813,91 +828,117 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
               {/* Avatar Section */}
               <View style={styles.editFieldGroup}>
                 <View style={styles.avatarLabelRow}>
-                  <Text style={styles.editFieldLabel}>VOXEL-ART AVATAR (DICEBEAR)</Text>
+                  <Text style={styles.editFieldLabel}>PROFILE PICTURE / AVATAR</Text>
                   <View style={styles.voxelTagPill}>
-                    <Text style={styles.voxelTagText}>3D VOXEL</Text>
+                    <Text style={styles.voxelTagText}>PHOTO OR AVATAR</Text>
                   </View>
                 </View>
 
                 <View style={[styles.editAvatarWrap, BRUTAL_SHADOWS.xs]}>
-                  {editAvatar.trim() ? (
-                    <Image
-                      source={{ uri: editAvatar.trim() }}
-                      style={styles.editAvatarPreview}
-                      onError={() => {}}
-                    />
-                  ) : (
-                    <View style={[styles.editAvatarPreview, styles.avatarFallbackWrap]}>
-                      <Text style={styles.avatarFallbackLetter}>
-                        {editName?.charAt(0)?.toUpperCase() || 'D'}
-                      </Text>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={promptAvatarChoice}
+                    style={{ position: 'relative' }}
+                  >
+                    {editAvatar.trim() ? (
+                      <Image
+                        source={{ uri: editAvatar.trim() }}
+                        style={styles.editAvatarPreview}
+                        onError={() => {}}
+                      />
+                    ) : (
+                      <View style={[styles.editAvatarPreview, styles.avatarFallbackWrap]}>
+                        <Text style={styles.avatarFallbackLetter}>
+                          {editName?.charAt(0)?.toUpperCase() || 'D'}
+                        </Text>
+                      </View>
+                    )}
+                    <View style={styles.editAvatarBadge}>
+                      <Text style={styles.editAvatarBadgeText}>TAP</Text>
                     </View>
-                  )}
+                  </TouchableOpacity>
+
                   <View style={styles.editAvatarControls}>
-                    <TextInput
-                      value={editAvatar}
-                      onChangeText={setEditAvatar}
-                      placeholder="DiceBear Avatar URL"
-                      placeholderTextColor={COLORS.textLight}
-                      autoCapitalize="none"
-                      style={[styles.formInput, { marginBottom: 8, fontSize: 11 }]}
-                    />
+                    {/* Primary Button: Upload Photo */}
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={handlePickProfileImage}
+                      style={[styles.uploadPhotoBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <DoodleSparkle size={13} color={COLORS.ink} />
+                      <Text style={styles.uploadPhotoBtnText}>UPLOAD MY PHOTO</Text>
+                    </TouchableOpacity>
+
+                    {/* Secondary Button: Toggle DiceBear styles */}
+                    <TouchableOpacity
+                      activeOpacity={0.85}
+                      onPress={() => setShowDicebearPicker(!showDicebearPicker)}
+                      style={[styles.dicebearToggleBtn, BRUTAL_SHADOWS.xs]}
+                    >
+                      <Text style={styles.dicebearToggleBtnText}>
+                        {showDicebearPicker ? 'HIDE AVATAR STYLES' : 'OR USE DICEBEAR AVATAR'}
+                      </Text>
+                    </TouchableOpacity>
 
                     {/* Voxel & Pop Art Styles */}
-                    <View style={styles.presetRow}>
-                      {DICEBEAR_STYLES.map((styleObj) => {
-                        const isSelected = editAvatar.includes(`/${styleObj.id}/`);
-                        return (
+                    {showDicebearPicker && (
+                      <View style={{ marginTop: 8 }}>
+                        <View style={styles.presetRow}>
+                          {DICEBEAR_STYLES.map((styleObj) => {
+                            const isSelected = editAvatar.includes(`/${styleObj.id}/`);
+                            return (
+                              <TouchableOpacity
+                                key={styleObj.id}
+                                activeOpacity={0.8}
+                                onPress={() => {
+                                  const newAv = getDiceBearAvatar(editName || currentUser?.name || 'Developer', styleObj.id);
+                                  setEditAvatar(newAv);
+                                }}
+                                style={[
+                                  styles.presetBtn,
+                                  isSelected && styles.presetBtnActive,
+                                  BRUTAL_SHADOWS.xs,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.presetBtnText,
+                                    isSelected && styles.presetBtnTextActive,
+                                  ]}
+                                >
+                                  {styleObj.name}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        {/* Quick Voxel Actions */}
+                        <View style={styles.voxelActionsRow}>
                           <TouchableOpacity
-                            key={styleObj.id}
+                            activeOpacity={0.85}
+                            onPress={() => {
+                              const randSeed = `dev-${Math.random().toString(36).substring(2, 7)}`;
+                              setEditAvatar(getDiceBearAvatar(randSeed, 'voxel-bot'));
+                            }}
+                            style={[styles.randomVoxelBtn, BRUTAL_SHADOWS.xs]}
+                          >
+                            <DoodleSparkle size={12} color={COLORS.ink} />
+                            <Text style={styles.randomVoxelText}>RANDOMIZE</Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
                             activeOpacity={0.8}
                             onPress={() => {
-                              const newAv = getDiceBearAvatar(editName || currentUser?.name || 'Developer', styleObj.id);
-                              setEditAvatar(newAv);
+                              setEditAvatar(getDiceBearAvatar(editName || currentUser?.name || 'Developer', 'voxel-bot'));
                             }}
-                            style={[
-                              styles.presetBtn,
-                              isSelected && styles.presetBtnActive,
-                              BRUTAL_SHADOWS.xs,
-                            ]}
+                            style={[styles.presetClearBtn, BRUTAL_SHADOWS.xs]}
                           >
-                            <Text
-                              style={[
-                                styles.presetBtnText,
-                                isSelected && styles.presetBtnTextActive,
-                              ]}
-                            >
-                              {styleObj.name}
-                            </Text>
+                            <Text style={styles.presetClearText}>RESET</Text>
                           </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-
-                    {/* Quick Voxel Actions */}
-                    <View style={styles.voxelActionsRow}>
-                      <TouchableOpacity
-                        activeOpacity={0.85}
-                        onPress={() => {
-                          const randSeed = `dev-${Math.random().toString(36).substring(2, 7)}`;
-                          setEditAvatar(getDiceBearAvatar(randSeed, 'voxel-bot'));
-                        }}
-                        style={[styles.randomVoxelBtn, BRUTAL_SHADOWS.xs]}
-                      >
-                        <DoodleSparkle size={12} color={COLORS.ink} />
-                        <Text style={styles.randomVoxelText}>RANDOMIZE VOXEL</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          setEditAvatar(getDiceBearAvatar(editName || currentUser?.name || 'Developer', 'voxel-bot'));
-                        }}
-                        style={[styles.presetClearBtn, BRUTAL_SHADOWS.xs]}
-                      >
-                        <Text style={styles.presetClearText}>RESET</Text>
-                      </TouchableOpacity>
-                    </View>
+                        </View>
+                      </View>
+                    )}
                   </View>
                 </View>
               </View>
@@ -1974,6 +2015,57 @@ const styles = StyleSheet.create({
   },
   presetClearText: {
     fontSize: 10,
+    fontWeight: '900',
+    color: COLORS.ink,
+  },
+  uploadPhotoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.regular,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingVertical: 7,
+    paddingHorizontal: 10,
+    marginBottom: 6,
+  },
+  uploadPhotoBtnText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.4,
+  },
+  dicebearToggleBtn: {
+    backgroundColor: COLORS.white,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: BORDER_RADIUS.xs,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dicebearToggleBtnText: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: COLORS.ink,
+    letterSpacing: 0.3,
+  },
+  editAvatarBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -4,
+    backgroundColor: COLORS.yellow,
+    borderWidth: BORDERS.thin,
+    borderColor: COLORS.borderBlack,
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  editAvatarBadgeText: {
+    fontSize: 8,
     fontWeight: '900',
     color: COLORS.ink,
   },

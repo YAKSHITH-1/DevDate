@@ -5,14 +5,42 @@ import { AppProvider, useApp } from './context/AppContext';
 import { COLORS, SHELL, BRUTAL_SHADOWS, BORDERS } from './styles/theme';
 import { DoodleCode, DoodleStar, DoodleSparkle } from './components/DoodleElements';
 
-import LandingScreen from './screens/LandingScreen';
-import HomeScreen from './screens/HomeScreen';
-import ProjectsScreen from './screens/ProjectsScreen';
-import MatchesScreen from './screens/MatchesScreen';
-import ChatsScreen from './screens/ChatsScreen';
-import ProfileScreen from './screens/ProfileScreen';
 import BottomNav from './components/BottomNav';
 import ComicHalftoneBackground from './components/ComicHalftoneBackground';
+import { Asset } from 'expo-asset';
+
+// Code-split screens loaded on-demand via React.lazy & dynamic import()
+const LandingScreen = React.lazy(() => import('./screens/LandingScreen'));
+const HomeScreen = React.lazy(() => import('./screens/HomeScreen'));
+const ProjectsScreen = React.lazy(() => import('./screens/ProjectsScreen'));
+const MatchesScreen = React.lazy(() => import('./screens/MatchesScreen'));
+const ChatsScreen = React.lazy(() => import('./screens/ChatsScreen'));
+const ProfileScreen = React.lazy(() => import('./screens/ProfileScreen'));
+
+function ScreenFallback() {
+  return (
+    <View style={styles.loadingContainer}>
+      <View style={styles.loadingDoodleTopLeft}>
+        <DoodleCode symbol="</>" color="rgba(24, 24, 27, 0.08)" bgColor="transparent" />
+      </View>
+      <View style={styles.loadingDoodleBottomRight}>
+        <DoodleStar size={14} color="rgba(255, 222, 0, 0.20)" />
+      </View>
+      <View style={styles.loadingBadge}>
+        <DoodleSparkle size={20} color={COLORS.yellow} />
+        <Text style={styles.loadingText}>LOADING...</Text>
+      </View>
+      <ActivityIndicator size="small" color={SHELL.loadingAccent} style={{ marginTop: 12 }} />
+    </View>
+  );
+}
+
+// Pre-warm landing video asset immediately on startup into local device cache
+try {
+  Asset.fromModule(require('./assets/landervideo.mp4')).downloadAsync().catch(() => {});
+} catch (e) {
+  // safe fallback
+}
 
 function MainNavigator() {
   const {
@@ -175,15 +203,16 @@ function MainNavigator() {
   return (
     <SafeAreaProvider>
       <StatusBar
-        barStyle="dark-content"
-        backgroundColor="#FAF6EB"
+        barStyle={isLanding ? 'light-content' : 'dark-content'}
+        backgroundColor={isLanding ? 'transparent' : '#FAF6EB'}
+        translucent={true}
       />
       <SafeAreaView
         style={[
           styles.safeArea,
-          { backgroundColor: '#FAF6EB' },
+          { backgroundColor: isLanding ? 'transparent' : '#FAF6EB' },
         ]}
-        edges={['top', 'left', 'right']}
+        edges={isLanding ? [] : ['top', 'left', 'right']}
       >
         <View style={styles.container}>
           <ComicHalftoneBackground />
@@ -197,7 +226,9 @@ function MainNavigator() {
               },
             ]}
           >
-            {renderActiveScreen()}
+            <React.Suspense fallback={<ScreenFallback />}>
+              {renderActiveScreen()}
+            </React.Suspense>
           </Animated.View>
 
           {/* Bottom Nav Bar (Hidden on landing screen) */}

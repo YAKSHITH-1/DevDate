@@ -813,12 +813,19 @@ export const seedSkills = async () => {
 
   const result = await Skill.bulkWrite(operations);
   const totalInDb = await Skill.countDocuments();
-  console.log(`✅ Successfully seeded/synced skills. (Upserted: ${result.upsertedCount}, Modified: ${result.modifiedCount}). Total skills in DB: ${totalInDb}`);
+  console.log(` Successfully seeded/synced skills. (Upserted: ${result.upsertedCount}, Modified: ${result.modifiedCount}). Total skills in DB: ${totalInDb}`);
 
-  // Category breakdown
-  console.log("\n📊 Category Breakdown:");
+  // Category breakdown (batched via aggregation instead of querying countDocuments inside a loop)
+  console.log("\n Category Breakdown:");
+  const categoryCounts = await Skill.aggregate([
+    { $unwind: "$categories" },
+    { $group: { _id: "$categories", count: { $sum: 1 } } },
+  ]);
+  const countMap = new Map();
+  categoryCounts.forEach((c) => countMap.set(c._id, c.count));
+
   for (const category of SKILL_CATEGORIES) {
-    const count = await Skill.countDocuments({ categories: category });
+    const count = countMap.get(category) || 0;
     console.log(`  - ${category}: ${count} skills`);
   }
 

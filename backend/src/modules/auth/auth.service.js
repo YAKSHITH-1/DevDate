@@ -93,9 +93,41 @@ export const registerUser = async ({ name, email, password }) => {
 };
 
 /**
- * Verifies a user's email address using a submitted 6-digit OTP.
+ * Helper to generate a device session and access/refresh token pair for a user
  */
-export const verifyEmail = async ({ email, otp }) => {
+export const createSessionAndTokens = async (user, deviceInfo = {}) => {
+  const expiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+  const session = new Session({
+    userId: user._id,
+    refreshTokenHash: "pending",
+    revoked: false,
+    expiresAt,
+    lastUsedAt: new Date(),
+    deviceInfo: {
+      userAgent: deviceInfo.userAgent || "",
+      ipAddress: deviceInfo.ipAddress || "",
+      deviceType: deviceInfo.deviceType || "unknown",
+    },
+  });
+
+  const refreshToken = generateRefreshToken(user._id, session._id);
+  session.refreshTokenHash = hashToken(refreshToken);
+  await session.save();
+
+  const accessToken = generateAccessToken(user._id, session._id);
+
+  return {
+    user,
+    accessToken,
+    refreshToken,
+  };
+};
+
+/**
+ * Verifies a user's email address using a submitted 6-digit OTP.
+ * Automatically provisions session tokens so the user is logged in immediately.
+ */
+export const verifyEmail = async ({ email, otp, deviceInfo = {} }) => {
   const normalizedEmail = email.trim().toLowerCase();
 
   const user = await User.findOne({ email: normalizedEmail });
@@ -127,11 +159,18 @@ export const verifyEmail = async ({ email, otp }) => {
 
   await EmailOTP.deleteMany({ userId: user._id });
 
+  // Provision session tokens for immediate automatic login
+  const sessionData = await createSessionAndTokens(user, deviceInfo);
+
   return {
     userId: user._id,
+    user,
     name: user.name,
     email: user.email,
+    role: user.role,
     isVerified: true,
+    accessToken: sessionData.accessToken,
+    refreshToken: sessionData.refreshToken,
   };
 };
 
@@ -155,31 +194,7 @@ export const loginUser = async ({ email, password, deviceInfo = {} }) => {
     throw new ApiError(403, "Please verify your email address before logging in.");
   }
 
-  const expiresAt = new Date(Date.now() + SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
-  const session = new Session({
-    userId: user._id,
-    refreshTokenHash: "pending",
-    revoked: false,
-    expiresAt,
-    lastUsedAt: new Date(),
-    deviceInfo: {
-      userAgent: deviceInfo.userAgent || "",
-      ipAddress: deviceInfo.ipAddress || "",
-      deviceType: deviceInfo.deviceType || "unknown",
-    },
-  });
-
-  const refreshToken = generateRefreshToken(user._id, session._id);
-  session.refreshTokenHash = hashToken(refreshToken);
-  await session.save();
-
-  const accessToken = generateAccessToken(user._id, session._id);
-
-  return {
-    user,
-    accessToken,
-    refreshToken,
-  };
+  return await createSessionAndTokens(user, deviceInfo);
 };
 
 /**
@@ -309,7 +324,7 @@ export const forgotPassword = async ({ email }) => {
   const resetUrl = `${APP_URL}/reset-password?token=${rawToken}`;
 
   try {
-    await sendPasswordResetEmail(user.email, resetUrl, RESET_TOKEN_EXPIRY_MINUTES);
+    await sendPasswordResetEmail(user.email, resetUrl, RESET_TOKEN_EXPIRY_MINUTES, rawToken);
   } catch (error) {
     if ((process.env.NODE_ENV || NODE_ENV) === "production") {
       await PasswordReset.deleteMany({ userId: user._id });
@@ -367,11 +382,13 @@ export const resetPassword = async ({ token, newPassword }) => {
   };
 };
 
+const USER_PROFILE_FIELDS = "name email isVerified bio introduction role preferredRole experience availability skills interests github linkedin portfolio avatar location lookingTo createdAt";
+
 /**
  * Fetches the authenticated user profile.
  */
 export const getMe = async (userId) => {
-  const user = await User.findById(userId).select("-passwordHash");
+  const user = await User.findById(userId).select(USER_PROFILE_FIELDS).lean();
   if (!user) {
     throw new ApiError(404, "User not found.");
   }
@@ -427,32 +444,60 @@ export const updateUserProfile = async (userId, profileData = {}) => {
       rawSkills = rawSkills.split(",").map((s) => s.trim()).filter(Boolean);
     }
     if (Array.isArray(rawSkills)) {
-      const canonicalSkills = [];
-      const seen = new Set();
-
+      const validSkillInputs = [];
+      const seenInputs = new Set();
       for (const skillItem of rawSkills) {
         if (!skillItem || typeof skillItem !== "string") continue;
         const trimmed = skillItem.trim();
         if (!trimmed) continue;
-
-        // Try finding matching canonical skill by exact name or alias (case-insensitive)
-        const escaped = trimmed.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
-        const matchedSkill = await Skill.findOne({
-          $or: [
-            { name: new RegExp(`^${escaped}$`, "i") },
-            { aliases: new RegExp(`^${escaped}$`, "i") },
-          ],
-        });
-
-        const canonicalName = matchedSkill ? matchedSkill.name : trimmed;
-        const lower = canonicalName.toLowerCase();
-        if (!seen.has(lower)) {
-          seen.add(lower);
-          canonicalSkills.push(canonicalName);
+        const lower = trimmed.toLowerCase();
+        if (!seenInputs.has(lower)) {
+          seenInputs.add(lower);
+          validSkillInputs.push(trimmed);
         }
       }
 
-      user.skills = canonicalSkills;
+      if (validSkillInputs.length === 0) {
+        user.skills = [];
+      } else {
+        // Build regexes for all unique inputs and execute a single batch query
+        const regexes = validSkillInputs.map(
+          (s) => new RegExp(`^${s.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&")}$`, "i")
+        );
+
+        const matchedSkills = await Skill.find({
+          $or: [
+            { name: { $in: regexes } },
+            { aliases: { $in: regexes } },
+          ],
+        }).lean();
+
+        // Build lookup map by lowercase canonical name and aliases
+        const skillLookup = new Map();
+        for (const skill of matchedSkills) {
+          skillLookup.set(skill.name.toLowerCase(), skill.name);
+          if (Array.isArray(skill.aliases)) {
+            for (const alias of skill.aliases) {
+              if (alias && typeof alias === "string") {
+                skillLookup.set(alias.toLowerCase(), skill.name);
+              }
+            }
+          }
+        }
+
+        const canonicalSkills = [];
+        const seenCanonical = new Set();
+        for (const input of validSkillInputs) {
+          const canonicalName = skillLookup.get(input.toLowerCase()) || input;
+          const lower = canonicalName.toLowerCase();
+          if (!seenCanonical.has(lower)) {
+            seenCanonical.add(lower);
+            canonicalSkills.push(canonicalName);
+          }
+        }
+
+        user.skills = canonicalSkills;
+      }
     }
   }
 
@@ -486,8 +531,8 @@ export const updateUserProfile = async (userId, profileData = {}) => {
 
   await user.save();
 
-  // Return updated user document stripped of passwordHash
-  const updatedUser = await User.findById(userId).select("-passwordHash");
+  // Return updated user document stripped of passwordHash and internal fields
+  const updatedUser = await User.findById(userId).select(USER_PROFILE_FIELDS).lean();
   return updatedUser;
 };
 

@@ -41,11 +41,30 @@ export const register = asyncHandler(async (req, res) => {
 export const verifyEmail = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
-  const result = await verifyEmailService({ email, otp });
+  const deviceInfo = {
+    userAgent: req.headers["user-agent"] || "",
+    ipAddress: req.ip || req.connection?.remoteAddress || "",
+    deviceType: req.headers["x-device-type"] || "desktop",
+  };
+
+  const result = await verifyEmailService({ email, otp, deviceInfo });
+
+  if (result.refreshToken) {
+    res.cookie(REFRESH_COOKIE_NAME, result.refreshToken, getRefreshCookieOptions());
+  }
 
   return res.status(200).json({
     success: true,
-    message: "Email verified successfully! You can now log in to your account.",
+    message: "Email verified successfully! Welcome to DevDate.",
+    accessToken: result.accessToken,
+    refreshToken: result.refreshToken,
+    user: {
+      id: result.user?._id?.toString() || result.userId?.toString(),
+      name: result.name,
+      email: result.email,
+      role: result.role,
+      isVerified: result.isVerified,
+    },
     data: result,
   });
 });

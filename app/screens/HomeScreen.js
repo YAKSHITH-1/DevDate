@@ -9,6 +9,7 @@ import {
   Modal,
   FlatList,
   RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS, BORDER_RADIUS, BORDERS, BRUTAL_SHADOWS } from '../styles/theme';
 import DeveloperCard from '../components/DeveloperCard';
@@ -17,7 +18,10 @@ import SwipeControls from '../components/SwipeControls';
 import ComicBadge from '../components/ComicBadge';
 import { DoodleStar, DoodleSparkle, DoodleCode, DoodleArrow, DoodleUnderline } from '../components/DoodleElements';
 import { useApp } from '../context/AppContext';
-import NotificationsList from '../components/NotificationsList';
+
+// Code-split NotificationsList loaded on-demand when notifications modal opens
+const NotificationsList = React.lazy(() => import('../components/NotificationsList'));
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getSkillLabels } from '../data/skillsDatabase';
 import { recordSwipeApi, createInvitationApi } from '../utils/api';
 
@@ -27,6 +31,7 @@ export default function HomeScreen({
   onNavigateToProfile,
   onOpenChat,
 }) {
+  const insets = useSafeAreaInsets();
   const {
     activeProject,
     projects,
@@ -316,6 +321,14 @@ export default function HomeScreen({
     }
   };
 
+  const modalBackdropStyle = [
+    styles.modalBackdrop,
+    {
+      paddingTop: Math.max(insets.top + 12, 24),
+      paddingBottom: Math.max(insets.bottom + 12, 24),
+    },
+  ];
+
   return (
     <View style={styles.container}>
       {/* 1. TOP HEADER (DevDate 3D Logo + Bell + Filter) */}
@@ -483,8 +496,8 @@ export default function HomeScreen({
         animationType="fade"
         onRequestClose={() => setInviteModalData(null)}
       >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, BRUTAL_SHADOWS.modal]}>
+        <View style={modalBackdropStyle}>
+          <View style={[styles.modalCard, styles.inviteModalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.modalSticker}>
               <ComicBadge
                 text={inviteModalData?.isSuper ? "SUPER INVITED!" : "MATCH INVITE SENT!"}
@@ -498,16 +511,23 @@ export default function HomeScreen({
             {inviteModalData && (
               <>
                 <Text style={styles.modalDevName}>{inviteModalData.name}</Text>
-                <Text style={styles.modalDevRole}>{inviteModalData.role}</Text>
-                <Text style={styles.modalNotice}>
-                  Invited to collaborate on <Text style={{ fontWeight: '900' }}>{activeProject?.title}</Text>! When they accept, you will receive a notification in Matches.
-                </Text>
+                <Text style={styles.modalDevRole}>{inviteModalData.role || 'Developer'}</Text>
+                
+                <View style={styles.modalNoticeBox}>
+                  <Text style={styles.modalNotice}>
+                    Invited to collaborate on{' '}
+                    <Text style={styles.modalProjectHighlight}>
+                      {activeProject?.title || 'your project'}
+                    </Text>
+                    ! When they accept, you will receive a notification in Matches.
+                  </Text>
+                </View>
 
                 <View style={styles.modalActions}>
                   <TouchableOpacity
                     activeOpacity={0.85}
                     onPress={() => setInviteModalData(null)}
-                    style={[styles.continueBtn, BRUTAL_SHADOWS.xs]}
+                    style={[styles.continueBtn, BRUTAL_SHADOWS.button]}
                   >
                     <Text style={styles.continueBtnText}>KEEP SWIPING</Text>
                   </TouchableOpacity>
@@ -518,7 +538,7 @@ export default function HomeScreen({
                       setInviteModalData(null);
                       if (onNavigateToMatches) onNavigateToMatches();
                     }}
-                    style={[styles.viewMatchesBtn, BRUTAL_SHADOWS.xs]}
+                    style={[styles.viewMatchesBtn, BRUTAL_SHADOWS.button]}
                   >
                     <Text style={styles.viewMatchesBtnText}>VIEW MATCHES →</Text>
                   </TouchableOpacity>
@@ -536,7 +556,7 @@ export default function HomeScreen({
         animationType="slide"
         onRequestClose={() => setProjectPickerVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.modalCard, styles.pickerModalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
               <ComicBadge text="SELECT DISCOVERY PROJECT" color="#FFCC00" textColor="#000" size="sm" />
@@ -603,7 +623,7 @@ export default function HomeScreen({
         animationType="slide"
         onRequestClose={() => setNotificationsVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.modalCard, styles.notificationsModalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
               <ComicBadge text="NOTIFICATIONS" color="#38BDF8" textColor="#000" size="sm" />
@@ -612,12 +632,16 @@ export default function HomeScreen({
               </TouchableOpacity>
             </View>
 
-            <NotificationsList
-              showHeader={true}
-              onSelectNotification={(n) => {
-                handleNotificationPress(n);
-              }}
-            />
+            {notificationsVisible && (
+              <React.Suspense fallback={<ActivityIndicator size="small" color="#000" style={{ padding: 32 }} />}>
+                <NotificationsList
+                  showHeader={true}
+                  onSelectNotification={(n) => {
+                    handleNotificationPress(n);
+                  }}
+                />
+              </React.Suspense>
+            )}
           </View>
         </View>
       </Modal>
@@ -629,7 +653,7 @@ export default function HomeScreen({
         animationType="slide"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <View style={modalBackdropStyle}>
           <View style={[styles.modalCard, BRUTAL_SHADOWS.modal]}>
             <View style={styles.pickerHeaderRow}>
               <ComicBadge text="DISCOVERY FILTERS" color="#4ADE80" textColor="#000" size="sm" />
@@ -860,7 +884,7 @@ const styles = StyleSheet.create({
   // Modal styling
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.72)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -868,7 +892,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: COLORS.cream,
+    backgroundColor: '#FAF6EB',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 18,
     borderBottomLeftRadius: 20,
@@ -877,6 +901,13 @@ const styles = StyleSheet.create({
     borderColor: COLORS.ink,
     padding: 20,
     alignItems: 'center',
+  },
+  inviteModalCard: {
+    maxWidth: 360,
+    backgroundColor: '#FAF6EB',
+    paddingHorizontal: 22,
+    paddingTop: 24,
+    paddingBottom: 22,
   },
   pickerModalCard: {
     maxHeight: 520,
@@ -1092,26 +1123,48 @@ const styles = StyleSheet.create({
   },
 
   modalSticker: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   modalDevName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '900',
     color: COLORS.ink,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    marginTop: 4,
   },
   modalDevRole: {
     fontSize: 13,
     fontWeight: '800',
     color: COLORS.textMuted,
-    marginBottom: 10,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalNoticeBox: {
+    width: '100%',
+    backgroundColor: '#FFFDF9',
+    borderWidth: 2,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    marginTop: 6,
+    marginBottom: 18,
   },
   modalNotice: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: COLORS.inkMuted,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 18,
+    lineHeight: 19,
+  },
+  modalProjectHighlight: {
+    fontWeight: '900',
+    color: COLORS.ink,
+    backgroundColor: COLORS.yellowHighlight,
   },
   modalActions: {
     flexDirection: 'row',
@@ -1120,7 +1173,7 @@ const styles = StyleSheet.create({
   },
   continueBtn: {
     flex: 1,
-    height: 42,
+    height: 44,
     backgroundColor: COLORS.white,
     borderWidth: 2.5,
     borderColor: COLORS.ink,
@@ -1132,13 +1185,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   continueBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
     color: COLORS.ink,
+    letterSpacing: 0.3,
   },
   viewMatchesBtn: {
     flex: 1.2,
-    height: 42,
+    height: 44,
     backgroundColor: COLORS.yellow,
     borderWidth: 2.5,
     borderColor: COLORS.ink,
@@ -1150,8 +1204,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewMatchesBtnText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '900',
     color: COLORS.ink,
+    letterSpacing: 0.3,
   },
 });

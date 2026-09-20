@@ -63,6 +63,23 @@ export const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN ? process.e
 // Application URL
 export const APP_URL = process.env.APP_URL ? process.env.APP_URL.trim() : `http://localhost:${PORT}`;
 
+// Rate Limiting Configuration
+// 1. Strict Auth Route Limits (Per-IP & Per-Account with Exponential Backoff)
+export const RATE_LIMIT_AUTH_WINDOW_MS = Number(process.env.RATE_LIMIT_AUTH_WINDOW_MS) || 15 * 60 * 1000; // 15 minutes
+export const RATE_LIMIT_AUTH_MAX_IP = Number(process.env.RATE_LIMIT_AUTH_MAX_IP) || 10; // Max attempts per IP before backoff
+export const RATE_LIMIT_AUTH_MAX_ACCOUNT = Number(process.env.RATE_LIMIT_AUTH_MAX_ACCOUNT) || 5; // Max attempts per account before backoff
+export const RATE_LIMIT_AUTH_BASE_DELAY_MS = Number(process.env.RATE_LIMIT_AUTH_BASE_DELAY_MS) || 2000; // Base delay: 2 seconds
+export const RATE_LIMIT_AUTH_MAX_DELAY_MS = Number(process.env.RATE_LIMIT_AUTH_MAX_DELAY_MS) || 300000; // Delay cap: 5 minutes
+export const RATE_LIMIT_AUTH_BACKOFF_FACTOR = Number(process.env.RATE_LIMIT_AUTH_BACKOFF_FACTOR) || 2; // Factor multiplier
+
+// 2. Moderate Public Endpoint Limits (IP-based)
+export const RATE_LIMIT_PUBLIC_WINDOW_MS = Number(process.env.RATE_LIMIT_PUBLIC_WINDOW_MS) || 15 * 60 * 1000; // 15 minutes
+export const RATE_LIMIT_PUBLIC_MAX = Number(process.env.RATE_LIMIT_PUBLIC_MAX) || 100; // 100 requests per 15 min
+
+// 3. Looser Authenticated User Action Limits (User-based)
+export const RATE_LIMIT_USER_WINDOW_MS = Number(process.env.RATE_LIMIT_USER_WINDOW_MS) || 15 * 60 * 1000; // 15 minutes
+export const RATE_LIMIT_USER_MAX = Number(process.env.RATE_LIMIT_USER_MAX) || 1000; // 1000 requests per 15 min
+
 export default {
   PORT,
   NODE_ENV,
@@ -80,4 +97,14 @@ export default {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REFRESH_TOKEN,
   APP_URL,
+  RATE_LIMIT_AUTH_WINDOW_MS,
+  RATE_LIMIT_AUTH_MAX_IP,
+  RATE_LIMIT_AUTH_MAX_ACCOUNT,
+  RATE_LIMIT_AUTH_BASE_DELAY_MS,
+  RATE_LIMIT_AUTH_MAX_DELAY_MS,
+  RATE_LIMIT_AUTH_BACKOFF_FACTOR,
+  RATE_LIMIT_PUBLIC_WINDOW_MS,
+  RATE_LIMIT_PUBLIC_MAX,
+  RATE_LIMIT_USER_WINDOW_MS,
+  RATE_LIMIT_USER_MAX,
 };
