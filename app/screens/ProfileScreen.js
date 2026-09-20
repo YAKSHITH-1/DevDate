@@ -307,17 +307,7 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
       >
         {/* ===== PROFILE HERO CARD ===== */}
         {isThirdParty ? (
-          /* Third-Party Developer Banner */
-          dev?.name === 'Alex Chen' ? (
-            <View style={[styles.heroBannerCard, BRUTAL_SHADOWS.sm]}>
-              <Image
-                source={require('../assets/alex_banner_clean.png')}
-                style={styles.heroBannerImage}
-                resizeMode="cover"
-              />
-            </View>
-          ) : (
-            <View style={[styles.heroCard, BRUTAL_SHADOWS.sm]}>
+          <View style={[styles.heroCard, BRUTAL_SHADOWS.sm]}>
               <View style={styles.heroTopRow}>
                 {/* Avatar */}
                 <View style={styles.heroAvatarWrap}>
@@ -372,7 +362,6 @@ export default function ProfileScreen({ onBackToDiscover, onOpenChat, onLogout }
                 ) : null}
               </View>
             </View>
-          )
         ) : (
           /* ===== OWN PROFILE HERO CARD ===== */
           <View style={[styles.heroCard, BRUTAL_SHADOWS.sm]}>

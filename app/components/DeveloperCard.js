@@ -20,10 +20,6 @@ export default function DeveloperCard({ developer, onPress }) {
 
   const [imgError, setImgError] = React.useState(false);
 
-  // Use the exact comic artwork from screen-ref Phone 2 for Maya, and customized comic frames for others
-  const isMaya = developer.name.startsWith('Maya');
-  const isAlex = developer.name.startsWith('Alex');
-
   const CardWrapper = onPress ? TouchableOpacity : View;
   const wrapperProps = onPress ? { activeOpacity: 0.92, onPress } : {};
 
@@ -39,51 +35,37 @@ export default function DeveloperCard({ developer, onPress }) {
           </View>
         ) : null}
 
-        {isMaya ? (
-          <Image
-            source={require('../assets/maya_card_art.png')}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-        ) : isAlex ? (
-          <Image
-            source={require('../assets/alex_banner_clean.png')}
-            style={styles.cardImage}
-            resizeMode="cover"
-          />
-        ) : (
-          <View style={styles.customImageWrap}>
-            {!imgError && developer.avatar ? (
-              <Image
-                source={{ uri: developer.avatar }}
-                style={styles.cardImage}
-                onError={() => setImgError(true)}
-              />
-            ) : (
-              <View style={[styles.cardImage, styles.cardFallbackImage]}>
-                {/* Doodle circle frame behind initial */}
-                <View style={styles.fallbackCircle}>
-                  <Text style={styles.cardFallbackInitial}>
-                    {developer.name?.charAt(0)?.toUpperCase() || 'D'}
-                  </Text>
-                </View>
-                {/* Corner doodle accent */}
-                <View style={styles.fallbackDoodleAccent}>
-                  <DoodleCode symbol="</>" color="rgba(24,24,27,0.12)" bgColor="transparent" />
-                </View>
+        <View style={styles.customImageWrap}>
+          {!imgError && developer.avatar ? (
+            <Image
+              source={{ uri: developer.avatar }}
+              style={styles.cardImage}
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <View style={[styles.cardImage, styles.cardFallbackImage]}>
+              {/* Doodle circle frame behind initial */}
+              <View style={styles.fallbackCircle}>
+                <Text style={styles.cardFallbackInitial}>
+                  {developer.name?.charAt(0)?.toUpperCase() || 'D'}
+                </Text>
               </View>
-            )}
-            {developer.sticker && (
-              <View style={styles.customStickyNote}>
-                <Text style={styles.customStickyText}>{developer.sticker}</Text>
+              {/* Corner doodle accent */}
+              <View style={styles.fallbackDoodleAccent}>
+                <DoodleCode symbol="</>" color="rgba(24,24,27,0.12)" bgColor="transparent" />
               </View>
-            )}
-            <View style={styles.deckCounter}>
-              <DoodleStar size={8} color={COLORS.white} style={{ marginRight: 4 }} />
-              <Text style={styles.deckCounterText}>TOP MATCH</Text>
             </View>
+          )}
+          {developer.sticker && (
+            <View style={styles.customStickyNote}>
+              <Text style={styles.customStickyText}>{developer.sticker}</Text>
+            </View>
+          )}
+          <View style={styles.deckCounter}>
+            <DoodleStar size={8} color={COLORS.white} style={{ marginRight: 4 }} />
+            <Text style={styles.deckCounterText}>TOP MATCH</Text>
           </View>
-        )}
+        </View>
 
         {/* Decorative doodle sparkle on image corner */}
         <View style={styles.imageDoodleAccent}>
