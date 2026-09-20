@@ -24,8 +24,7 @@ import matchingService from "../modules/matching/matching.service.js";
 import invitationService from "../modules/invitations/invitation.service.js";
 import notificationService from "../modules/notifications/notification.service.js";
 import authService from "../modules/auth/auth.service.js";
-
-const MONGO_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/devdate";
+import { MONGO_URI } from "../config/env.js";
 
 async function runTests() {
   console.log("Connecting to MongoDB...");

@@ -60,8 +60,13 @@ export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID ? process.env.GOOGL
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET ? process.env.GOOGLE_CLIENT_SECRET.trim() : "";
 export const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN ? process.env.GOOGLE_REFRESH_TOKEN.trim() : "";
 
-// Application URL
+// Application URL & Allowed CORS Origins
 export const APP_URL = process.env.APP_URL ? process.env.APP_URL.trim() : `http://localhost:${PORT}`;
+export const ALLOWED_ORIGINS = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",")
+      .map((origin) => origin.trim().replace(/\/+$/, ""))
+      .filter(Boolean)
+  : [];
 
 // Rate Limiting Configuration
 // 1. Strict Auth Route Limits (Per-IP & Per-Account with Exponential Backoff)
@@ -97,6 +102,7 @@ export default {
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REFRESH_TOKEN,
   APP_URL,
+  ALLOWED_ORIGINS,
   RATE_LIMIT_AUTH_WINDOW_MS,
   RATE_LIMIT_AUTH_MAX_IP,
   RATE_LIMIT_AUTH_MAX_ACCOUNT,

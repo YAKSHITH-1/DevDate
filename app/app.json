@@ -4,7 +4,7 @@
     "slug": "devdate",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/Devdatelogo.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/splash.png",
@@ -25,12 +25,12 @@
         "android.permission.DETECT_SCREEN_CAPTURE"
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/Devdatelogo.png",
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAF6EB"
       }
     },
     "web": {
-      "favicon": "./assets/Devdatelogo.png"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-secure-store",

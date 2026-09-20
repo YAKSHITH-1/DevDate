@@ -1,19 +1,23 @@
 import asyncHandler from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/ApiError.js";
 import notificationService from "./notification.service.js";
+import { NODE_ENV } from "../../config/env.js";
 
-// Helper to extract user ID from auth middleware or header/query for testing
+// Helper to extract user ID from authenticated user context, with development fallback
 const getUserId = (req) => {
   if (req.user && req.user._id) return req.user._id.toString();
-  if (req.headers["x-user-id"]) return req.headers["x-user-id"].toString();
-  if (req.query.userId) return req.query.userId.toString();
+  if (req.userId) return req.userId.toString();
+  if ((process.env.NODE_ENV || NODE_ENV) !== "production") {
+    if (req.headers["x-user-id"]) return req.headers["x-user-id"].toString();
+    if (req.query.userId) return req.query.userId.toString();
+  }
   return null;
 };
 
 export const getNotifications = asyncHandler(async (req, res) => {
   const userId = getUserId(req);
   if (!userId) {
-    throw new ApiError(400, "User ID is required (via token or x-user-id header)");
+    throw new ApiError(401, "Authentication required to access notifications");
   }
 
   const unreadOnly = req.query.unread === "true";
@@ -37,7 +41,7 @@ export const getNotifications = asyncHandler(async (req, res) => {
 export const getUnreadCount = asyncHandler(async (req, res) => {
   const userId = getUserId(req);
   if (!userId) {
-    throw new ApiError(400, "User ID is required (via token or x-user-id header)");
+    throw new ApiError(401, "Authentication required to access notifications");
   }
 
   const count = await notificationService.getUnreadCount(userId);
@@ -50,7 +54,7 @@ export const getUnreadCount = asyncHandler(async (req, res) => {
 export const markAsRead = asyncHandler(async (req, res) => {
   const userId = getUserId(req);
   if (!userId) {
-    throw new ApiError(400, "User ID is required (via token or x-user-id header)");
+    throw new ApiError(401, "Authentication required to access notifications");
   }
 
   const notification = await notificationService.markAsRead(req.params.id, userId);
@@ -64,7 +68,7 @@ export const markAsRead = asyncHandler(async (req, res) => {
 export const markAllAsRead = asyncHandler(async (req, res) => {
   const userId = getUserId(req);
   if (!userId) {
-    throw new ApiError(400, "User ID is required (via token or x-user-id header)");
+    throw new ApiError(401, "Authentication required to access notifications");
   }
 
   const result = await notificationService.markAllAsRead(userId);

@@ -4,7 +4,8 @@ import User from "../models/User.js";
 import Match from "../models/Match.js";
 import Message from "../models/Message.js";
 import chatService from "../modules/chat/chat.service.js";
-import { JWT_SECRET } from "../config/env.js";
+import { JWT_SECRET, NODE_ENV } from "../config/env.js";
+import { isOriginAllowed } from "../config/cors.js";
 
 let io = null;
 
@@ -13,7 +14,13 @@ export const getIO = () => io;
 export const initSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
-      origin: true,
+      origin: (origin, callback) => {
+        if (isOriginAllowed(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`CORS policy: Origin '${origin}' is not authorized.`));
+        }
+      },
       credentials: true,
     },
     pingTimeout: 60000,
@@ -28,14 +35,12 @@ export const initSocket = (httpServer) => {
         token = authHeader.split(" ")[1];
       }
 
-      const explicitUserId =
-        socket.handshake.headers?.["x-user-id"] ||
-        socket.handshake.auth?.userId ||
-        socket.handshake.query?.userId;
-
       if (token) {
         try {
           const decoded = jwt.verify(token, JWT_SECRET);
+          if (decoded.type && decoded.type !== "access") {
+            return next(new Error("Authentication error: Invalid token type"));
+          }
           const userId = decoded.userId || decoded.id || decoded._id;
           const user = await User.findById(userId).select("-passwordHash");
           if (user) {
@@ -44,20 +49,31 @@ export const initSocket = (httpServer) => {
             return next();
           }
         } catch {
-          // If token verification fails, check if valid explicitUserId was provided (for testing/simulated role switcher)
+          // Token verification failed; if in production, reject immediately
+          if ((process.env.NODE_ENV || NODE_ENV) === "production") {
+            return next(new Error("Authentication error: Invalid or expired token"));
+          }
         }
       }
 
-      if (explicitUserId) {
-        const user = await User.findById(explicitUserId).select("-passwordHash");
-        if (user) {
-          socket.user = user;
-          socket.userId = user._id.toString();
-          return next();
+      // Development/testing fallback ONLY permitted when NODE_ENV !== "production"
+      if ((process.env.NODE_ENV || NODE_ENV) !== "production") {
+        const explicitUserId =
+          socket.handshake.headers?.["x-user-id"] ||
+          socket.handshake.auth?.userId ||
+          socket.handshake.query?.userId;
+
+        if (explicitUserId) {
+          const user = await User.findById(explicitUserId).select("-passwordHash");
+          if (user) {
+            socket.user = user;
+            socket.userId = user._id.toString();
+            return next();
+          }
         }
       }
 
-      return next(new Error("Authentication error: Valid token or User ID required"));
+      return next(new Error("Authentication error: Valid authentication token required"));
     } catch (err) {
       return next(new Error(`Authentication error: ${err.message}`));
     }

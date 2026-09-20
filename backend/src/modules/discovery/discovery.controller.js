@@ -1,11 +1,15 @@
 import asyncHandler from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/ApiError.js";
 import discoveryService from "./discovery.service.js";
+import { NODE_ENV } from "../../config/env.js";
 
 const getUserId = (req) => {
   if (req.user && req.user._id) return req.user._id.toString();
-  if (req.headers["x-user-id"]) return req.headers["x-user-id"].toString();
-  if (req.query.userId) return req.query.userId.toString();
+  if (req.userId) return req.userId.toString();
+  if ((process.env.NODE_ENV || NODE_ENV) !== "production") {
+    if (req.headers["x-user-id"]) return req.headers["x-user-id"].toString();
+    if (req.query.userId) return req.query.userId.toString();
+  }
   return null;
 };
 

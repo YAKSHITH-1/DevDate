@@ -811,47 +811,73 @@ export function AppProvider({ children }) {
   }, [activeProjectId]);
 
   // --- DISCOVERY & MATCHING ACTIONS ---
-  // Returns developers who have NOT been skipped or invited for the active project
+  // Returns developers who have NOT been invited for the active project (continuous loop over passed profiles)
   const availableDevelopersForActiveProject = useMemo(() => {
     const targetId = activeProjectId || activeProject?.id || 'default';
-    const skipped = skippedDevsByProject[targetId] || [];
-    const invited = invitedDevsByProject[targetId] || [];
-    const excludedIds = new Set([...skipped, ...invited]);
+    const invited = new Set(invitedDevsByProject[targetId] || []);
+    const skipped = new Set(skippedDevsByProject[targetId] || []);
 
     const pool = Array.isArray(discoveryDevelopers) ? discoveryDevelopers : [];
 
-    return pool
-      .filter((d) => d && !excludedIds.has(d.id))
-      .map((d) => {
-        let matchedSkills = 0;
-        const projSkills = getSkillLabels(activeProject?.techStack || activeProject?.requiredSkills || []);
-        const devSkills = Array.isArray(d.skills) ? d.skills : [];
-        devSkills.forEach((s) => {
-          if (
-            projSkills.some(
-              (ps) =>
-                ps.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(ps.toLowerCase())
-            )
-          ) {
-            matchedSkills++;
-          }
-        });
-        const calculatedScore = Math.min(99, Math.max(78, 80 + matchedSkills * 6));
-        return {
-          ...d,
-          matchScore: d.matchScore || calculatedScore,
-        };
+    // Eligible developer pool excludes anyone who has already been invited
+    const eligiblePool = pool.filter((d) => d && !invited.has(d.id || d._id));
+
+    // Remaining un-skipped developers in the current rotation cycle
+    let available = eligiblePool.filter((d) => !skipped.has(d.id || d._id));
+
+    // Continuous Loop: If all non-invited developers have been passed, automatically restart the loop
+    if (available.length === 0 && eligiblePool.length > 0) {
+      available = eligiblePool;
+    }
+
+    return available.map((d) => {
+      let matchedSkills = 0;
+      const projSkills = getSkillLabels(activeProject?.techStack || activeProject?.requiredSkills || []);
+      const devSkills = Array.isArray(d.skills) ? d.skills : [];
+      devSkills.forEach((s) => {
+        if (
+          projSkills.some(
+            (ps) =>
+              ps.toLowerCase().includes(s.toLowerCase()) || s.toLowerCase().includes(ps.toLowerCase())
+          )
+        ) {
+          matchedSkills++;
+        }
       });
+      const calculatedScore = Math.min(99, Math.max(78, 80 + matchedSkills * 6));
+      return {
+        ...d,
+        matchScore: d.matchScore || calculatedScore,
+      };
+    });
   }, [activeProjectId, activeProject, skippedDevsByProject, invitedDevsByProject, discoveryDevelopers]);
 
   const skipDeveloper = (devOrId, projId = null) => {
     const devId = typeof devOrId === 'object' && devOrId !== null ? (devOrId.id || devOrId._id) : devOrId;
     if (!devId) return;
     const targetId = projId || activeProjectId || activeProject?.id || 'default';
-    setSkippedDevsByProject((prev) => ({
-      ...prev,
-      [targetId]: [...(prev[targetId] || []).filter((id) => id !== devId), devId],
-    }));
+
+    setSkippedDevsByProject((prev) => {
+      const currentSkipped = prev[targetId] || [];
+      const pool = Array.isArray(discoveryDevelopers) ? discoveryDevelopers : [];
+      const invited = new Set(invitedDevsByProject[targetId] || []);
+      const eligibleDevs = pool.filter((d) => !invited.has(d.id || d._id));
+
+      const nextSkipped = [...currentSkipped.filter((id) => id !== devId), devId];
+
+      // If all eligible non-invited developers have been passed in this cycle, reset to loop continuously
+      if (eligibleDevs.length > 0 && nextSkipped.length >= eligibleDevs.length) {
+        return {
+          ...prev,
+          [targetId]: [],
+        };
+      }
+
+      return {
+        ...prev,
+        [targetId]: nextSkipped,
+      };
+    });
   };
 
   const unskipDeveloper = (devOrId, projId = null) => {
@@ -872,11 +898,6 @@ export function AppProvider({ children }) {
       ...prev,
       [targetId]: (prev[targetId] || []).filter((id) => id !== devId),
     }));
-    setInvitations((prev) =>
-      prev.filter(
-        (inv) => !(inv.developerId === devId && (inv.projectId === targetId || inv.projectId === activeProjectId))
-      )
-    );
   };
 
   const resetDiscoveryForProject = (projectId = null) => {
@@ -900,35 +921,19 @@ export function AppProvider({ children }) {
     if (!devId) return;
 
     const targetId = projId || activeProjectId || activeProject?.id || 'default';
+    const projectName = activeProject ? activeProject.title : 'Project';
 
-    // Record invited ID for active project so dev won't re-appear
+    // Record invited ID for active project so dev won't re-appear in discovery deck
     setInvitedDevsByProject((prev) => ({
       ...prev,
       [targetId]: [...(prev[targetId] || []).filter((id) => id !== devId), devId],
     }));
 
-    // Create an invitation record tied to the active project
-    const newInvitation = {
-      id: `inv-${Date.now()}`,
-      developerId: devId,
-      developerName: devObj.name || 'Developer',
-      developerRole: devObj.role || 'Full Stack Developer',
-      developerAvatar: devObj.avatar || '',
-      projectId: targetId,
-      projectName: activeProject ? activeProject.title : 'StudySync',
-      timeAgo: 'Just now',
-      matchScore: devObj.matchScore || 95,
-      isSuper,
-      status: 'PENDING',
-    };
-
-    setInvitations((prev) => [newInvitation, ...prev]);
-
-    // Add notification
+    // Add local confirmation notification
     addNotification({
       type: 'INVITATION',
       title: isSuper ? 'Super Invite Sent!' : 'Invite Sent!',
-      message: `Invited ${devObj.name || 'Developer'} to join ${newInvitation.projectName}.`,
+      message: `Invited ${devObj.name || 'Developer'} to join ${projectName}.`,
     });
   };
 

@@ -1,20 +1,25 @@
 import asyncHandler from "../../utils/asyncHandler.js";
 import ApiError from "../../utils/ApiError.js";
 import invitationService from "./invitation.service.js";
+import { NODE_ENV } from "../../config/env.js";
 
 const getUserId = (req) => {
   if (req.user && req.user._id) return req.user._id.toString();
-  if (req.headers["x-user-id"]) return req.headers["x-user-id"].toString();
-  if (req.query.userId) return req.query.userId.toString();
-  if (req.body.senderId) return req.body.senderId.toString();
-  if (req.body.developerId && req.path.includes("received")) return req.body.developerId.toString();
+  if (req.userId) return req.userId.toString();
+  if ((process.env.NODE_ENV || NODE_ENV) !== "production") {
+    if (req.headers["x-user-id"]) return req.headers["x-user-id"].toString();
+    if (req.query.userId) return req.query.userId.toString();
+    if (req.body.senderId) return req.body.senderId.toString();
+    if (req.body.developerId && req.path.includes("received")) return req.body.developerId.toString();
+  }
   return null;
 };
 
 export const createInvitation = asyncHandler(async (req, res) => {
-  const senderId = getUserId(req) || req.body.senderId;
+  const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+  const senderId = getUserId(req) || (isNotProd ? req.body.senderId : null);
   if (!senderId) {
-    throw new ApiError(400, "Sender / Lead User ID is required");
+    throw new ApiError(401, "Authentication required to send invitation");
   }
 
   const invitation = await invitationService.createInvitation(senderId, req.body);
@@ -26,9 +31,10 @@ export const createInvitation = asyncHandler(async (req, res) => {
 });
 
 export const acceptInvitation = asyncHandler(async (req, res) => {
-  const developerId = getUserId(req) || req.body.developerId;
+  const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+  const developerId = getUserId(req) || (isNotProd ? req.body.developerId : null);
   if (!developerId) {
-    throw new ApiError(400, "Developer User ID is required");
+    throw new ApiError(401, "Authentication required to accept invitation");
   }
 
   const invitation = await invitationService.acceptInvitation(req.params.id, developerId);
@@ -40,9 +46,10 @@ export const acceptInvitation = asyncHandler(async (req, res) => {
 });
 
 export const rejectInvitation = asyncHandler(async (req, res) => {
-  const developerId = getUserId(req) || req.body.developerId;
+  const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+  const developerId = getUserId(req) || (isNotProd ? req.body.developerId : null);
   if (!developerId) {
-    throw new ApiError(400, "Developer User ID is required");
+    throw new ApiError(401, "Authentication required to reject invitation");
   }
 
   const invitation = await invitationService.rejectInvitation(req.params.id, developerId);
@@ -54,9 +61,10 @@ export const rejectInvitation = asyncHandler(async (req, res) => {
 });
 
 export const withdrawInvitation = asyncHandler(async (req, res) => {
-  const senderId = getUserId(req) || req.body.senderId;
+  const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+  const senderId = getUserId(req) || (isNotProd ? req.body.senderId : null);
   if (!senderId) {
-    throw new ApiError(400, "Sender / Lead User ID is required");
+    throw new ApiError(401, "Authentication required to withdraw invitation");
   }
 
   const invitation = await invitationService.withdrawInvitation(req.params.id, senderId);
@@ -84,9 +92,10 @@ export const getProjectInvitationStats = asyncHandler(async (req, res) => {
 });
 
 export const getReceivedInvitations = asyncHandler(async (req, res) => {
-  const developerId = req.query.developerId || getUserId(req);
+  const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+  const developerId = getUserId(req) || (isNotProd ? req.query.developerId : null);
   if (!developerId) {
-    throw new ApiError(400, "Developer User ID is required");
+    throw new ApiError(401, "Authentication required to view received invitations");
   }
 
   const invitations = await invitationService.getReceivedInvitations(developerId, req.query.status);
@@ -97,9 +106,10 @@ export const getReceivedInvitations = asyncHandler(async (req, res) => {
 });
 
 export const getSentInvitations = asyncHandler(async (req, res) => {
-  const senderId = req.query.senderId || getUserId(req);
+  const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+  const senderId = getUserId(req) || (isNotProd ? req.query.senderId : null);
   if (!senderId) {
-    throw new ApiError(400, "Sender User ID is required");
+    throw new ApiError(401, "Authentication required to view sent invitations");
   }
 
   const invitations = await invitationService.getSentInvitations(senderId, req.query.status);

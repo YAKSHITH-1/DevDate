@@ -2,7 +2,7 @@ import jwt from "jsonwebtoken";
 import ApiError from "../utils/ApiError.js";
 import asyncHandler from "../utils/asyncHandler.js";
 import User from "../models/User.js";
-import { JWT_SECRET } from "../config/env.js";
+import { JWT_SECRET, NODE_ENV } from "../config/env.js";
 
 /**
  * Middleware to enforce JWT Access Token authentication on protected routes.
@@ -16,7 +16,9 @@ export const authenticate = asyncHandler(async (req, res, next) => {
   }
 
   if (!token) {
-    if (req.headers["x-user-id"]) {
+    // Only permit x-user-id fallback in non-production environments (development & test suites)
+    const isNotProd = (process.env.NODE_ENV || NODE_ENV) !== "production";
+    if (isNotProd && req.headers["x-user-id"]) {
       const rawUid = req.headers["x-user-id"].toString();
       const user = await User.findById(rawUid).select("-passwordHash");
       if (!user) {
@@ -84,6 +86,18 @@ export const optionalAuthenticate = asyncHandler(async (req, res, next) => {
           req.user = user;
           req.userId = user._id;
         }
+      }
+    } catch {
+      // Ignored for optional auth
+    }
+  } else if ((process.env.NODE_ENV || NODE_ENV) !== "production" && req.headers["x-user-id"]) {
+    // Development/testing fallback only
+    try {
+      const rawUid = req.headers["x-user-id"].toString();
+      const user = await User.findById(rawUid).select("-passwordHash");
+      if (user && user.isVerified) {
+        req.user = user;
+        req.userId = user._id;
       }
     } catch {
       // Ignored for optional auth

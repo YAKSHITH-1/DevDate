@@ -8,29 +8,29 @@ import {
 import { getDiceBearAvatar, resolveProfileAvatar } from './avatar.js';
 
 export function getApiBaseUrl() {
+  const envUrl = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL
+    ? String(process.env.EXPO_PUBLIC_API_URL).trim().replace(/^(https?:\/\/)\s+/, '$1').replace(/\/+$/, '')
+    : null;
+
   // If running in a web browser (React Native Web)
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const hostname = window.location.hostname;
-    const envUrl = typeof process !== 'undefined' ? process.env?.EXPO_PUBLIC_API_URL : null;
 
-    // If an explicit HTTPS tunnel (e.g. ngrok or production) is configured, prioritize it
+    // If an explicit HTTPS URL (e.g. production Render or tunnel) is configured, prioritize it
     if (envUrl && envUrl.startsWith('https://')) {
       return envUrl;
     }
 
     // If accessing web locally via localhost or 127.0.0.1, talk to local backend directly
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:5000/api';
+      return 'http://localhost:3000/api';
     }
 
     // If accessing web via local network IP (e.g. http://192.168.1.6:8081), match the host
-    return `http://${hostname}:5000/api`;
+    return `http://${hostname}:3000/api`;
   }
 
-  return (
-    (typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL) ||
-    'http://localhost:5000/api'
-  );
+  return envUrl || 'http://localhost:3000/api';
 }
 
 export function getSocketBaseUrl() {
@@ -255,11 +255,16 @@ export async function request(endpoint, options = {}) {
     }
   }
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 12000);
+
   try {
     const res = await fetch(url, {
       ...options,
       headers,
+      signal: options.signal || controller.signal,
     });
+    clearTimeout(timeoutId);
 
     const data = await res.json().catch(() => ({}));
 
@@ -309,12 +314,15 @@ export async function request(endpoint, options = {}) {
       data: data.data !== undefined ? data.data : data,
     };
   } catch (err) {
+    const isTimeout = err.name === 'AbortError';
     return {
       success: false,
       status: 0,
-      error: err.message || 'Network request failed',
+      error: isTimeout ? 'Request timed out. Please check your backend connection.' : (err.message || 'Network request failed'),
       data: null,
     };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 

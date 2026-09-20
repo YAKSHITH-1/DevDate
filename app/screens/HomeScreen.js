@@ -463,17 +463,17 @@ export default function HomeScreen({
         ) : (
           <View style={[styles.emptyCard, BRUTAL_SHADOWS.card]}>
             <DoodleSparkle size={30} color={COLORS.yellow} style={{ marginBottom: 10 }} />
-            <Text style={styles.emptyTitle}>NO MORE DEVELOPERS</Text>
-            <DoodleUnderline width={140} color={COLORS.yellow} height={3} style={{ marginBottom: 10 }} />
+            <Text style={styles.emptyTitle}>ALL DEVELOPERS INVITED!</Text>
+            <DoodleUnderline width={160} color={COLORS.yellow} height={3} style={{ marginBottom: 10 }} />
             <Text style={styles.emptySubtitle}>
-              You've gone through everyone available for this project.
+              You have sent invitations to all available developers for this project squad!
             </Text>
             <TouchableOpacity
               activeOpacity={0.85}
               onPress={handleResetDeck}
               style={[styles.resetBtn, BRUTAL_SHADOWS.button]}
             >
-              <Text style={styles.resetBtnText}>EXPLORE AGAIN</Text>
+              <Text style={styles.resetBtnText}>RESET & EXPLORE AGAIN</Text>
             </TouchableOpacity>
           </View>
         )}
