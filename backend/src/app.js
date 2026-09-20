@@ -50,9 +50,27 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static("public"));
 
-// Lightweight health check endpoints for external keep-alive / uptime monitoring (zero auth, minimal payload)
-app.get(["/health", "/api/health"], (req, res) => {
-  res.status(200).json({ status: "ok" });
+// Lightweight health check & cron job keep-alive endpoints (zero auth, no rate limiting, supports GET & HEAD)
+const healthRoutes = [
+  "/health",
+  "/api/health",
+  "/cron/health",
+  "/api/cron/health",
+  "/ping",
+  "/api/ping",
+];
+
+app.all(healthRoutes, (req, res) => {
+  if (req.method !== "GET" && req.method !== "HEAD") {
+    return res.status(405).json({ status: "error", message: "Method not allowed" });
+  }
+  res.status(200).json({
+    status: "ok",
+    message: "DevDate API is healthy and active",
+    timestamp: new Date().toISOString(),
+    uptime: Math.floor(process.uptime()),
+    environment: process.env.NODE_ENV || "development",
+  });
 });
 
 // Public landing & reset password views (protected by moderate public rate limiter)
