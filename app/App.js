@@ -7,6 +7,7 @@ import { DoodleCode, DoodleStar, DoodleSparkle } from './components/DoodleElemen
 
 import BottomNav from './components/BottomNav';
 import ComicHalftoneBackground from './components/ComicHalftoneBackground';
+import VideoSplashScreen from './components/VideoSplashScreen';
 import { Asset } from 'expo-asset';
 
 // Code-split screens loaded on-demand via React.lazy & dynamic import()
@@ -35,9 +36,20 @@ function ScreenFallback() {
   );
 }
 
-// Pre-warm landing video asset immediately on startup into local device cache
+import { getApiBaseUrl } from './utils/api';
+
+// Pre-warm splash & landing video assets immediately on startup into local device cache
 try {
+  Asset.fromModule(require('./assets/DevDate_portrait_splash_5s.mp4')).downloadAsync().catch(() => {});
   Asset.fromModule(require('./assets/landervideo.mp4')).downloadAsync().catch(() => {});
+} catch (e) {
+  // safe fallback
+}
+
+// Background wake-up ping for Render backend (fire-and-forget, zero blocking)
+try {
+  const healthUrl = `${getApiBaseUrl().replace(/\/api\/?$/, '')}/health`;
+  fetch(healthUrl, { method: 'GET' }).catch(() => {});
 } catch (e) {
   // safe fallback
 }
@@ -251,14 +263,25 @@ function MainNavigator() {
 }
 
 export default function App() {
+  const [splashFinished, setSplashFinished] = useState(false);
+
   return (
     <AppProvider>
-      <MainNavigator />
+      <View style={styles.rootAppContainer}>
+        <MainNavigator />
+        {!splashFinished && (
+          <VideoSplashScreen onFinish={() => setSplashFinished(true)} />
+        )}
+      </View>
     </AppProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  rootAppContainer: {
+    flex: 1,
+    backgroundColor: '#FAF6EB',
+  },
   safeArea: {
     flex: 1,
   },

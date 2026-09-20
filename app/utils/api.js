@@ -8,29 +8,31 @@ import {
 import { getDiceBearAvatar, resolveProfileAvatar } from './avatar.js';
 
 export function getApiBaseUrl() {
-  const envUrl = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL
+  let envUrl = typeof process !== 'undefined' && process.env?.EXPO_PUBLIC_API_URL
     ? String(process.env.EXPO_PUBLIC_API_URL).trim().replace(/^(https?:\/\/)\s+/, '$1').replace(/\/+$/, '')
     : null;
+
+  if (envUrl) {
+    if (!envUrl.endsWith('/api')) {
+      envUrl = `${envUrl}/api`;
+    }
+    return envUrl;
+  }
 
   // If running in a web browser (React Native Web)
   if (typeof window !== 'undefined' && window.location?.hostname) {
     const hostname = window.location.hostname;
 
-    // If an explicit HTTPS URL (e.g. production Render or tunnel) is configured, prioritize it
-    if (envUrl && envUrl.startsWith('https://')) {
-      return envUrl;
-    }
-
     // If accessing web locally via localhost or 127.0.0.1, talk to local backend directly
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'http://localhost:3000/api';
+      return 'http://localhost:5000/api';
     }
 
     // If accessing web via local network IP (e.g. http://192.168.1.6:8081), match the host
-    return `http://${hostname}:3000/api`;
+    return `http://${hostname}:5000/api`;
   }
 
-  return envUrl || 'http://localhost:3000/api';
+  return 'http://localhost:5000/api';
 }
 
 export function getSocketBaseUrl() {
@@ -237,7 +239,8 @@ async function performTokenRefresh() {
  * automatic 401 token refresh, and retry exactly once.
  */
 export async function request(endpoint, options = {}) {
-  const url = `${getApiBaseUrl()}${endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${getApiBaseUrl()}${cleanEndpoint}`;
 
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const defaultHeaders = isFormData ? {} : { 'Content-Type': 'application/json' };
@@ -256,7 +259,13 @@ export async function request(endpoint, options = {}) {
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), options.timeout || 12000);
+  // 35-second default timeout to comfortably tolerate Render free-tier cold-start wake-up
+  const timeoutDuration = options.timeout || 35000;
+  const timeoutId = setTimeout(() => {
+    try {
+      controller.abort();
+    } catch (e) {}
+  }, timeoutDuration);
 
   try {
     const res = await fetch(url, {
@@ -314,11 +323,25 @@ export async function request(endpoint, options = {}) {
       data: data.data !== undefined ? data.data : data,
     };
   } catch (err) {
-    const isTimeout = err.name === 'AbortError';
+    const isTimeout =
+      err.name === 'AbortError' ||
+      /abort|cancel|timeout/i.test(err.message || '');
+
+    // If request timed out while backend was waking up, retry once automatically
+    if (!options._isNetworkRetry && isTimeout) {
+      return await request(endpoint, {
+        ...options,
+        _isNetworkRetry: true,
+        timeout: 45000,
+      });
+    }
+
     return {
       success: false,
       status: 0,
-      error: isTimeout ? 'Request timed out. Please check your backend connection.' : (err.message || 'Network request failed'),
+      error: isTimeout
+        ? 'Server is waking up from sleep. Please try again in a few moments.'
+        : (err.message || 'Network request failed'),
       data: null,
     };
   } finally {
