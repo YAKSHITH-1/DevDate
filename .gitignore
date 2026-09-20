@@ -1,7 +1,6 @@
 # Node modules & dependencies
 node_modules/
 backend/node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
@@ -12,6 +11,8 @@ dist/
 web-build/
 
 # Native builds & caches
+/app/android/
+/app/ios/
 *.orig.*
 *.jks
 *.p8
@@ -46,7 +47,9 @@ yarn-error.log*
 .system_generated/
 
 # Local backup & scratch files
-assets/
+/assets/
+!app/assets/
+!app/assets/**
 Files/
 memory/
 BACKUP_CURRENT_STRUCTURE.txt

@@ -27,7 +27,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FAF6EB"
-      }
+      },
+      "package": "com.yakshith0505sorganization.devdate"
     },
     "web": {
       "favicon": "./assets/favicon.png"

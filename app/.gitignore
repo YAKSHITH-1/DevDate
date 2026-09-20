@@ -1,6 +1,5 @@
 # Node modules & dependencies
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 bun.lockb
@@ -11,6 +10,8 @@ dist/
 web-build/
 
 # Native builds & caches
+/android/
+/ios/
 *.orig.*
 *.jks
 *.p8
