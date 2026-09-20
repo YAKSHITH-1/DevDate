@@ -15,16 +15,14 @@ export const isOriginAllowed = (origin) => {
 
   const currentEnv = process.env.NODE_ENV || NODE_ENV;
 
-  // 2. In non-production environments (development & test), permit localhost,
-  // LAN private IP ranges (for physical mobile device testing), and Expo dev tools.
-  if (currentEnv !== "production") {
-    const isLocalOrLAN =
-      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
-      /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin);
+  // 2. Permit localhost, LAN private IP ranges (for physical mobile device testing), and Expo dev tools
+  const isLocalOrLAN =
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin) ||
+    /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/.test(origin) ||
+    /^https?:\/\/[a-z0-9-]+\.exp\.direct(:\d+)?$/.test(origin);
 
-    if (isLocalOrLAN) {
-      return true;
-    }
+  if (isLocalOrLAN) {
+    return true;
   }
 
   // 3. Normalize and check trusted production origins from environment configuration
