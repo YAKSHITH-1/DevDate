@@ -91,6 +91,6 @@ DevDate includes automated backend integration and regression tests covering aut
 ## Author
 
 **Yakshith V**
-**Shrikar V**
+**Shrikar **
 
 Portfolio: **https://yakshith.me**
